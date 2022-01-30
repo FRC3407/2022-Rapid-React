@@ -5,6 +5,7 @@ import edu.wpi.first.wpilibj.Timer;
 import frc.robot.commands.*;
 import frc.robot.modules.common.*;
 import frc.robot.modules.common.Input.*;
+import frc.robot.modules.common.EventTriggers.*;
 import frc.robot.modules.vision.java.VisionServer;
 
 import edu.wpi.first.wpilibj.DriverStation;
@@ -29,46 +30,42 @@ public class Runtime extends TimedRobot {
 	}
 
 
-
 	@Override public void robotInit() {
 		VisionServer.Get();
 
-		input.getCallback(Xbox.Digital.LB.value).whenPressed(VisionServer.getPipelineIncrementCommand());
-		input.getCallback(Xbox.Digital.RB.value).whenPressed(VisionServer.getPipelineDecrementCommand());
-		input.getCallback(Xbox.Digital.DT.value).whenPressed(VisionServer.getCameraIncrementCommand());
-		input.getCallback(Xbox.Digital.DB.value).whenPressed(VisionServer.getCameraDecrementCommand());
-		input.getCallback(Xbox.Digital.START.value).whenPressed(VisionServer.getPipelineToggleCommand());
-		input.getCallback(Xbox.Digital.BACK.value).whenPressed(VisionServer.getToggleStatisticsCommand());
+		Xbox.Digital.LB.getButton(input).whenPressed(VisionServer.getPipelineIncrementCommand());
+		Xbox.Digital.RB.getButton(input).whenPressed(VisionServer.getPipelineDecrementCommand());
+		Xbox.Digital.DT.getButton(input).whenPressed(VisionServer.getCameraIncrementCommand());
+		Xbox.Digital.DB.getButton(input).whenPressed(VisionServer.getCameraDecrementCommand());
+		Xbox.Digital.START.getButton(input).whenPressed(VisionServer.getPipelineToggleCommand());
+		Xbox.Digital.BACK.getButton(input).whenPressed(VisionServer.getToggleStatisticsCommand());
 
-		input.getCallback(Xbox.Digital.DR.value).whenPressed(new TestCommand("Dpad right"));
-		input.getCallback(Xbox.Digital.DL.value).whenPressed(new TestCommand("Dpad left"));
+		Xbox.Digital.DR.getButton(input).whenPressed(new TestCommand("Dpad right"));
+		Xbox.Digital.DL.getButton(input).whenPressed(new TestCommand("Dpad left"));
+
+		TeleopTrigger.Get().whenActive(this.drivebase.tankDrive(Xbox.Analog.LY.getCallback(input), Xbox.Analog.RY.getCallback(input)));
+		AutonomousTrigger.Get().whenActive(new CargoTurn(this.drivebase, DriverStation.getAlliance()));
 	}
-	@Override public void robotPeriodic() {
-		CommandScheduler.getInstance().run();
-	}
+	@Override public void robotPeriodic() { CommandScheduler.getInstance().run(); }
 
 	@Override public void disabledInit() {}
 	@Override public void disabledPeriodic() {}
 
-	@Override public void autonomousInit() {
-		//CommandScheduler.getInstance().cancelAll();		// only for non-competition
-		//Autonomous auto = new Autonomous(this.drivebase);
-		//CommandScheduler.getInstance().schedule(auto.withTimeout(3));
-		CommandScheduler.getInstance().schedule(new CargoTurn(this.drivebase, DriverStation.getAlliance()));
-		this.drivebase.tankDrive().cancel();
-	}
+	@Override public void autonomousInit() {}
 	@Override public void autonomousPeriodic() {
-		System.out.println(RapidReactVision.getClosestAllianceCargo(DriverStation.getAlliance()).lr);
+		//System.out.println(RapidReactVision.getClosestAllianceCargo(DriverStation.getAlliance()).lr);
 	}
 
-	@Override public void teleopInit() {
-		this.drivebase.tankDrive(()->this.input.getRawAxis(Xbox.Analog.LY.value), ()->this.input.getRawAxis(Xbox.Analog.RY.value)).schedule();
-	}
+	@Override public void teleopInit() {}
 	@Override public void teleopPeriodic() {}
+	@Override public void teleopExit() {
+		//this.drivebase.tankDrive().cancel();
+		this.drivebase.getDecelerateCommand().schedule();
+	}
 
 	@Override public void testInit() {
 		// Cancels all running commands at the start of test mode.
-		CommandScheduler.getInstance().cancelAll();
+		//CommandScheduler.getInstance().cancelAll();
 		this.timer.reset();
 		this.timer.start();
 	}
