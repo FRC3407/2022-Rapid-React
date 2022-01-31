@@ -14,5 +14,8 @@ public class Robot {
 	public static class Shooter extends SubsystemBase {
 		
 	}
+	public static class Climber extends SubsystemBase {
+		
+	}
 
 }
