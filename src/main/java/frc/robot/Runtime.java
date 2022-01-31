@@ -1,13 +1,15 @@
 package frc.robot;
 
-import edu.wpi.first.wpilibj.Timer;
-
 import frc.robot.commands.*;
 import frc.robot.modules.common.*;
 import frc.robot.modules.common.Input.*;
 import frc.robot.modules.common.EventTriggers.*;
+import frc.robot.modules.common.MotionTracking.*;
 import frc.robot.modules.vision.java.VisionServer;
 
+import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.interfaces.Gyro;
+import edu.wpi.first.wpilibj.BuiltInAccelerometer;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
@@ -19,11 +21,12 @@ public class Runtime extends TimedRobot {
 	private final InputDevice input = new InputDevice(0);
 	private final DriveBase drivebase = new DriveBase(Constants.drivebase_map, Constants.drivebase_settings);
 
-	private final Positions.LinearMotionIntegrator 
-		posX = new Positions.LinearMotionIntegrator(1, 0.1, 0.1), 
-		posY = new Positions.LinearMotionIntegrator(1, 0.005, 0.005);
+	private final LinearMotionIntegrator 
+		posX = new LinearMotionIntegrator(1, 0.1, 0.1), 
+		posY = new LinearMotionIntegrator(1, 0.005, 0.005);
 	private final Timer timer = new Timer();
-	private final Positions gyro = new Positions();
+	private final Gyro gyro = new ADIS16470_Gyro();
+	private final BuiltInAccelerometer acc = new BuiltInAccelerometer();
 
 	public Runtime() {
 		System.out.println("RUNTIME INITIALIZATION");
@@ -33,17 +36,17 @@ public class Runtime extends TimedRobot {
 	@Override public void robotInit() {
 		VisionServer.Get();
 
-		Xbox.Digital.LB.getButton(input).whenPressed(VisionServer.getPipelineIncrementCommand());
-		Xbox.Digital.RB.getButton(input).whenPressed(VisionServer.getPipelineDecrementCommand());
-		Xbox.Digital.DT.getButton(input).whenPressed(VisionServer.getCameraIncrementCommand());
-		Xbox.Digital.DB.getButton(input).whenPressed(VisionServer.getCameraDecrementCommand());
-		Xbox.Digital.START.getButton(input).whenPressed(VisionServer.getPipelineToggleCommand());
-		Xbox.Digital.BACK.getButton(input).whenPressed(VisionServer.getToggleStatisticsCommand());
+		Xbox.Digital.LB.getCallbackFrom(input).whenPressed(VisionServer.getPipelineIncrementCommand());
+		Xbox.Digital.RB.getCallbackFrom(input).whenPressed(VisionServer.getPipelineDecrementCommand());
+		Xbox.Digital.DT.getCallbackFrom(input).whenPressed(VisionServer.getCameraIncrementCommand());
+		Xbox.Digital.DB.getCallbackFrom(input).whenPressed(VisionServer.getCameraDecrementCommand());
+		Xbox.Digital.START.getCallbackFrom(input).whenPressed(VisionServer.getPipelineToggleCommand());
+		Xbox.Digital.BACK.getCallbackFrom(input).whenPressed(VisionServer.getToggleStatisticsCommand());
 
-		Xbox.Digital.DR.getButton(input).whenPressed(new TestCommand("Dpad right"));
-		Xbox.Digital.DL.getButton(input).whenPressed(new TestCommand("Dpad left"));
+		Xbox.Digital.DR.getCallbackFrom(input).whenPressed(new TestCommand("Dpad right"));
+		Xbox.Digital.DL.getCallbackFrom(input).whenPressed(new TestCommand("Dpad left"));
 
-		TeleopTrigger.Get().whenActive(this.drivebase.tankDrive(Xbox.Analog.LY.getCallback(input), Xbox.Analog.RY.getCallback(input)));
+		TeleopTrigger.Get().whenActive(this.drivebase.tankDrive(Xbox.Analog.LY.getSupplier(input), Xbox.Analog.RY.getSupplier(input)));
 		AutonomousTrigger.Get().whenActive(new CargoTurn(this.drivebase, DriverStation.getAlliance()));
 	}
 	@Override public void robotPeriodic() { CommandScheduler.getInstance().run(); }
@@ -70,8 +73,8 @@ public class Runtime extends TimedRobot {
 		this.timer.start();
 	}
 	@Override public void testPeriodic() {
-		//double x = this.input.getRawAxis(Xbox.Analog.LX.value), y = this.input.getRawAxis(Xbox.Analog.LY.value);
-		double x = this.gyro.getBuiltIn().getX()*9.81*3.2, y = this.gyro.getBuiltIn().getY()*9.81*3.2;
+		
+		double x = this.acc.getX()*9.81*3.2, y = this.acc.getY()*9.81*3.2;
 		if(Math.abs(x) > 0.05) {
 			this.posX.update(x, this.timer.get());
 		} else {
@@ -85,7 +88,7 @@ public class Runtime extends TimedRobot {
 		timer.reset();
 		timer.start();
 
-		System.out.println("Angle" + this.gyro.getIMU().getAngle());
+		//System.out.println("Angle" + this.gyro.getAngle());
 
 		NetworkTableInstance.getDefault().getTable("Motion").getSubTable("Velocity").getEntry("X").setNumber(this.posX.getVelocity());
 		NetworkTableInstance.getDefault().getTable("Motion").getSubTable("Velocity").getEntry("Y").setNumber(this.posY.getVelocity());
