@@ -55,6 +55,9 @@
       "Normal-Sized-1": {
         "open": true
       },
+      "Upper-Hub": {
+        "open": true
+      },
       "open": true
     },
     "Vision Server": {
@@ -76,6 +79,18 @@
       "open": true,
       "stats": {
         "open": true
+      }
+    }
+  },
+  "Plot": {
+    "Plot <0>": {
+      "plots": [
+        {
+          "height": 338
+        }
+      ],
+      "window": {
+        "visible": false
       }
     }
   }

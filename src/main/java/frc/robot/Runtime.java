@@ -19,14 +19,15 @@ import edu.wpi.first.networktables.NetworkTableInstance;
 public class Runtime extends TimedRobot {
 
 	private final InputDevice input = new InputDevice(0);
-	private final DriveBase drivebase = new DriveBase(Constants.drivebase_map, Constants.drivebase_settings);
+	private final DriveBase drivebase = new DriveBase(Constants.db_2019_map, Constants.drivebase_settings);
+	private final CargoTurn.Demo cargo_turn = new CargoTurn.Demo(this.drivebase, DriverStation.getAlliance());
 
-	private final LinearMotionIntegrator 
-		posX = new LinearMotionIntegrator(1, 0.1, 0.1), 
-		posY = new LinearMotionIntegrator(1, 0.005, 0.005);
-	private final Timer timer = new Timer();
-	private final Gyro gyro = new ADIS16470_Gyro();
-	private final BuiltInAccelerometer acc = new BuiltInAccelerometer();
+	//private final LinearMotionIntegrator 
+		//posX = new LinearMotionIntegrator(1, 0.1, 0.1), 
+		//posY = new LinearMotionIntegrator(1, 0.005, 0.005);
+	//private final Timer timer = new Timer();
+	//private final Gyro gyro = new ADIS16470();
+	//private final BuiltInAccelerometer acc = new BuiltInAccelerometer();
 
 	public Runtime() {
 		System.out.println("RUNTIME INITIALIZATION");
@@ -47,7 +48,13 @@ public class Runtime extends TimedRobot {
 		Xbox.Digital.DL.getCallbackFrom(input).whenPressed(new TestCommand("Dpad left"));
 
 		TeleopTrigger.Get().whenActive(this.drivebase.tankDrive(Xbox.Analog.LY.getSupplier(input), Xbox.Analog.RY.getSupplier(input)));
-		AutonomousTrigger.Get().whenActive(new CargoTurn(this.drivebase, DriverStation.getAlliance()));
+		//AutonomousTrigger.Get().whenActive(new CargoTurn(this.drivebase, DriverStation.getAlliance()));
+		AutonomousTrigger.Get().whenActive(new HubTurn(this.drivebase));
+		//AutonomousTrigger.Get().whenActive(new TestCommand.DriveBaseTest(this.drivebase, "Autonomous"));
+		//Xbox.Digital.X.getCallbackFrom(input).toggleWhenPressed(new CargoTurn.Demo(this.drivebase, DriverStation.getAlliance()));
+		//Xbox.Digital.Y.getCallbackFrom(input).toggleWhenPressed(new CargoFollow.Demo(this.drivebase, DriverStation.getAlliance()));
+		//Xbox.Digital.B.getCallbackFrom(input).toggleWhenPressed(new HubTurn(this.drivebase));
+		//Xbox.Digital.A.getCallbackFrom(input).toggleWhenPressed(this.cargo_turn);
 	}
 	@Override public void robotPeriodic() { CommandScheduler.getInstance().run(); }
 
@@ -55,46 +62,45 @@ public class Runtime extends TimedRobot {
 	@Override public void disabledPeriodic() {}
 
 	@Override public void autonomousInit() {}
-	@Override public void autonomousPeriodic() {
-		//System.out.println(RapidReactVision.getClosestAllianceCargo(DriverStation.getAlliance()).lr);
-	}
+	@Override public void autonomousPeriodic() {}
+	@Override public void autonomousExit() {}
 
 	@Override public void teleopInit() {}
 	@Override public void teleopPeriodic() {}
 	@Override public void teleopExit() {
 		//this.drivebase.tankDrive().cancel();
-		this.drivebase.getDecelerateCommand().schedule();
+		//this.drivebase.getDecelerateCommand().schedule();
 	}
 
-	@Override public void testInit() {
-		// Cancels all running commands at the start of test mode.
-		//CommandScheduler.getInstance().cancelAll();
-		this.timer.reset();
-		this.timer.start();
-	}
-	@Override public void testPeriodic() {
+	// @Override public void testInit() {
+	// 	// Cancels all running commands at the start of test mode.
+	// 	//CommandScheduler.getInstance().cancelAll();
+	// 	this.timer.reset();
+	// 	this.timer.start();
+	// }
+	// @Override public void testPeriodic() {
 		
-		double x = this.acc.getX()*9.81*3.2, y = this.acc.getY()*9.81*3.2;
-		if(Math.abs(x) > 0.05) {
-			this.posX.update(x, this.timer.get());
-		} else {
-			this.posX.update(0, this.timer.get());
-		}
-		if(Math.abs(y) > 0.05) {
-			this.posY.update(y, this.timer.get());
-		} else {
-			this.posY.update(0, this.timer.get());
-		}
-		timer.reset();
-		timer.start();
+	// 	double x = this.acc.getX()*9.81*3.2, y = this.acc.getY()*9.81*3.2;
+	// 	if(Math.abs(x) > 0.05) {
+	// 		this.posX.update(x, this.timer.get());
+	// 	} else {
+	// 		this.posX.update(0, this.timer.get());
+	// 	}
+	// 	if(Math.abs(y) > 0.05) {
+	// 		this.posY.update(y, this.timer.get());
+	// 	} else {
+	// 		this.posY.update(0, this.timer.get());
+	// 	}
+	// 	timer.reset();
+	// 	timer.start();
 
-		//System.out.println("Angle" + this.gyro.getAngle());
+	// 	//System.out.println("Angle" + this.gyro.getAngle());
 
-		NetworkTableInstance.getDefault().getTable("Motion").getSubTable("Velocity").getEntry("X").setNumber(this.posX.getVelocity());
-		NetworkTableInstance.getDefault().getTable("Motion").getSubTable("Velocity").getEntry("Y").setNumber(this.posY.getVelocity());
-		NetworkTableInstance.getDefault().getTable("Motion").getSubTable("Position").getEntry("X").setNumber(this.posX.getPosition());
-		NetworkTableInstance.getDefault().getTable("Motion").getSubTable("Position").getEntry("Y").setNumber(this.posY.getPosition());
-		NetworkTableInstance.getDefault().getTable("Motion").getEntry("Angle").setNumber(this.gyro.getAngle());
-	}
+	// 	NetworkTableInstance.getDefault().getTable("Motion").getSubTable("Velocity").getEntry("X").setNumber(this.posX.getVelocity());
+	// 	NetworkTableInstance.getDefault().getTable("Motion").getSubTable("Velocity").getEntry("Y").setNumber(this.posY.getVelocity());
+	// 	NetworkTableInstance.getDefault().getTable("Motion").getSubTable("Position").getEntry("X").setNumber(this.posX.getPosition());
+	// 	NetworkTableInstance.getDefault().getTable("Motion").getSubTable("Position").getEntry("Y").setNumber(this.posY.getPosition());
+	// 	NetworkTableInstance.getDefault().getTable("Motion").getEntry("Angle").setNumber(this.gyro.getAngle());
+	// }
 
 }
