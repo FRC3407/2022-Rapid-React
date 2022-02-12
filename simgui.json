@@ -29,6 +29,10 @@
       "/LiveWindow/DriveBase": "Subsystem",
       "/LiveWindow/Ungrouped/DifferentialDrive[1]": "DifferentialDrive",
       "/LiveWindow/Ungrouped/DifferentialDrive[2]": "DifferentialDrive",
+      "/LiveWindow/Ungrouped/PWMVictorSPX[0]": "Motor Controller",
+      "/LiveWindow/Ungrouped/PWMVictorSPX[1]": "Motor Controller",
+      "/LiveWindow/Ungrouped/PWMVictorSPX[2]": "Motor Controller",
+      "/LiveWindow/Ungrouped/PWMVictorSPX[3]": "Motor Controller",
       "/LiveWindow/Ungrouped/Scheduler": "Scheduler"
     }
   },
@@ -63,6 +67,9 @@
     "Vision Server": {
       "Cameras": {
         "MAIN": {
+          "open": true
+        },
+        "SECOND": {
           "open": true
         },
         "open": true

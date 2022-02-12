@@ -19,9 +19,13 @@ public class CargoTurn extends DriveBase.DriveCommandBase {
 	}
 
 	@Override public void initialize() {
+		// set correct camera
+		RapidReactVision.setCargoPipelineScaling(4);
+		VisionServer.Get().getCurrentCamera().applyPreset(Constants.cam_cargo_pipeline);
 		if(!RapidReactVision.verifyCargoPipelineActive()) {
-			System.out.println("CargoTurn: Failed to set UpperHub pipeline");
+			System.out.println("CargoTurn: Failed to set Cargo pipeline");
 			this.cancel();
+			return;
 		}
 	}
 	@Override public void execute() {
@@ -33,11 +37,11 @@ public class CargoTurn extends DriveBase.DriveCommandBase {
 		} else {
 			super.fromLast(Constants.uncertainty_continuation_percentage);	// % of what was last set (decelerating)
 			//super.autoDrive(0, 0);
-			System.out.println("Idling...");
+			System.out.println("CargoTurn: Idling...");
 		}
 	}
 	@Override public void end(boolean i) {
-		super.autoDrive(0, 0);
+		System.out.println("CargoTurn: Completed.");
 	}
 	@Override public boolean isFinished() {	// change threshold angle when testing >>
 		if(this.position != null) {
