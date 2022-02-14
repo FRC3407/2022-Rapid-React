@@ -1,5 +1,17 @@
 {
   "HALProvider": {
+    "Other Devices": {
+      "ADIS16470[0]": {
+        "header": {
+          "open": true
+        }
+      },
+      "BuiltInAccel": {
+        "header": {
+          "open": true
+        }
+      }
+    },
     "PWM Outputs": {
       "window": {
         "visible": true
@@ -17,6 +29,10 @@
       "/LiveWindow/DriveBase": "Subsystem",
       "/LiveWindow/Ungrouped/DifferentialDrive[1]": "DifferentialDrive",
       "/LiveWindow/Ungrouped/DifferentialDrive[2]": "DifferentialDrive",
+      "/LiveWindow/Ungrouped/PWMVictorSPX[0]": "Motor Controller",
+      "/LiveWindow/Ungrouped/PWMVictorSPX[1]": "Motor Controller",
+      "/LiveWindow/Ungrouped/PWMVictorSPX[2]": "Motor Controller",
+      "/LiveWindow/Ungrouped/PWMVictorSPX[3]": "Motor Controller",
       "/LiveWindow/Ungrouped/Scheduler": "Scheduler"
     }
   },
@@ -43,11 +59,17 @@
       "Normal-Sized-1": {
         "open": true
       },
+      "Upper-Hub": {
+        "open": true
+      },
       "open": true
     },
     "Vision Server": {
       "Cameras": {
         "MAIN": {
+          "open": true
+        },
+        "SECOND": {
           "open": true
         },
         "open": true
@@ -59,11 +81,26 @@
         "Cargo Pipeline": {
           "open": true
         },
+        "Upper-Hub Pipeline": {
+          "open": true
+        },
         "open": true
       },
       "open": true,
       "stats": {
         "open": true
+      }
+    }
+  },
+  "Plot": {
+    "Plot <0>": {
+      "plots": [
+        {
+          "height": 338
+        }
+      ],
+      "window": {
+        "visible": false
       }
     }
   }
