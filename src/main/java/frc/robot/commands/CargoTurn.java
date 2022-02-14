@@ -27,17 +27,18 @@ public class CargoTurn extends DriveBase.DriveCommandBase {
 			this.cancel();
 			return;
 		}
+		System.out.println("CargoTurn: Running...");
 	}
 	@Override public void execute() {
 		this.position = RapidReactVision.getClosestAllianceCargo(this.team);
 		if(this.position != null) {
 			//System.out.println("Turning???");
-			System.out.println(String.valueOf(this.position.lr));
+			//System.out.println(String.valueOf(this.position.lr));
 			super.autoTurn((this.position.lr / Constants.target_angle_range_lr) * Constants.auto_max_turn_speed);
 		} else {
 			super.fromLast(Constants.uncertainty_continuation_percentage);	// % of what was last set (decelerating)
 			//super.autoDrive(0, 0);
-			System.out.println("CargoTurn: Idling...");
+			//System.out.println("CargoTurn: Idling...");
 		}
 	}
 	@Override public void end(boolean i) {

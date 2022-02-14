@@ -19,9 +19,11 @@ public class RapidReactVision {
 
 	public static boolean verifyHubPipeline() {
 		if(!isHubPipelineValid()) {
+			//System.out.println("VerifyHubPipeline: pipeline not valid, updating...");
 			upperhub = vs.getPipeline("Upper-Hub Pipeline");
 			return isHubPipelineValid();
 		}
+		//System.out.println("VerifyHubPipeline: pipeline already valid");
 		return true;
 	}
 	public static boolean verifyCargoPipeline() {
@@ -106,9 +108,11 @@ public class RapidReactVision {
 		return false;
 	}
 	public static boolean setCargoPipelineActive() {
-		if(verifyHubPipeline()) {
+		if(verifyCargoPipeline()) {
+			//System.out.println("SetCargoPipelineActive: pipeline exists, attempting to set");
 			return vs.setPipeline(cargo.getIdx());
 		}
+		//System.out.println("SetCargoPipelineActive: pipeline nonexistant");
 		return false;
 	}
 	public static boolean verifyHubPipelineActive() {
@@ -121,8 +125,10 @@ public class RapidReactVision {
 	}
 	public static boolean verifyCargoPipelineActive() {
 		if(!isCargoPipelineActive()) {
+			//System.out.println("VerifyCargoPipelineActive: not active");
 			return setCargoPipelineActive();
 		}
+		//System.out.println("VerifyCargoPipelineActive: already active");
 		return true;
 	}
 
@@ -232,9 +238,9 @@ public class RapidReactVision {
 					return vs.getTargetDataIfMatching("Cargo-1r");
 				}
 			case Blue:
-			if(verifyRedCargo(false) && verifyBlueCargo(true)) {
-				return vs.getTargetDataIfMatching("Cargo-1b");
-			}
+				if(verifyRedCargo(false) && verifyBlueCargo(true)) {
+					return vs.getTargetDataIfMatching("Cargo-1b");
+				}
 			case Invalid:
 			default:
 				return vs.getTargetData();

@@ -27,6 +27,7 @@ public class CargoFollow extends DriveBase.DriveCommandBase {
 			this.cancel();
 			return;
 		}
+		System.out.println("CargoFollow: Running...");
 	}
 	@Override public void execute() {
 		this.position = RapidReactVision.getClosestAllianceCargo(this.team);
@@ -37,7 +38,7 @@ public class CargoFollow extends DriveBase.DriveCommandBase {
 		} else {
 			super.fromLast(Constants.uncertainty_continuation_percentage);	// 75% of what was last set (decelerating)
 			//super.autoDrive(0, 0);
-			System.out.println("CargoFollow: Idling...");
+			//System.out.println("CargoFollow: Idling...");
 		}
 	}
 	@Override public void end(boolean i) {
