@@ -12,6 +12,7 @@ import edu.wpi.first.wpilibj.interfaces.Gyro;
 import edu.wpi.first.wpilibj.BuiltInAccelerometer;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.TimedRobot;
+import edu.wpi.first.wpilibj2.command.CommandBase;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import edu.wpi.first.networktables.NetworkTableInstance;
 
@@ -34,8 +35,8 @@ public class Runtime extends TimedRobot {
 	}
 
 
+	@Override public void robotPeriodic() { CommandScheduler.getInstance().run(); }
 	@Override public void robotInit() {
-		VisionServer.Get();
 
 		Xbox.Digital.LB.getCallbackFrom(input).whenPressed(VisionServer.getPipelineIncrementCommand());
 		Xbox.Digital.RB.getCallbackFrom(input).whenPressed(VisionServer.getPipelineDecrementCommand());
@@ -44,19 +45,29 @@ public class Runtime extends TimedRobot {
 		Xbox.Digital.START.getCallbackFrom(input).whenPressed(VisionServer.getPipelineToggleCommand());
 		Xbox.Digital.BACK.getCallbackFrom(input).whenPressed(VisionServer.getToggleStatisticsCommand());
 
-		Xbox.Digital.DR.getCallbackFrom(input).whenPressed(new TestCommand("Dpad right"));
-		Xbox.Digital.DL.getCallbackFrom(input).whenPressed(new TestCommand("Dpad left"));
+		Xbox.Digital.DR.getCallbackFrom(input).whenPressed(new Test.Print("Dpad right"));
+		Xbox.Digital.DL.getCallbackFrom(input).whenPressed(new Test.Print("Dpad left"));
 
-		TeleopTrigger.Get().whenActive(this.drivebase.tankDrive(Xbox.Analog.LY.getSupplier(input), Xbox.Analog.RY.getSupplier(input)));
+		TeleopTrigger.Get().whenActive(
+			new SetCameras(Constants.cam_driving).andThen(
+				this.drivebase.tankDrive(Xbox.Analog.LY.getSupplier(input), Xbox.Analog.RY.getSupplier(input))
+			)
+		);
 		//AutonomousTrigger.Get().whenActive(new CargoTurn(this.drivebase, DriverStation.getAlliance()));
-		AutonomousTrigger.Get().whenActive(new HubTurn(this.drivebase));
+		//AutonomousTrigger.Get().whenActive(new HubTurn(this.drivebase));
 		//AutonomousTrigger.Get().whenActive(new TestCommand.DriveBaseTest(this.drivebase, "Autonomous"));
+		AutonomousTrigger.Get().whenActive(new Auto(this.drivebase));
 		//Xbox.Digital.X.getCallbackFrom(input).toggleWhenPressed(new CargoTurn.Demo(this.drivebase, DriverStation.getAlliance()));
 		//Xbox.Digital.Y.getCallbackFrom(input).toggleWhenPressed(new CargoFollow.Demo(this.drivebase, DriverStation.getAlliance()));
 		//Xbox.Digital.B.getCallbackFrom(input).toggleWhenPressed(new HubTurn(this.drivebase));
 		//Xbox.Digital.A.getCallbackFrom(input).toggleWhenPressed(this.cargo_turn);
+		Xbox.Digital.A.getCallbackFrom(input).whenPressed(
+			()->{
+				System.out.println("Current Pipeline: " + VisionServer.Get().getCurrentPipeline().getName());
+			}
+		);
+		// Xbox.Digital.B.getCallbackFrom(input).whenPressed(new TestCamera(Constants.cam_hub_pipeline));
 	}
-	@Override public void robotPeriodic() { CommandScheduler.getInstance().run(); }
 
 	@Override public void disabledInit() {}
 	@Override public void disabledPeriodic() {}
@@ -67,11 +78,7 @@ public class Runtime extends TimedRobot {
 
 	@Override public void teleopInit() {}
 	@Override public void teleopPeriodic() {}
-	@Override public void teleopExit() {
-		//this.drivebase.tankDrive().cancel();
-		//this.drivebase.getDecelerateCommand().schedule();
-	}
-
+	@Override public void teleopExit() {}
 	// @Override public void testInit() {
 	// 	// Cancels all running commands at the start of test mode.
 	// 	//CommandScheduler.getInstance().cancelAll();

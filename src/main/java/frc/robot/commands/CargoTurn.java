@@ -19,25 +19,30 @@ public class CargoTurn extends DriveBase.DriveCommandBase {
 	}
 
 	@Override public void initialize() {
+		// set correct camera
+		RapidReactVision.setCargoPipelineScaling(4);
+		VisionServer.Get().getCurrentCamera().applyPreset(Constants.cam_cargo_pipeline);
 		if(!RapidReactVision.verifyCargoPipelineActive()) {
-			System.out.println("CargoTurn: Failed to set UpperHub pipeline");
+			System.out.println("CargoTurn: Failed to set Cargo pipeline");
 			this.cancel();
+			return;
 		}
+		System.out.println("CargoTurn: Running...");
 	}
 	@Override public void execute() {
 		this.position = RapidReactVision.getClosestAllianceCargo(this.team);
 		if(this.position != null) {
 			//System.out.println("Turning???");
-			System.out.println(String.valueOf(this.position.lr));
+			//System.out.println(String.valueOf(this.position.lr));
 			super.autoTurn((this.position.lr / Constants.target_angle_range_lr) * Constants.auto_max_turn_speed);
 		} else {
 			super.fromLast(Constants.uncertainty_continuation_percentage);	// % of what was last set (decelerating)
 			//super.autoDrive(0, 0);
-			System.out.println("Idling...");
+			//System.out.println("CargoTurn: Idling...");
 		}
 	}
 	@Override public void end(boolean i) {
-		super.autoDrive(0, 0);
+		System.out.println("CargoTurn: Completed.");
 	}
 	@Override public boolean isFinished() {	// change threshold angle when testing >>
 		if(this.position != null) {

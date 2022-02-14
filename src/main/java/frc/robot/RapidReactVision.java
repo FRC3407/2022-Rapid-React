@@ -19,9 +19,11 @@ public class RapidReactVision {
 
 	public static boolean verifyHubPipeline() {
 		if(!isHubPipelineValid()) {
+			//System.out.println("VerifyHubPipeline: pipeline not valid, updating...");
 			upperhub = vs.getPipeline("Upper-Hub Pipeline");
 			return isHubPipelineValid();
 		}
+		//System.out.println("VerifyHubPipeline: pipeline already valid");
 		return true;
 	}
 	public static boolean verifyCargoPipeline() {
@@ -34,6 +36,23 @@ public class RapidReactVision {
 	public static boolean updatePipelines() {
 		return verifyHubPipeline() || verifyCargoPipeline();
 	}
+
+	// public static void applySettingsListener() {
+	// 	int p_handle = 0;
+	// 	final int c_handle = vs.cameras.addSubTableListener(
+	// 		(parent, name, table)->{
+	// 			vs.updateCameras();
+	// 			vs.getCamera(name).setExposure(20);
+	// 			vs.getCamera(name).setWhiteBalance(3000);
+	// 			vs.cameras.removeTableListener(c_handle);
+	// 		}, false
+	// 	);
+	// 	vs.pipelines.addSubTableListener(
+	// 		(parent, name, table)->{
+	// 			vs.updatePipelines();
+	// 		}, false
+	// 	);
+	// }
 
 // ADD NULLPTR SAFETY TO ALL OF THESE? ->>
 
@@ -82,26 +101,34 @@ public class RapidReactVision {
 	}
 	public static boolean setHubPipelineActive() {
 		if(verifyHubPipeline()) {
-			return vs.setPipeline(upperhub);
+			//System.out.println("SetHubPipelineActive: pipeline exists, attempting to set");
+			return vs.setPipeline(upperhub.getIdx());
 		}
+		//System.out.println("SetHubPipelineActive: pipeline nonexistant");
 		return false;
 	}
 	public static boolean setCargoPipelineActive() {
-		if(verifyHubPipeline()) {
-			return vs.setPipeline(cargo);
+		if(verifyCargoPipeline()) {
+			//System.out.println("SetCargoPipelineActive: pipeline exists, attempting to set");
+			return vs.setPipeline(cargo.getIdx());
 		}
+		//System.out.println("SetCargoPipelineActive: pipeline nonexistant");
 		return false;
 	}
 	public static boolean verifyHubPipelineActive() {
 		if(!isHubPipelineActive()) {
+			//System.out.println("VerifyHubPipelineActive: not active");
 			return setHubPipelineActive();
 		}
+		//System.out.println("VerifyHubPipelineActive: already active");
 		return true;
 	}
 	public static boolean verifyCargoPipelineActive() {
 		if(!isCargoPipelineActive()) {
+			//System.out.println("VerifyCargoPipelineActive: not active");
 			return setCargoPipelineActive();
 		}
+		//System.out.println("VerifyCargoPipelineActive: already active");
 		return true;
 	}
 
@@ -211,9 +238,9 @@ public class RapidReactVision {
 					return vs.getTargetDataIfMatching("Cargo-1r");
 				}
 			case Blue:
-			if(verifyRedCargo(false) && verifyBlueCargo(true)) {
-				return vs.getTargetDataIfMatching("Cargo-1b");
-			}
+				if(verifyRedCargo(false) && verifyBlueCargo(true)) {
+					return vs.getTargetDataIfMatching("Cargo-1b");
+				}
 			case Invalid:
 			default:
 				return vs.getTargetData();
