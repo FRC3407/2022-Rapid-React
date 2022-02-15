@@ -2,14 +2,19 @@ package frc.robot;
 
 import frc.robot.modules.common.Types.*;
 import frc.robot.modules.vision.java.VisionServer.*;
+
+import com.ctre.phoenix.motorcontrol.can.WPI_TalonSRX;
 import edu.wpi.first.wpilibj.motorcontrol.PWMVictorSPX;
+
 
 public final class Constants {
 
     //        descriptions >>  {fl fr bl br} {MotorController Instantiation}  {inversion settings}  {Drive layout}
-    public static final DB4 
-        drivebase_map = new DB4(3, 1, 2, 0, (int p)->new PWMVictorSPX(p), Inversions.LEFT, DriveLayout.DIFFERENTIAL),
-        db_2019_map = new DB4(6, 8, 9, 7, (int p)->new PWMVictorSPX(p), Inversions.RIGHT, DriveLayout.DIFFERENTIAL);
+    public static final DB4<PWMVictorSPX> 
+        drivebase_map = new DB4<>(3, 1, 2, 0, (int p)->new PWMVictorSPX(p), Inversions.LEFT, DriveLayout.DIFFERENTIAL),
+        drivebase_map_2019 = new DB4<>(6, 8, 9, 7, (int p)->new PWMVictorSPX(p), Inversions.RIGHT, DriveLayout.DIFFERENTIAL);
+	public static final DB4<WPI_TalonSRX>
+		drivebase_map_cl = new DB4<>(0, 1, 2, 3, (int p)->new WPI_TalonSRX(p), Inversions.NEITHER, DriveLayout.DIFFERENTIAL);
     public static final DBS 
         drivebase_settings = new DBS(Deceleration._98, true);
 
@@ -43,7 +48,11 @@ public final class Constants {
 		max_velocity = 3.0,					// max velocity of drivebase in meters/second
 		max_acceleration = 3.0,				// max acceleration of drivebase in meters/second^2
 		ramsete_B = 2.0,
-		ramsete_Zeta = 0.7;					// constants for ramsete command -> recommended in WPILib docs
+		ramsete_Zeta = 0.7,					// constants for ramsete command -> recommended in WPILib docs
+
+		drivewheel_circumfrance_meters = 0.1524,	// used for finding distances with the encoders
+		srx_mag_units_per_revolution = 4096,	// self explainatory (12 bit precision)
+		srx_mag_rawunits_to_meters = drivewheel_circumfrance_meters / srx_mag_units_per_revolution;
 
 
 	public static final CameraPreset
