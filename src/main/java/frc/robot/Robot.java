@@ -69,7 +69,7 @@ public class Robot {
 
 
 	}
-	public static class Shooter extends SubsystemBase {
+	public static class Shooter extends SubsystemBase {		// add a way to invert
 		
 		private final WPI_TalonFX
             main, secondary;
@@ -87,18 +87,44 @@ public class Robot {
             this.secondary.configFactoryDefault();
             this.main.configSelectedFeedbackSensor(TalonFXFeedbackDevice.IntegratedSensor, 0, 0);
             this.secondary.follow(this.main);
+            this.secondary.setInverted(InvertType.FollowMaster);
 		}
 
 		public void setPercentage(double p) {
 			this.main.set(ControlMode.PercentOutput, p);
 		}
-		public void setVelocity(double v) {
+		public void setVelocity(double v) {		// input velocity is currently in raw units per 100 ms
 			this.main.set(ControlMode.Velocity, v);
 		}
+        public double getRawPosition() {	// in raw encoder units (see Constants.falcon_encoder_units_per_revolution)
+            return this.main.getSelectedSensorPosition();
+        }
+        public double getRawVelocity() {	// in raw units per 100 ms
+            return this.main.getSelectedSensorVelocity();
+        }
+        public double getVelocity() {	// in meters per second
+            return this.getRawVelocity() * 
+                (Constants.shooter_wheel_diameter_meters * Math.PI / Constants.falcon_encoder_units_per_revolution) * 10;
+        }
+
 
 	}
 	public static class Climber extends SubsystemBase {
 		
 	}
 
+
 }
+
+/* POSSIBLE (high level) CONTROL COMMANDS TO AIM TOWARDS SUPPORTING
+ - "Shoot" -> sets shooter to correct speed, feeds ball, then shifts secondary ball into position for another shot
+ - "ShootVision" -> ^^^ but with calculated speed based on distance found from vision target
+ - "Intake" -> spin up intake and possibly end the command when a ball is collected (prerequisite of having space for cargo)
+ - "Climb" -> execute a full climbing action (prerequisite of being in position)
+
+~~~~~~
+Things to add: 
+- ball management system for keeping track of position -> theoretically the only commands needed then would be those to intake and shoot, 
+... the transfer system would be completely autonomous and self-contained
+
+*/

@@ -1,6 +1,6 @@
 package frc.robot.commands;
 
-import frc.robot.modules.common.DriveBase;
+import frc.robot.modules.common.drive.DriveBase;
 
 
 public class BasicAutoDrive extends DriveBase.DriveCommandBase {
