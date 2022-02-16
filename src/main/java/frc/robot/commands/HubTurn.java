@@ -1,6 +1,6 @@
 package frc.robot.commands;
 
-import frc.robot.modules.common.DriveBase;
+import frc.robot.modules.common.drive.DriveBase;
 import frc.robot.modules.vision.java.VisionServer;
 import frc.robot.Constants;
 import frc.robot.RapidReactVision;
@@ -8,6 +8,7 @@ import frc.robot.RapidReactVision;
 
 public class HubTurn extends DriveBase.DriveCommandBase {
 
+	private boolean failed = false;
 	private VisionServer.TargetData position;
 
 	public HubTurn(DriveBase db) {
@@ -15,11 +16,10 @@ public class HubTurn extends DriveBase.DriveCommandBase {
 	}
 
 	@Override public void initialize() {
-		// set correct camera
-		VisionServer.Get().getCurrentCamera().applyPreset(Constants.cam_hub_pipeline);
+		VisionServer.Get().applyCameraPreset(Constants.cam_hub_pipeline);
 		if(!RapidReactVision.verifyHubPipelineActive()) {
 			System.out.println("HubTurn: Failed to set UpperHub pipeline");
-			this.cancel();
+			this.failed = true;
 			return;
 		}
 		System.out.println("HubTurn: Running...");
@@ -30,17 +30,16 @@ public class HubTurn extends DriveBase.DriveCommandBase {
 			super.autoTurn((this.position.lr / Constants.target_angle_range_lr) * Constants.auto_max_turn_speed);
 		} else {
 			super.fromLast(Constants.uncertainty_continuation_percentage);
-			//System.out.println("HubTurn: Idling...");
 		}
 	}
 	@Override public void end(boolean i) {
-		System.out.println("HubTurn: Completed.");
+		System.out.println(this.failed ? "HubTurn: Terminated." : "HubTurn: Completed.");
 	}
 	@Override public boolean isFinished() {
 		if(this.position != null) {
 			return Math.abs(this.position.lr) < Constants.turn_thresh;
 		}
-		return false;
+		return this.failed;
 	}
 
 

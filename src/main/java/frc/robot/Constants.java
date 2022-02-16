@@ -1,6 +1,6 @@
 package frc.robot;
 
-import frc.robot.modules.common.Types.*;
+import frc.robot.modules.common.drive.Types.*;
 import frc.robot.modules.vision.java.VisionServer.*;
 
 import com.ctre.phoenix.motorcontrol.can.WPI_TalonSRX;
@@ -10,13 +10,11 @@ import edu.wpi.first.wpilibj.motorcontrol.PWMVictorSPX;
 public final class Constants {
 
     //        descriptions >>  {fl fr bl br} {MotorController Instantiation}  {inversion settings}  {Drive layout}
-    public static final DB4<PWMVictorSPX> 
-        drivebase_map = new DB4<>(3, 1, 2, 0, (int p)->new PWMVictorSPX(p), Inversions.LEFT, DriveLayout.DIFFERENTIAL),
-        drivebase_map_2019 = new DB4<>(6, 8, 9, 7, (int p)->new PWMVictorSPX(p), Inversions.RIGHT, DriveLayout.DIFFERENTIAL);
-	public static final DB4<WPI_TalonSRX>
-		drivebase_map_cl = new DB4<>(0, 1, 2, 3, (int p)->new WPI_TalonSRX(p), Inversions.NEITHER, DriveLayout.DIFFERENTIAL);
-    public static final DBS 
-        drivebase_settings = new DBS(Deceleration._98, true);
+    public static final DriveMap_4<PWMVictorSPX> 
+        drivebase_map = new DriveMap_4<>(3, 1, 2, 0, (int p)->new PWMVictorSPX(p), Inversions.LEFT, DriveLayout.DIFFERENTIAL),
+        drivebase_map_2019 = new DriveMap_4<>(6, 8, 9, 7, (int p)->new PWMVictorSPX(p), Inversions.RIGHT, DriveLayout.DIFFERENTIAL);
+	public static final DriveMap_4<WPI_TalonSRX>
+		drivebase_map_cl = new DriveMap_4<>(0, 1, 2, 3, (int p)->new WPI_TalonSRX(p), Inversions.NEITHER, DriveLayout.DIFFERENTIAL);
 
 	public static final int 
 		intake_port = -1,		// port for intake motor
@@ -50,9 +48,13 @@ public final class Constants {
 		ramsete_B = 2.0,
 		ramsete_Zeta = 0.7,					// constants for ramsete command -> recommended in WPILib docs
 
-		drivewheel_circumfrance_meters = 0.1524,	// used for finding distances with the encoders
-		srx_mag_units_per_revolution = 4096,	// self explainatory (12 bit precision)
-		srx_mag_rawunits_to_meters = drivewheel_circumfrance_meters / srx_mag_units_per_revolution;
+		drivewheel_diameter_meters = 0.1524,		// used for finding distances with the encoders (6 inches converted to meters)
+		srx_mag_units_per_revolution = 4096,		// self explainatory (12 bit precision)
+		srx_mag_rawunits_to_meters = drivewheel_diameter_meters * Math.PI / srx_mag_units_per_revolution,
+
+// Additional subsystem physical/electrical config
+		shooter_wheel_diameter_meters = 0.2032,			// currently 8 inches, may change to 6
+		falcon_encoder_units_per_revolution = 2048;		// self explainatory (11 bit precision)
 
 
 	public static final CameraPreset
