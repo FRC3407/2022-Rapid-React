@@ -1,7 +1,7 @@
 package frc.robot;
 
-import frc.robot.modules.common.DriveBase;
-import frc.robot.modules.common.Types.*;
+import frc.robot.modules.common.drive.DriveBase;
+import frc.robot.modules.common.drive.Types.*;
 
 import edu.wpi.first.math.kinematics.DifferentialDriveOdometry;
 import edu.wpi.first.math.kinematics.DifferentialDriveWheelSpeeds;
@@ -32,8 +32,8 @@ public class CLDifferentialBase extends DriveBase {	// not completely safe yet a
 	private final DifferentialDriveOdometry 
 		odometry;
 
-	public CLDifferentialBase(DB2<WPI_TalonSRX> map, DBS s) {
-		super(map, s);
+	public CLDifferentialBase(DriveMap_2<WPI_TalonSRX> map) {
+		super(map);
 
 		this.left = map.left;
 		this.right = map.right;
@@ -44,8 +44,8 @@ public class CLDifferentialBase extends DriveBase {	// not completely safe yet a
 
 		this.odometry = new DifferentialDriveOdometry(this.gyro.getRotation2d());
 	}
-	public CLDifferentialBase(DB4<WPI_TalonSRX> map, DBS s) {
-		super(map, s);
+	public CLDifferentialBase(DriveMap_4<WPI_TalonSRX> map) {
+		super(map);
 
 		this.left = map.front_left;
 		this.right = map.front_right;
@@ -53,10 +53,10 @@ public class CLDifferentialBase extends DriveBase {	// not completely safe yet a
 		configDefault(this.left, this.right, map.back_left, map.back_right);
 		this.left.configSelectedFeedbackSensor(FeedbackDevice.CTRE_MagEncoder_Relative);
 		this.right.configSelectedFeedbackSensor(FeedbackDevice.CTRE_MagEncoder_Relative);
-		map.back_left.setInverted(InvertType.FollowMaster);
-		map.back_right.setInverted(InvertType.FollowMaster);
 		map.back_left.follow(this.left);
 		map.back_right.follow(this.right);
+		map.back_left.setInverted(InvertType.FollowMaster);
+		map.back_right.setInverted(InvertType.FollowMaster);
 
 		this.odometry = new DifferentialDriveOdometry(this.gyro.getRotation2d());
 	}
