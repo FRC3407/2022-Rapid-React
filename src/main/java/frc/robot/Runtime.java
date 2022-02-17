@@ -4,6 +4,7 @@ import frc.robot.commands.*;
 import frc.robot.modules.common.*;
 import frc.robot.modules.common.Input.*;
 import frc.robot.modules.common.drive.DriveBase;
+import frc.robot.modules.common.drive.*;
 import frc.robot.modules.common.EventTriggers.*;
 import frc.robot.modules.vision.java.*;
 
@@ -22,12 +23,13 @@ import edu.wpi.first.networktables.NetworkTableInstance;
  - Commands for CLDifferential -> Ramsete controller (characterization first)
  - Update C++ VisionServer-Robot API (actually already safe because of the use of LANGUAGE SUPPORT FOR UNSIGNED ~> smh java :| )
  - Methods/impelemtation to search DriverStation for a certain input (common.Input.InputDevice) and return object/port
+ - max output/scaling method for drivebase
 */
 
 public class Runtime extends TimedRobot {
 
 	private final InputDevice input = new InputDevice(0);
-	private final DriveBase drivebase = new DriveBase(Constants.drivebase_map_2019);
+	private final DriveBase drivebase = new DriveBase(Constants.drivebase_map);
 
 	public Runtime() {
 		System.out.println("RUNTIME INITIALIZATION");
@@ -44,7 +46,7 @@ public class Runtime extends TimedRobot {
 		Xbox.Digital.START.getCallbackFrom(input).whenPressed(VisionSubsystem.getProcessingToggleCommand());
 		Xbox.Digital.BACK.getCallbackFrom(input).whenPressed(VisionSubsystem.getToggleStatisticsCommand());
 		Xbox.Digital.A.getCallbackFrom(input).whenPressed(
-			()->{ System.out.println("Current Pipeline: " + VisionServer.Get().getCurrentPipeline().getName()); }
+			()->System.out.println("Current Pipeline: " + VisionServer.Get().getCurrentPipeline().getName())
 		);
 
 		AutonomousTrigger.Get().whenActive(
@@ -55,9 +57,23 @@ public class Runtime extends TimedRobot {
 				new LambdaCommand(()->VisionServer.Get().setStatistics(false)),
 				new LambdaCommand(()->VisionServer.Get().applyCameraPreset(Constants.cam_driving)),
 				new LambdaCommand(()->VisionServer.Get().setProcessingEnabled(false)),
-				this.drivebase.tankDrive(Xbox.Analog.LY.getSupplier(input), Xbox.Analog.RY.getSupplier(input))
+				// this.drivebase.tankDrive(
+				// 	Xbox.Analog.LY.getSupplier(input), 
+				// 	Xbox.Analog.RY.getSupplier(input)
+				// )
+				this.drivebase.modeDrive(	// <<- fix buttons triggering too many times
+					Xbox.Analog.LX.getSupplier(input),
+					Xbox.Analog.LY.getSupplier(input),
+					Xbox.Analog.LT.getSupplier(input),
+					Xbox.Analog.RX.getSupplier(input),
+					Xbox.Analog.RY.getSupplier(input),
+					Xbox.Analog.RT.getSupplier(input),
+					Xbox.Digital.RB.getPressedSupplier(input),
+					Xbox.Digital.LB.getPressedSupplier(input)
+				)
 			)
 		);
+		//TestTrigger.Get().whenActive(null);
 
 	}
 
