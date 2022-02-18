@@ -14,6 +14,9 @@ import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
 import edu.wpi.first.networktables.NetworkTableInstance;
 
+// import frc.robot.modules.common.drive.Types.*;
+// import edu.wpi.first.wpilibj.motorcontrol.PWMVictorSPX;
+
 
 /* TODO:
  x Split VisionServer into base and an extension that integrates command-based structure (this would extend SubsystemBase)
@@ -33,6 +36,10 @@ public class Runtime extends TimedRobot {
 
 	public Runtime() {
 		System.out.println("RUNTIME INITIALIZATION");
+
+		this.drivebase.setSpeedScaling(Constants.teleop_drivebase_scaling);
+		this.drivebase.setSpeedDeadband(Constants.teleop_drivebase_deadband);
+		this.drivebase.setSpeedSquaring(Constants.teleop_drivebase_speed_squaring);
 	}
 
 
