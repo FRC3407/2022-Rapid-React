@@ -1,7 +1,0 @@
-[submodule "src/main/java/frc/robot/modules/vision"]
-	path = src/main/java/frc/robot/modules/vision
-	url = https://github.com/S1ink/VisionServer-Robot/
-
-[submodule "src/main/java/frc/robot/modules/common"]
-	path = src/main/java/frc/robot/modules/common
-	url = https://github.com/S1ink/FRC-Java-Modules/

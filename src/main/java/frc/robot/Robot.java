@@ -1,130 +1,87 @@
+// Copyright (c) FIRST and other WPILib contributors.
+// Open Source Software; you can modify and/or share it under the terms of
+// the WPILib BSD license file in the root directory of this project.
+
 package frc.robot;
 
-import edu.wpi.first.wpilibj.Encoder;
-import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import edu.wpi.first.wpilibj.Joystick;
+import edu.wpi.first.wpilibj.TimedRobot;
+import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.drive.DifferentialDrive;
 import edu.wpi.first.wpilibj.motorcontrol.MotorControllerGroup;
 import edu.wpi.first.wpilibj.motorcontrol.PWMVictorSPX;
+import com.ctre.phoenix.motorcontrol.can.WPI_TalonSRX;
 
-//import com.ctre.phoenix.motorcontrol.ControlMode;
-import com.ctre.phoenix.motorcontrol.*;
-import com.ctre.phoenix.motorcontrol.can.*;
+/**
+ * The VM is configured to automatically run this class, and to call the functions corresponding to
+ * each mode, as described in the TimedRobot documentation. If you change the name of this class or
+ * the package after creating this project, you must also update the manifest file in the resource
+ * directory.
+ */
+public class Robot extends TimedRobot {
+  private final WPI_TalonSRX m_leftfrontDrive = new WPI_TalonSRX(0);
+  private final WPI_TalonSRX m_rightfrontDrive = new WPI_TalonSRX(3);
+  private final WPI_TalonSRX m_leftbackDrive = new WPI_TalonSRX(1);
+  private final WPI_TalonSRX m_rightbackDrive = new WPI_TalonSRX(2);
+  //private final PWMVictorSPX m_leftfrontDrive = new PWMVictorSPX(0);
+  //private final PWMVictorSPX m_rightfrontDrive = new PWMVictorSPX(3);
+  //private final PWMVictorSPX m_leftbackDrive = new PWMVictorSPX(1);
+  //private final PWMVictorSPX m_rightbackDrive = new PWMVictorSPX(2);
+  //private final PWMVictorSPX ballShooter = new PWMVictorSPX(4);
+  private final MotorControllerGroup left_side = new MotorControllerGroup(m_leftfrontDrive, m_leftbackDrive);
+  private final MotorControllerGroup right_side = new MotorControllerGroup(m_rightfrontDrive, m_rightbackDrive);
+  private final DifferentialDrive m_robotDrive = new DifferentialDrive(left_side, right_side);
+  private final Joystick m_stick = new Joystick(0);
+  private final Timer m_timer = new Timer();
 
+  /**
+   * This function is run when the robot is first started up and should be used for any
+   * initialization code.
+   */
+  @Override
+  public void robotInit() {
+    // We need to invert one side of the drivetrain so that positive voltages
+    // result in both sides moving forward. Depending on how your robot's
+    // gearbox is constructed, you might have to invert the left side instead.
+    right_side.setInverted(true);
+  }
 
-public class Robot {
+  /** This function is run once each time the robot enters autonomous mode. */
+  @Override
+  public void autonomousInit() {
+    m_timer.reset();
+    m_timer.start();
+  }
 
-    private final Intake intake = null;
-    private final Transfer transfer = null;
-    private final Shooter shooter = null;
-	
-	public static class Intake extends SubsystemBase {
-		
-        private final PWMVictorSPX 
-            motor;
+  /** This function is called periodically during autonomous. */
+  // At 0.5 speed it went 3 tiles at 1 sec, 5.25 tiles at 2 secs, and 7.555 tiles at 3 secs
+  // At 0.5 speed .375 secs = 45 degrees, .75=90 degrees, 1.5 secs=180 degrees
+  @Override
+  public void autonomousPeriodic() {
+    // Drive for 3 seconds
+    if (m_timer.get() < 5) {
+      m_robotDrive.arcadeDrive(0.5, 0.0); // drive forwards half speed
+      //ballShooter.set(0.5);//shoot ball
+    } else {
+      m_robotDrive.stopMotor(); // stop robot
+    }
+  }
 
-        public Intake(int p) {
-            this.motor = new PWMVictorSPX(p);
-        }
+  /** This function is called once each time the robot enters teleoperated mode. */
+  @Override
+  public void teleopInit() {}
 
-        public void set(double s) {
-            this.motor.set(s);
-        }
-        public void setVoltage(double v) {
-            this.motor.setVoltage(v);
-        }
+  /** This function is called periodically during teleoperated mode. */
+  @Override
+  public void teleopPeriodic() {
+    m_robotDrive.arcadeDrive(m_stick.getY(), m_stick.getX());
+  }
 
+  /** This function is called once each time the robot enters test mode. */
+  @Override
+  public void testInit() {}
 
-	}
-	public static class Transfer extends SubsystemBase {
-        
-        private final PWMVictorSPX feed;
-        private final MotorControllerGroup primary;
-
-        public Transfer(int feedp, int... ports) {
-            this.feed = new PWMVictorSPX(feedp);
-            PWMVictorSPX[] motors = new PWMVictorSPX[ports.length];
-            for(int i = 0; i < ports.length; i++) {
-                motors[i] = new PWMVictorSPX(ports[i]);
-            }
-            this.primary = new MotorControllerGroup(motors);
-        }
-
-        public void setFeed(double s) {
-            this.feed.set(s);
-        }
-        public void setFeedVoltage(double s) {
-            this.feed.setVoltage(s);
-        }
-        public void stopFeed() {
-            this.feed.stopMotor();
-        }
-        public void setPrimary(double s) {
-            this.primary.set(s);
-        }
-        public void setPrimaryVoltage(double s) {
-            this.primary.set(s);
-        }
-        public void stopPrimary() {
-            this.primary.stopMotor();
-        }
-
-
-	}
-	public static class Shooter extends SubsystemBase {		// add a way to invert
-		
-		private final WPI_TalonFX
-            main, secondary;
-
-		public Shooter(int i) {
-            this.main = new WPI_TalonFX(i);
-			this.secondary = null;
-            this.main.configFactoryDefault();
-            this.main.configSelectedFeedbackSensor(TalonFXFeedbackDevice.IntegratedSensor, 0, 0);
-		}
-		public Shooter(int i_m, int i_s) {
-            this.main = new WPI_TalonFX(i_m);
-            this.secondary = new WPI_TalonFX(i_s);
-            this.main.configFactoryDefault();
-            this.secondary.configFactoryDefault();
-            this.main.configSelectedFeedbackSensor(TalonFXFeedbackDevice.IntegratedSensor, 0, 0);
-            this.secondary.follow(this.main);
-            this.secondary.setInverted(InvertType.FollowMaster);
-		}
-
-		public void setPercentage(double p) {
-			this.main.set(ControlMode.PercentOutput, p);
-		}
-		public void setVelocity(double v) {		// input velocity is currently in raw units per 100 ms
-			this.main.set(ControlMode.Velocity, v);
-		}
-        public double getRawPosition() {	// in raw encoder units (see Constants.falcon_encoder_units_per_revolution)
-            return this.main.getSelectedSensorPosition();
-        }
-        public double getRawVelocity() {	// in raw units per 100 ms
-            return this.main.getSelectedSensorVelocity();
-        }
-        public double getVelocity() {	// in meters per second
-            return this.getRawVelocity() * 
-                (Constants.shooter_wheel_diameter_meters * Math.PI / Constants.falcon_encoder_units_per_revolution) * 10;
-        }
-
-
-	}
-	public static class Climber extends SubsystemBase {
-		
-	}
-
-
+  /** This function is called periodically during test mode. */
+  @Override
+  public void testPeriodic() {}
 }
-
-/* POSSIBLE (high level) CONTROL COMMANDS TO AIM TOWARDS SUPPORTING
- - "Shoot" -> sets shooter to correct speed, feeds ball, then shifts secondary ball into position for another shot
- - "ShootVision" -> ^^^ but with calculated speed based on distance found from vision target
- - "Intake" -> spin up intake and possibly end the command when a ball is collected (prerequisite of having space for cargo)
- - "Climb" -> execute a full climbing action (prerequisite of being in position)
-
-~~~~~~
-Things to add: 
-- ball management system for keeping track of position -> theoretically the only commands needed then would be those to intake and shoot, 
-... the transfer system would be completely autonomous and self-contained
-
-*/
