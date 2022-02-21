@@ -11,13 +11,13 @@ public final class Constants {
 
     //        descriptions >>  {fl fr bl br} {MotorController Instantiation}  {inversion settings}  {Drive layout}
     public static final DriveMap_4<PWMVictorSPX> 
-        drivebase_map = new DriveMap_4<>(3, 1, 2, 0, (int p)->new PWMVictorSPX(p), Inversions.LEFT, DriveLayout.DIFFERENTIAL),
+        drivebase_map_testbot = new DriveMap_4<>(3, 1, 2, 0, (int p)->new PWMVictorSPX(p), Inversions.RIGHT, DriveLayout.DIFFERENTIAL),
         drivebase_map_2019 = new DriveMap_4<>(6, 8, 9, 7, (int p)->new PWMVictorSPX(p), Inversions.RIGHT, DriveLayout.DIFFERENTIAL);
 	public static final DriveMap_4<WPI_TalonSRX>
-		drivebase_map_cl = new DriveMap_4<>(0, 1, 2, 3, (int p)->new WPI_TalonSRX(p), Inversions.NEITHER, DriveLayout.DIFFERENTIAL);
+		drivebase_map_2022 = new DriveMap_4<>(0, 3, 1, 2, (int p)->new WPI_TalonSRX(p), Inversions.RIGHT, DriveLayout.DIFFERENTIAL);
 
 	public static final int 
-		intake_port = -1,		// port for intake motor
+		intake_port = 4,		// port for intake motor
 		feed_port = -1,			// port for transfer system feed motor
 		shooter_port = -1;		// port for shooter motor (can id for falcon)
 	public static final int[]
@@ -37,6 +37,9 @@ public final class Constants {
 		auto_max_forward_speed = 0.4,	// maximum speed when driving forward during auto
 		motors_thresh_tozero = 0.1,		// the point where it is safe to go straight to zero (deceleration)
 
+		teleop_drivebase_scaling = -0.5,
+		teleop_drivebase_deadband = 0.05,
+
 // DriveBase closed-loop params
 		kS_voltage = 0.0,					// voltage to overcome static friction -> from SysID characterization
 		kV_volt_seconds_per_meter = 0.0,	// voltage for each meter/second of velocity -> from SysID characterization
@@ -55,6 +58,9 @@ public final class Constants {
 // Additional subsystem physical/electrical config
 		shooter_wheel_diameter_meters = 0.2032,			// currently 8 inches, may change to 6
 		falcon_encoder_units_per_revolution = 2048;		// self explainatory (11 bit precision)
+
+	public static final boolean 
+		teleop_drivebase_speed_squaring = false;
 
 
 	public static final CameraPreset
