@@ -11,17 +11,20 @@ public final class Constants {
 
     //        descriptions >>  {fl fr bl br} {MotorController Instantiation}  {inversion settings}  {Drive layout}
     public static final DriveMap_4<PWMVictorSPX> 
-        drivebase_map_testbot = new DriveMap_4<>(3, 1, 2, 0, (int p)->new PWMVictorSPX(p), Inversions.RIGHT, DriveLayout.DIFFERENTIAL),
-        drivebase_map_2019 = new DriveMap_4<>(6, 8, 9, 7, (int p)->new PWMVictorSPX(p), Inversions.RIGHT, DriveLayout.DIFFERENTIAL);
+        drivebase_map_testbot = new DriveMap_4<>(3, 1, 2, 0, (int p)->new PWMVictorSPX(p), Inversions.RIGHT, DriveLayout.DIFFERENTIAL)/*,
+        drivebase_map_2019 = new DriveMap_4<>(6, 8, 9, 7, (int p)->new PWMVictorSPX(p), Inversions.RIGHT, DriveLayout.DIFFERENTIAL)*/;
 	public static final DriveMap_4<WPI_TalonSRX>
 		drivebase_map_2022 = new DriveMap_4<>(0, 3, 1, 2, (int p)->new WPI_TalonSRX(p), Inversions.RIGHT, DriveLayout.DIFFERENTIAL);
 
 	public static final int 
 		intake_port = 4,		// port for intake motor
-		feed_port = -1,			// port for transfer system feed motor
-		shooter_port = -1;		// port for shooter motor (can id for falcon)
+		feed_port = 6,			// port for transfer system feed motor
+		shooter_canid = 4,		// port for shooter motor (can id for falcon)
+		lim_entering_dio = 0,
+		lim_exiting_dio = 1;
+
 	public static final int[]
-		transfer_ports = {-1};	// ports for all additional motors in transfer system (all controlled together)
+		transfer_ports = {5};	// ports for all additional motors in transfer system (all controlled together)
 
 
 	public static final double 
@@ -39,6 +42,9 @@ public final class Constants {
 
 		teleop_drivebase_scaling = -0.5,
 		teleop_drivebase_deadband = 0.05,
+		intake_speed = 0.5,
+		transfer_speed = 0.5,
+		feed_speed = 0.2,
 
 // DriveBase closed-loop params
 		kS_voltage = 0.0,					// voltage to overcome static friction -> from SysID characterization

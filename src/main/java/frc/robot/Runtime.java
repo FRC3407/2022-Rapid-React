@@ -37,7 +37,15 @@ public class Runtime extends TimedRobot {
 
 	private final InputDevice input = new InputDevice(0);
 	private final DriveBase drivebase = new DriveBase(Constants.drivebase_map_testbot);
-	private final Robot.Intake intake = new Robot.Intake(Constants.intake_port);
+	//private final Robot.Intake intake = new Robot.Intake(Constants.intake_port);
+	private final BallManagement ballsystem = new BallManagement(
+		Constants.intake_port,
+		Constants.feed_port,
+		Constants.shooter_canid,
+		Constants.lim_entering_dio,
+		Constants.lim_exiting_dio,
+		Constants.transfer_ports
+	);
 
 	public Runtime() {
 		System.out.println("RUNTIME INITIALIZATION");
@@ -57,14 +65,22 @@ public class Runtime extends TimedRobot {
 		Xbox.Digital.DR.getCallbackFrom(input).whenPressed(VisionSubsystem.IncrementCamera.Get());
 		Xbox.Digital.DL.getCallbackFrom(input).whenPressed(VisionSubsystem.DecrementCamera.Get());
 		Xbox.Digital.START.getCallbackFrom(input).whenPressed(VisionSubsystem.ToggleProcessing.Get());
-		Xbox.Digital.BACK.getCallbackFrom(input).whenPressed(VisionSubsystem.ToggleStatistics.Get());
-		Xbox.Digital.A.getCallbackFrom(input).whenPressed(
-			()->System.out.println("Current Pipeline: " + VisionServer.Get().getCurrentPipeline().getName())
+		//Xbox.Digital.BACK.getCallbackFrom(input).whenPressed(VisionSubsystem.ToggleStatistics.Get());
+		Xbox.Digital.BACK.getCallbackFrom(input).and(TeleopTrigger.Get()).whileActiveOnce(
+			this.ballsystem.manualOverride(
+				Xbox.Digital.X.getSupplier(input),	// manually operate intake (override)
+				Xbox.Digital.Y.getSupplier(input),	// manually operate transfer (override)
+				Xbox.Digital.B.getSupplier(input)	// manually shoot (override)
+			)
 		);
-		Xbox.Digital.B.getCallbackFrom(input).and(TeleopTrigger.Get()).whileActiveContinuous(	// when in teleop and 'B' button pressed
-			()->{ this.intake.set(0.5); }
-		).whenInactive(
-			()->{ this.intake.set(0.0); }
+		Xbox.Digital.X.getCallbackFrom(input).and(TeleopTrigger.Get()).and(Xbox.Digital.BACK.getCallbackFrom(input).negate()).whileActiveOnce(
+			new LambdaCommand(()->System.out.println("Smart Intake"))	// intake command (smart)
+		);
+		Xbox.Digital.Y.getCallbackFrom(input).and(TeleopTrigger.Get()).and(Xbox.Digital.BACK.getCallbackFrom(input).negate()).whileActiveOnce(
+			new LambdaCommand(()->System.out.println("Manual Transfer"))	// transfer command manual (~smart)
+		);
+		Xbox.Digital.B.getCallbackFrom(input).and(TeleopTrigger.Get()).and(Xbox.Digital.BACK.getCallbackFrom(input).negate()).whenActive(
+			new LambdaCommand(()->System.out.println("Shoot (smart, vision?)"))	// shoot command (smart)
 		);
 
 		AutonomousTrigger.Get().whenActive(
@@ -89,7 +105,7 @@ public class Runtime extends TimedRobot {
 					Xbox.Digital.RS.getPressedSupplier(input),
 					Xbox.Digital.LS.getPressedSupplier(input)
 				)
-			)
+			), false	// not interruptable because the drivebase should always be drivable in teleop mode
 		);
 		//TestTrigger.Get().whenActive(null);
 

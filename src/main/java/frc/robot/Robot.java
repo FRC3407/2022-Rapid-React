@@ -1,8 +1,8 @@
 package frc.robot;
 
-import edu.wpi.first.wpilibj.Encoder;
 import edu.wpi.first.wpilibj.DigitalInput;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import edu.wpi.first.wpilibj2.command.CommandBase;
 import edu.wpi.first.wpilibj.motorcontrol.MotorControllerGroup;
 import edu.wpi.first.wpilibj.motorcontrol.PWMVictorSPX;
 
@@ -12,25 +12,51 @@ import com.ctre.phoenix.motorcontrol.can.*;
 
 
 public class Robot {
-
-    private final Intake intake = null;
-    private final Transfer transfer = null;
-    private final Shooter shooter = null;
 	
 	public static class Intake extends SubsystemBase {
 		
-        private final PWMVictorSPX 
-            motor;
-
+        private final PWMVictorSPX motor;
+        private EnableIntake enable = new EnableIntake(this, 0);
         public Intake(int p) {
             this.motor = new PWMVictorSPX(p);
         }
 
-        public void set(double s) {
-            this.motor.set(s);
+        public EnableIntake intakeCommand() { return this.enable; }
+        public EnableIntake intakeCommand(double s) {
+            if(s != this.enable.speed) {    // no need to reinstantiate if the speed is the same
+                this.enable = new EnableIntake(this, s);
+            }
+            return this.enable;
         }
-        public void setVoltage(double v) {
-            this.motor.setVoltage(v);
+
+        /**
+         * Intake control is granted through extending this class. This enforces the use of "addRequirements()" and makes sure 
+         * no 2 things are trying to control the intake motor at a time
+        */
+        public static abstract class IntakeCommand extends CommandBase {
+            protected final Intake intake;
+            protected IntakeCommand(Intake i) {
+                this.intake = i;
+                super.addRequirements(i);
+            }
+            protected void set(double s) { this.intake.motor.set(s); }
+            protected void setVoltage(double v) { this.intake.motor.setVoltage(v); }
+            protected void stop() { this.intake.motor.stopMotor(); }
+            @Override public void end(boolean i) { this.stop(); }   // stop motor when finished by default
+            @Override public boolean runsWhenDisabled() { return false; }
+        }
+
+        public static class EnableIntake extends IntakeCommand {
+
+            private final double speed;
+            public EnableIntake(Intake i, double s) {
+                super(i);
+                this.speed = s;
+            }
+            @Override public void execute() { super.set(this.speed); }
+            @Override public boolean isFinished() { return false; }
+
+
         }
 
 
@@ -41,7 +67,7 @@ public class Robot {
         private final MotorControllerGroup primary;
         private final DigitalInput
             t_intake,   // this would be a limit switch just after the intake and before "ball position 1"
-            t_mid,      // this would be a limit switch inbetween the ball positions
+            t_mid,      // this would be a limit switch inbetween the ball positions (may not need this one)
             t_shooter;  // this would be a limit switch just before a ball enters the shooter
 
         public Transfer(int di, int dm, int ds, int feedp, int... ports) {
@@ -61,33 +87,22 @@ public class Robot {
             // maybe create a separate class that handles all the "states"
         }
 
-        public void setFeed(double s) {
-            this.feed.set(s);
-        }
-        public void setFeedVoltage(double s) {
-            this.feed.setVoltage(s);
-        }
-        public void stopFeed() {
-            this.feed.stopMotor();
-        }
-        public void setPrimary(double s) {
-            this.primary.set(s);
-        }
-        public void setPrimaryVoltage(double s) {
-            this.primary.set(s);
-        }
-        public void stopPrimary() {
-            this.primary.stopMotor();
-        }
-        
-        public boolean isIntakeTriggered() {
-            return this.t_intake.get();
-        }
-        public boolean isMidTriggered() {
-            return this.t_mid.get();
-        }
-        public boolean isShooterTriggered() {
-            return this.t_shooter.get();
+        public static abstract class TransferCommand extends CommandBase {
+            protected final Transfer transfer;
+            protected TransferCommand(Transfer t) {
+                this.transfer = t;
+                super.addRequirements(t);
+            }
+            protected void setFeed(double s) { this.transfer.feed.set(s); }
+            protected void setFeedVoltage(double s) { this.transfer.feed.setVoltage(s); }
+            protected void stopFeed() { this.transfer.feed.stopMotor(); }
+            protected void setPrimary(double s) { this.transfer.primary.set(s); }
+            protected void setPrimaryVoltage(double s) { this.transfer.primary.set(s); }
+            protected void stopPrimary() { this.transfer.primary.stopMotor(); }
+            
+            protected boolean isIntakeTriggered() { return this.transfer.t_intake.get(); }
+            protected boolean isMidTriggered() { return this.transfer.t_mid.get(); }
+            protected boolean isShooterTriggered() { return this.transfer.t_shooter.get(); }
         }
 
         private static class BallPositions {
