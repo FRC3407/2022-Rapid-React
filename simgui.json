@@ -27,9 +27,12 @@
     "types": {
       "/FMSInfo": "FMSInfo",
       "/LiveWindow/BallManagement": "Subsystem",
+      "/LiveWindow/CargoSystem": "Subsystem",
       "/LiveWindow/DriveBase": "Subsystem",
       "/LiveWindow/GenericSubsystem": "Subsystem",
       "/LiveWindow/Intake": "Subsystem",
+      "/LiveWindow/Shooter": "Subsystem",
+      "/LiveWindow/Transfer": "Subsystem",
       "/LiveWindow/Ungrouped/DifferentialDrive[1]": "DifferentialDrive",
       "/LiveWindow/Ungrouped/DifferentialDrive[2]": "DifferentialDrive",
       "/LiveWindow/Ungrouped/DigitalInput[0]": "Digital Input",

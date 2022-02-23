@@ -18,7 +18,7 @@ public class Auto extends SequentialCommandGroup {
 			new LambdaCommand(()->VisionServer.Get().setStatistics(true)),
 			new LambdaCommand(()->VisionServer.Get().setProcessingEnabled(true)),
 		// move based on position on field and where a ball likely will be -> replace with trajectory movement when closed-loop is functional
-			new BasicAutoDrive(db, 0.2, 0.2).withTimeout(2.0),
+			new BasicAutoDrive(db, 0.3, 0.3).withTimeout(1.9),
 			new CargoTurn(db, DriverStation.getAlliance()),
 			new CargoFollow(db, DriverStation.getAlliance()),
 			// intake here
