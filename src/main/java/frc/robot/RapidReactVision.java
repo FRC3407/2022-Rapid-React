@@ -252,5 +252,8 @@ public class RapidReactVision {
 	public static VisionServer.TargetData getClosestBluePosition() {	// returns null on incorrect target
 		return getClosestAllianceCargo(DriverStation.Alliance.Blue);
 	}
+	public static boolean isAllianceCargoDetected(DriverStation.Alliance a) {
+		return getClosestAllianceCargo(a) != null;
+	}
 
 }

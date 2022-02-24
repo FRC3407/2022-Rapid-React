@@ -35,7 +35,7 @@ public final class Constants {
 		cargo_thresh = 20.0,			// threshold distance for a cargo to be considered close enough to influenced by intake
 		cargo_distance_range = 100.0,	// maximum range that a cargo could be (and detected - used as divisor for P-loop)
 // motorcontroller units (-1.0 to 1.0)
-		uncertainty_continuation_percentage = 0.75,	// if break in target detection, keep powering motors at this percent of the last values used
+		uncertainty_continuation_percentage = 0.95,	// if break in target detection, keep powering motors at this percent of the last values used
 		auto_max_turn_speed = 0.2,		// maximum speed when turning in place during auto
 		auto_max_forward_speed = 0.4,	// maximum speed when driving forward during auto
 		motors_thresh_tozero = 0.1,		// the point where it is safe to go straight to zero (deceleration)
@@ -43,8 +43,11 @@ public final class Constants {
 		teleop_drivebase_scaling = -0.5,
 		teleop_drivebase_deadband = 0.05,
 		intake_speed = 0.5,
-		transfer_speed = 0.5,
-		feed_speed = 0.2,
+		transfer_speed = 0.3,
+		feed_speed = 0.4,
+
+		shooter_default_speed = 8.0,		// in meters per second
+		shooter_speed_tollerance = 0.1,		// in meters per second
 
 // DriveBase closed-loop params
 		kS_voltage = 0.0,					// voltage to overcome static friction -> from SysID characterization
