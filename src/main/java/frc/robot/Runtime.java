@@ -28,6 +28,7 @@ import edu.wpi.first.networktables.NetworkTableInstance;
  - Methods/impelemtation to search DriverStation for a certain input (common.Input.InputDevice) and return object/port
  x max output/scaling method for drivebase
  - make a spreadsheet for camera presets (each pipeline) under different lighting conditions
+ x? fix controls being f'ed when not in sim mode and not connected on program startup
 
  - Tune hubturn p-loop
  - Change camera params / configure switching when camera positions are finalized
@@ -37,8 +38,7 @@ public class Runtime extends TimedRobot {
 
 	private final InputDevice input = new InputDevice(0);
 	private final DriveBase drivebase = new DriveBase(Constants.drivebase_map_testbot);
-	//private final Robot.Intake intake = new Robot.Intake(Constants.intake_port);
-	private final BallManagement ballsystem = new BallManagement(
+	private final CargoSystem cargo_sys = new CargoSystem(
 		Constants.intake_port,
 		Constants.feed_port,
 		Constants.shooter_canid,
@@ -56,9 +56,7 @@ public class Runtime extends TimedRobot {
 		this.drivebase.setSpeedSquaring(Constants.teleop_drivebase_speed_squaring);
 	}
 
-
-	@Override public void robotPeriodic() { CommandScheduler.getInstance().run(); }
-	@Override public void robotInit() {
+	private void buildRuntime() {	// schedules all button bindings and events for runtime
 
 		Xbox.Digital.DT.getCallbackFrom(input).whenPressed(VisionSubsystem.IncrementPipeline.Get());
 		Xbox.Digital.DB.getCallbackFrom(input).whenPressed(VisionSubsystem.DecrementPipeline.Get());
@@ -67,24 +65,24 @@ public class Runtime extends TimedRobot {
 		Xbox.Digital.START.getCallbackFrom(input).whenPressed(VisionSubsystem.ToggleProcessing.Get());
 		//Xbox.Digital.BACK.getCallbackFrom(input).whenPressed(VisionSubsystem.ToggleStatistics.Get());
 		Xbox.Digital.BACK.getCallbackFrom(input).and(TeleopTrigger.Get()).whileActiveOnce(
-			this.ballsystem.manualOverride(
+			this.cargo_sys.manualOverride(
 				Xbox.Digital.X.getSupplier(input),	// manually operate intake (override)
 				Xbox.Digital.Y.getSupplier(input),	// manually operate transfer (override)
 				Xbox.Digital.B.getSupplier(input)	// manually shoot (override)
 			)
 		);
 		Xbox.Digital.X.getCallbackFrom(input).and(TeleopTrigger.Get()).and(Xbox.Digital.BACK.getCallbackFrom(input).negate()).whileActiveOnce(
-			new LambdaCommand(()->System.out.println("Smart Intake"))	// intake command (smart)
+			this.cargo_sys.intakeCargo(Constants.intake_speed)
 		);
 		Xbox.Digital.Y.getCallbackFrom(input).and(TeleopTrigger.Get()).and(Xbox.Digital.BACK.getCallbackFrom(input).negate()).whileActiveOnce(
 			new LambdaCommand(()->System.out.println("Manual Transfer"))	// transfer command manual (~smart)
 		);
 		Xbox.Digital.B.getCallbackFrom(input).and(TeleopTrigger.Get()).and(Xbox.Digital.BACK.getCallbackFrom(input).negate()).whenActive(
-			new LambdaCommand(()->System.out.println("Shoot (smart, vision?)"))	// shoot command (smart)
+			this.cargo_sys.shootAllCargo(Constants.shooter_default_speed)
 		);
 
 		AutonomousTrigger.Get().whenActive(
-			new Auto(this.drivebase)
+			new Auto(this.drivebase, this.cargo_sys)
 		);
 		TeleopTrigger.Get().whenActive(
 			new SequentialCommandGroup(
@@ -109,6 +107,20 @@ public class Runtime extends TimedRobot {
 		);
 		//TestTrigger.Get().whenActive(null);
 
+		System.out.println("Bindings Scheduled.");
+
+	}
+
+	@Override public void robotPeriodic() { CommandScheduler.getInstance().run(); }
+	@Override public void robotInit() {
+		if(!this.input.isConnected()) {
+			this.input.connectionTrigger().whenActive(new LambdaCommand.Singular(()->{
+				this.buildRuntime();
+				CommandScheduler.getInstance();
+			}, true));
+		} else {
+			this.buildRuntime();
+		}
 	}
 
 	@Override public void disabledInit() {}

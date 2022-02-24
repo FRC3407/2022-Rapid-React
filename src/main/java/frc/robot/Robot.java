@@ -1,224 +1,221 @@
-package frc.robot;
+// package frc.robot;
 
-import edu.wpi.first.wpilibj.DigitalInput;
-import edu.wpi.first.wpilibj2.command.SubsystemBase;
-import edu.wpi.first.wpilibj2.command.CommandBase;
-import edu.wpi.first.wpilibj.motorcontrol.MotorControllerGroup;
-import edu.wpi.first.wpilibj.motorcontrol.PWMVictorSPX;
+// import edu.wpi.first.wpilibj.DigitalInput;
+// import edu.wpi.first.wpilibj2.command.SubsystemBase;
+// import edu.wpi.first.wpilibj2.command.CommandBase;
+// import edu.wpi.first.wpilibj.motorcontrol.MotorControllerGroup;
+// import edu.wpi.first.wpilibj.motorcontrol.PWMVictorSPX;
 
-//import com.ctre.phoenix.motorcontrol.ControlMode;
-import com.ctre.phoenix.motorcontrol.*;
-import com.ctre.phoenix.motorcontrol.can.*;
+// //import com.ctre.phoenix.motorcontrol.ControlMode;
+// import com.ctre.phoenix.motorcontrol.*;
+// import com.ctre.phoenix.motorcontrol.can.*;
 
 
-public class Robot {
+// public class Robot {
 	
-	public static class Intake extends SubsystemBase {
+// 	protected static class Intake extends SubsystemBase {
 		
-        private final PWMVictorSPX motor;
-        private EnableIntake enable = new EnableIntake(this, 0);
-        public Intake(int p) {
-            this.motor = new PWMVictorSPX(p);
-        }
+//         protected final PWMVictorSPX 
+//             motor;
+//         // private EnableIntake 
+//         //     enable = new EnableIntake(this, 0);
+//         public Intake(int p) {
+//             this.motor = new PWMVictorSPX(p);
+//         }
 
-        public EnableIntake intakeCommand() { return this.enable; }
-        public EnableIntake intakeCommand(double s) {
-            if(s != this.enable.speed) {    // no need to reinstantiate if the speed is the same
-                this.enable = new EnableIntake(this, s);
-            }
-            return this.enable;
-        }
+//         protected void set(double s) { this.motor.set(s); }
+//         protected void setVoltage(double v) { this.motor.setVoltage(v); }
+//         protected void stop() { this.motor.stopMotor(); }
 
-        /**
-         * Intake control is granted through extending this class. This enforces the use of "addRequirements()" and makes sure 
-         * no 2 things are trying to control the intake motor at a time
-        */
-        public static abstract class IntakeCommand extends CommandBase {
-            protected final Intake intake;
-            protected IntakeCommand(Intake i) {
-                this.intake = i;
-                super.addRequirements(i);
-            }
-            protected void set(double s) { this.intake.motor.set(s); }
-            protected void setVoltage(double v) { this.intake.motor.setVoltage(v); }
-            protected void stop() { this.intake.motor.stopMotor(); }
-            @Override public void end(boolean i) { this.stop(); }   // stop motor when finished by default
-            @Override public boolean runsWhenDisabled() { return false; }
-        }
+//         // public EnableIntake intakeCommand() { return this.enable; }
+//         // public EnableIntake intakeCommand(double s) {
+//         //     if(s != this.enable.speed) {    // no need to reinstantiate if the speed is the same
+//         //         this.enable = new EnableIntake(this, s);
+//         //     }
+//         //     return this.enable;
+//         // }
 
-        public static class EnableIntake extends IntakeCommand {
+//         /**
+//          * Intake control is granted through extending this class. This enforces the use of "addRequirements()" and makes sure 
+//          * no 2 things are trying to control the intake motor at a time
+//         */
+//         public static abstract class IntakeCommand extends CommandBase {
+//             protected final Intake intake;
+//             protected IntakeCommand(Intake i) {
+//                 this.intake = i;
+//                 super.addRequirements(i);
+//             }
+//             protected void set(double s) { this.intake.motor.set(s); }
+//             protected void setVoltage(double v) { this.intake.motor.setVoltage(v); }
+//             protected void stop() { this.intake.motor.stopMotor(); }
+//             @Override public void end(boolean i) { this.stop(); }   // stop motor when finished by default
+//             @Override public boolean runsWhenDisabled() { return false; }
+//         }
 
-            private final double speed;
-            public EnableIntake(Intake i, double s) {
-                super(i);
-                this.speed = s;
-            }
-            @Override public void execute() { super.set(this.speed); }
-            @Override public boolean isFinished() { return false; }
+//         // public static class EnableIntake extends IntakeCommand {	// implemented in ManualOverride in CargoSystem class
+
+//         //     private final double speed;
+//         //     public EnableIntake(Intake i, double s) {
+//         //         super(i);
+//         //         this.speed = s;
+//         //     }
+//         //     @Override public void execute() { super.set(this.speed); }
+//         //     @Override public boolean isFinished() { return false; }
 
 
-        }
+//         // }
 
 
-	}
-	public static class Transfer extends SubsystemBase {
+// 	}
+// 	protected static class Transfer extends SubsystemBase {
         
-        private final PWMVictorSPX feed;
-        private final MotorControllerGroup primary;
-        private final DigitalInput
-            t_intake,   // this would be a limit switch just after the intake and before "ball position 1"
-            t_mid,      // this would be a limit switch inbetween the ball positions (may not need this one)
-            t_shooter;  // this would be a limit switch just before a ball enters the shooter
+//         protected final MotorControllerGroup 
+//             primary;
+//         protected final DigitalInput
+// 			lim_entering,   // this would be a limit switch just after the intake and before "ball position 1"
+//             //t_mid,      // this would be a limit switch inbetween the ball positions (may not need this one)
+//             lim_exiting;  // this would be a limit switch just before a ball enters the shooter
 
-        public Transfer(int di, int dm, int ds, int feedp, int... ports) {
-            this.t_intake = new DigitalInput(di);
-            this.t_mid = new DigitalInput(dm);
-            this.t_shooter = new DigitalInput(ds);
-            this.feed = new PWMVictorSPX(feedp);
-            PWMVictorSPX[] motors = new PWMVictorSPX[ports.length];
-            for(int i = 0; i < ports.length; i++) {
-                motors[i] = new PWMVictorSPX(ports[i]);
-            }
-            this.primary = new MotorControllerGroup(motors);
-        }
+//         public Transfer(int di, int ds, int... ports) {
+//             this.lim_entering = new DigitalInput(di);
+//             this.lim_exiting = new DigitalInput(ds);
+//             PWMVictorSPX[] motors = new PWMVictorSPX[ports.length];
+//             for(int i = 0; i < ports.length; i++) {
+//                 motors[i] = new PWMVictorSPX(ports[i]);
+//             }
+//             this.primary = new MotorControllerGroup(motors);
+//         }
 
-        @Override public void periodic() {
-            // get all limit switch values and update "states" of where the balls are in the transfer system
-            // maybe create a separate class that handles all the "states"
-        }
+//         protected void set(double s) { this.primary.set(s); }
+//         protected void setVoltage(double s) { this.primary.set(s); }
+//         protected void stop() { this.primary.stopMotor(); }
+//         protected boolean isIntakeTriggered() { return this.lim_entering.get(); }
+//         protected boolean isShooterTriggered() { return this.lim_exiting.get(); }
 
-        public static abstract class TransferCommand extends CommandBase {
-            protected final Transfer transfer;
-            protected TransferCommand(Transfer t) {
-                this.transfer = t;
-                super.addRequirements(t);
-            }
-            protected void setFeed(double s) { this.transfer.feed.set(s); }
-            protected void setFeedVoltage(double s) { this.transfer.feed.setVoltage(s); }
-            protected void stopFeed() { this.transfer.feed.stopMotor(); }
-            protected void setPrimary(double s) { this.transfer.primary.set(s); }
-            protected void setPrimaryVoltage(double s) { this.transfer.primary.set(s); }
-            protected void stopPrimary() { this.transfer.primary.stopMotor(); }
-            
-            protected boolean isIntakeTriggered() { return this.transfer.t_intake.get(); }
-            protected boolean isMidTriggered() { return this.transfer.t_mid.get(); }
-            protected boolean isShooterTriggered() { return this.transfer.t_shooter.get(); }
-        }
+//         public static abstract class TransferCommand extends CommandBase {
+//             protected final Transfer transfer;
+//             protected TransferCommand(Transfer t) {
+//                 this.transfer = t;
+//                 super.addRequirements(t);
+//             }
+//             protected void set(double s) { this.transfer.primary.set(s); }
+//             protected void setVoltage(double s) { this.transfer.primary.set(s); }
+//             protected void stop() { this.transfer.primary.stopMotor(); }
+//             protected boolean isIntakeTriggered() { return this.transfer.lim_entering.get(); }
+//             protected boolean isShooterTriggered() { return this.transfer.lim_exiting.get(); }
+// 			@Override public void end(boolean i) { this.stop(); }   // stop motor when finished by default
+//             @Override public boolean runsWhenDisabled() { return false; }
+//         }
 
-        private static class BallPositions {
+//         // public static class AutomaticTransfer extends TransferCommand {
 
-            private boolean
-				position1 = false, position2 = false,
-				last_intake = false, last_mid = false, last_shooter = false;
-
-			public void update(boolean i, boolean m, boolean s) {
-				if(this.position1 == true && m == true) {
-					// the ball was in position 1 but has now moved out
-					this.position1 = false;
-				}
-				if(this.position2 == true && s == true) {
-					// the ball was in position 2 but is moving to be shot
-					this.position2 = false;
-				}
-				if(this.last_intake == true && i == false) {
-					// a ball has moved into the first position
-					this.position1 = true;
-				}
-				if(this.last_mid == true && m == false) {
-					// a ball has moved into the second position
-					this.position2 = true;
-				}
-				if(last_shooter == true && s == false) {
-					// a ball was shot
-				}
-				this.last_intake = i;
-				this.last_mid = m;
-				this.last_shooter = s;
-			}
-
-			public int ballCount() {
-				return this.position1 ? (this.position2 ? 2 : 1) : (this.position2 ? 1 : 0);
-			}
-			public boolean ballPos1() {
-				return this.position1;
-			}
-			public boolean ballPos2() {
-				return this.position2;
-			}
-			public boolean canIntake() {
-				return (!this.last_intake && !this.position2 && !this.last_shooter);
-			}
-			public boolean canShoot() {
-				return this.ballCount() > 0;
-			}
-
-			/* info to provide:
-			- number of balls currently in the system
-			- can we intake base on ^^^
-			- can we shoot based on ^^^ and ball positions
-			
-			*/
-
-        }
+//         // }
 
 
-	}
-	public static class Shooter extends SubsystemBase {		// add a way to invert
+// 	}
+// 	protected static class Shooter extends SubsystemBase {		// add a way to invert
+
+// 		protected final WPI_TalonFX
+//             main, secondary;
+// 		protected final PWMVictorSPX 
+//             feed;
+
+// 		public Shooter(int f, int m) {
+// 			this.feed = new PWMVictorSPX(f);
+//             this.main = new WPI_TalonFX(m);
+// 			this.secondary = null;
+//             this.main.configFactoryDefault();
+//             this.main.configSelectedFeedbackSensor(TalonFXFeedbackDevice.IntegratedSensor, 0, 0);
+// 		}
+// 		public Shooter(int f, int m, int s) {
+// 			this.feed = new PWMVictorSPX(f);
+//             this.main = new WPI_TalonFX(m);
+//             this.secondary = new WPI_TalonFX(s);
+//             this.main.configFactoryDefault();
+//             this.secondary.configFactoryDefault();
+//             this.main.configSelectedFeedbackSensor(TalonFXFeedbackDevice.IntegratedSensor, 0, 0);
+//             this.secondary.follow(this.main);
+//             this.secondary.setInverted(InvertType.FollowMaster);
+// 		}
+
+//         protected void setFeed(double s) { this.feed.set(s); }
+// 		protected void setFeedVoltage(double s) { this.feed.setVoltage(s); }
+// 		protected void stopFeed() { this.feed.stopMotor(); }
+
+// 		protected void setShooterPercentage(double p) {
+// 			this.main.set(ControlMode.PercentOutput, p);
+// 		}
+// 		protected void setShooterVelocity(double v) {		// input velocity is currently in raw units per 100 ms
+// 			this.main.set(ControlMode.Velocity, v);
+// 		}
+// 		protected void stopShooter() {
+// 			this.main.stopMotor();
+// 		}
+// 		public double getShooterRawPosition() {	// in raw encoder units (see Constants.falcon_encoder_units_per_revolution)
+// 			return this.main.getSelectedSensorPosition();
+// 		}
+// 		public double getShooterRawVelocity() {	// in raw units per 100 ms
+// 			return this.main.getSelectedSensorVelocity();
+// 		}
+// 		public double getShooterVelocity() {	// in meters per second
+// 			return this.getShooterRawVelocity() * 
+// 				(Constants.shooter_wheel_diameter_meters * Math.PI / Constants.falcon_encoder_units_per_revolution) * 10;
+// 		}
+
+// 		public static abstract class ShooterCommand extends CommandBase {
+// 			protected final Shooter shooter;
+// 			protected ShooterCommand(Shooter s) {
+// 				this.shooter = s;
+// 				super.addRequirements(s);
+// 			}
+// 			protected void setFeed(double s) { this.shooter.feed.set(s); }
+// 			protected void setFeedVoltage(double s) { this.shooter.feed.setVoltage(s); }
+// 			protected void stopFeed() { this.shooter.feed.stopMotor(); }
+
+// 			protected void setShooterPercentage(double p) {
+// 				this.shooter.main.set(ControlMode.PercentOutput, p);
+// 			}
+// 			protected void setShooterVelocity(double v) {		// input velocity is currently in raw units per 100 ms
+// 				this.shooter.main.set(ControlMode.Velocity, v);
+// 			}
+// 			protected void stopShooter() {
+// 				this.shooter.main.stopMotor();
+// 			}
+// 			public double getShooterRawPosition() {	// in raw encoder units (see Constants.falcon_encoder_units_per_revolution)
+// 				return this.shooter.main.getSelectedSensorPosition();
+// 			}
+// 			public double getShooterRawVelocity() {	// in raw units per 100 ms
+// 				return this.shooter.main.getSelectedSensorVelocity();
+// 			}
+// 			public double getShooterVelocity() {	// in meters per second
+// 				return this.getShooterRawVelocity() * 
+// 					(Constants.shooter_wheel_diameter_meters * Math.PI / Constants.falcon_encoder_units_per_revolution) * 10;
+// 			}
+// 			@Override public void end(boolean i) {	// stop motor when finished by default
+// 				this.stopFeed();
+// 				this.stopShooter();
+// 			}
+//             @Override public boolean runsWhenDisabled() { return false; }
+// 		}
+
+
+// 	}
+// 	public static class Climber extends SubsystemBase {
 		
-		private final WPI_TalonFX
-            main, secondary;
-
-		public Shooter(int i) {
-            this.main = new WPI_TalonFX(i);
-			this.secondary = null;
-            this.main.configFactoryDefault();
-            this.main.configSelectedFeedbackSensor(TalonFXFeedbackDevice.IntegratedSensor, 0, 0);
-		}
-		public Shooter(int i_m, int i_s) {
-            this.main = new WPI_TalonFX(i_m);
-            this.secondary = new WPI_TalonFX(i_s);
-            this.main.configFactoryDefault();
-            this.secondary.configFactoryDefault();
-            this.main.configSelectedFeedbackSensor(TalonFXFeedbackDevice.IntegratedSensor, 0, 0);
-            this.secondary.follow(this.main);
-            this.secondary.setInverted(InvertType.FollowMaster);
-		}
-
-		public void setPercentage(double p) {
-			this.main.set(ControlMode.PercentOutput, p);
-		}
-		public void setVelocity(double v) {		// input velocity is currently in raw units per 100 ms
-			this.main.set(ControlMode.Velocity, v);
-		}
-        public double getRawPosition() {	// in raw encoder units (see Constants.falcon_encoder_units_per_revolution)
-            return this.main.getSelectedSensorPosition();
-        }
-        public double getRawVelocity() {	// in raw units per 100 ms
-            return this.main.getSelectedSensorVelocity();
-        }
-        public double getVelocity() {	// in meters per second
-            return this.getRawVelocity() * 
-                (Constants.shooter_wheel_diameter_meters * Math.PI / Constants.falcon_encoder_units_per_revolution) * 10;
-        }
+// 	}
 
 
-	}
-	public static class Climber extends SubsystemBase {
-		
-	}
+// }
 
+// /* POSSIBLE (high level) CONTROL COMMANDS TO AIM TOWARDS SUPPORTING
+//  - "Shoot" -> sets shooter to correct speed, feeds ball, then shifts secondary ball into position for another shot
+//  - "ShootVision" -> ^^^ but with calculated speed based on distance found from vision target
+//  - "Intake" -> spin up intake and possibly end the command when a ball is collected (prerequisite of having space for cargo)
+//  - "Climb" -> execute a full climbing action (prerequisite of being in position)
 
-}
+// ~~~~~~
+// Things to add: 
+// - ball management system for keeping track of position -> theoretically the only commands needed then would be those to intake and shoot, 
+// ... the transfer system would be completely autonomous and self-contained
 
-/* POSSIBLE (high level) CONTROL COMMANDS TO AIM TOWARDS SUPPORTING
- - "Shoot" -> sets shooter to correct speed, feeds ball, then shifts secondary ball into position for another shot
- - "ShootVision" -> ^^^ but with calculated speed based on distance found from vision target
- - "Intake" -> spin up intake and possibly end the command when a ball is collected (prerequisite of having space for cargo)
- - "Climb" -> execute a full climbing action (prerequisite of being in position)
-
-~~~~~~
-Things to add: 
-- ball management system for keeping track of position -> theoretically the only commands needed then would be those to intake and shoot, 
-... the transfer system would be completely autonomous and self-contained
-
-*/
+// */
