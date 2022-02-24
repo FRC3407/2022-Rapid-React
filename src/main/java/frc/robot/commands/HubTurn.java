@@ -33,7 +33,7 @@ public class HubTurn extends DriveBase.DriveCommandBase {
 		}
 	}
 	@Override public void end(boolean i) {
-		System.out.println(this.failed ? "HubTurn: Terminated." : "HubTurn: Completed.");
+		System.out.println(this.failed || i ? "HubTurn: Terminated." : "HubTurn: Completed.");
 	}
 	@Override public boolean isFinished() {
 		if(this.position != null) {

@@ -40,7 +40,7 @@ public class CargoFollow extends DriveBase.DriveCommandBase {
 		}
 	}
 	@Override public void end(boolean i) {
-		System.out.println(this.failed ? "CargoFollow: Terminated." : "CargoFollow: Completed.");
+		System.out.println(this.failed || i ? "CargoFollow: Terminated." : "CargoFollow: Completed.");
 	}
 	@Override public boolean isFinished() {
 		if(this.position != null) {

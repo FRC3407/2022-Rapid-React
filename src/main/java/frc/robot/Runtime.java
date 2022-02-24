@@ -38,7 +38,6 @@ public class Runtime extends TimedRobot {
 
 	private final InputDevice input = new InputDevice(0);
 	private final DriveBase drivebase = new DriveBase(Constants.drivebase_map_testbot);
-	//private final Robot.Intake intake = new Robot.Intake(Constants.intake_port);
 	private final CargoSystem cargo_sys = new CargoSystem(
 		Constants.intake_port,
 		Constants.feed_port,
@@ -73,17 +72,17 @@ public class Runtime extends TimedRobot {
 			)
 		);
 		Xbox.Digital.X.getCallbackFrom(input).and(TeleopTrigger.Get()).and(Xbox.Digital.BACK.getCallbackFrom(input).negate()).whileActiveOnce(
-			new LambdaCommand(()->System.out.println("Smart Intake"))	// intake command (smart)
+			this.cargo_sys.intakeCargo(Constants.intake_speed)
 		);
 		Xbox.Digital.Y.getCallbackFrom(input).and(TeleopTrigger.Get()).and(Xbox.Digital.BACK.getCallbackFrom(input).negate()).whileActiveOnce(
 			new LambdaCommand(()->System.out.println("Manual Transfer"))	// transfer command manual (~smart)
 		);
 		Xbox.Digital.B.getCallbackFrom(input).and(TeleopTrigger.Get()).and(Xbox.Digital.BACK.getCallbackFrom(input).negate()).whenActive(
-			new LambdaCommand(()->System.out.println("Shoot (smart, vision?)"))	// shoot command (smart)
+			this.cargo_sys.shootAllCargo(Constants.shooter_default_speed)
 		);
 
 		AutonomousTrigger.Get().whenActive(
-			new Auto(this.drivebase)
+			new Auto(this.drivebase, this.cargo_sys)
 		);
 		TeleopTrigger.Get().whenActive(
 			new SequentialCommandGroup(
