@@ -23,7 +23,7 @@ public class HubFind extends DriveBase.DriveCommandBase {
 		System.out.println("HubFind: Running...");
 	}
 	@Override public void execute() {
-		super.autoTurn(Constants.auto_max_turn_speed/2.0);
+		super.autoTurn(Constants.auto_max_turn_speed*0.75);
 	}
 	@Override public void end(boolean i) {
 		System.out.println(this.failed || i ? "HubFind: Terminated." : "HubFind: Completed.");
