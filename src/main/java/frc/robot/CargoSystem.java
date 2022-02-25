@@ -3,6 +3,8 @@ package frc.robot;
 import frc.robot.modules.common.LambdaCommand;
 import frc.robot.modules.common.EventTriggers.EnabledTrigger;
 import frc.robot.modules.common.Input.DigitalSupplier;
+import frc.robot.modules.common.drive.DriveBase;
+import frc.robot.modules.vision.java.VisionServer;
 
 import com.ctre.phoenix.motorcontrol.*;
 import com.ctre.phoenix.motorcontrol.can.*;
@@ -49,6 +51,15 @@ public class CargoSystem extends SubsystemBase {
             }
             this.primary = new MotorControllerGroup(motors);
         }
+		private Transfer(DigitalInput en, DigitalInput ex, int... ports) {
+			this.lim_entering = en;
+            this.lim_exiting = ex;
+            PWMVictorSPX[] motors = new PWMVictorSPX[ports.length];
+            for(int i = 0; i < ports.length; i++) {
+                motors[i] = new PWMVictorSPX(ports[i]);
+            }
+            this.primary = new MotorControllerGroup(motors);
+		}
 
         protected void set(double s) { this.primary.set(s); }
         protected void setVoltage(double s) { this.primary.set(s); }
@@ -82,6 +93,11 @@ public class CargoSystem extends SubsystemBase {
             this.main.configSelectedFeedbackSensor(TalonFXFeedbackDevice.IntegratedSensor, 0, 0);
             this.secondary.follow(this.main);
             this.secondary.setInverted(InvertType.FollowMaster);
+		}
+		private Shooter(WPI_TalonFX m, WPI_TalonFX s, int f) {
+			this.feed = new PWMVictorSPX(f);
+			this.main = m;
+			this.secondary = s;
 		}
 
         protected void setFeed(double s) { this.feed.set(s); }
@@ -190,45 +206,67 @@ public class CargoSystem extends SubsystemBase {
 		this.state.update();
 	}
 
-	public ManualOverride manualOverride(DigitalSupplier i, DigitalSupplier t, DigitalSupplier s) {
-		return new ManualOverride(this, i, t, s);
+	public ManualOverride manualOverride(DigitalSupplier i, DigitalSupplier t, DigitalSupplier f, DigitalSupplier s) {
+		return new ManualOverride(this, i, t, f, s);
 	}
 	public IntakeCargo intakeCargo(double s) {
 		return new IntakeCargo(this.intake, this.state, s);
 	}
+	public ShootOne shootSingleCargo(double v) {
+		return new ShootOne(this.shooter, this.state, v);
+	}
 	public ShootAll shootAllCargo(double v) {
 		return new ShootAll(this.shooter, this.state, v);
 	}
+	
+	public OLIntake olIntake(DigitalSupplier finish) {
+		return new OLIntake(this.intake, finish);
+	}
+	public OLTransfer olTransfer(DigitalSupplier finish) {
+		return new OLTransfer(this.transfer, finish);
+	}
+	public OLShoot olShoot(DigitalSupplier feed, DigitalSupplier finish, double v) {
+		return new OLShoot(this.shooter, feed, finish, v);
+	}
 
 
 
-	public static class ManualOverride extends CommandBase {
+	public static class ManualOverride extends CommandBase {	// manually control all cargosystem motors
 		private final CargoSystem cargo_sys;
 		private final DigitalSupplier
-			intake, transfer;
-		public ManualOverride(CargoSystem cs, DigitalSupplier i, DigitalSupplier t, DigitalSupplier s) {
+			intake, transfer, feed, shooter;
+		public ManualOverride(CargoSystem cs, DigitalSupplier i, DigitalSupplier t, DigitalSupplier f, DigitalSupplier s) {
 			this.cargo_sys = cs;
 			this.intake = i;
 			this.transfer = t;
-			super.addRequirements(cs.intake, cs.transfer);
-
-			new Trigger(()->{return s.get();}).whenActive(new ShootAll(cs.shooter, cs.state, Constants.shooter_default_speed), false);
+			this.feed = f;
+			this.shooter = s;
+			super.addRequirements(cs.intake, cs.transfer, cs.shooter);
+		}
+		@Override public void initialize() {
+			System.out.println("ManualOverride: Running...");
 		}
 		@Override public void execute() {
-			if(this.intake.get()) {
-				this.cargo_sys.intake.set(Constants.intake_speed);
-			} else {
-				this.cargo_sys.intake.set(0);
-			}
-			if(this.transfer.get()) {
-				this.cargo_sys.transfer.set(Constants.transfer_speed);
-			} else {
-				this.cargo_sys.transfer.set(0);
-			}
+			if(this.intake.get()) { this.cargo_sys.intake.set(Constants.intake_speed); }
+			else { this.cargo_sys.intake.set(0); }
+			if(this.transfer.get()) { this.cargo_sys.transfer.set(Constants.transfer_speed); }
+			else { this.cargo_sys.transfer.set(0); }
+			if(this.feed.get()) { this.cargo_sys.shooter.setFeed(Constants.feed_speed); }
+			else { this.cargo_sys.shooter.setFeed(0); }
+			if(this.shooter.get()) { this.cargo_sys.shooter.setShooterVelocity(Constants.shooter_default_speed); }
+			else { this.cargo_sys.shooter.stopShooter(); }
+		}
+		@Override public void end(boolean i) {
+			System.out.println("ManualOverride: Completed.");
+			this.cargo_sys.intake.stop();
+			this.cargo_sys.transfer.stop();
+			this.cargo_sys.shooter.stopFeed();
+			this.cargo_sys.shooter.stopShooter();
+
 		}
 		@Override public boolean isFinished() { return false; }
 	}
-	public static class IntakeCargo extends CommandBase {
+	public static class IntakeCargo extends CommandBase {	// runs intake until a ball is detected by lim switch
 		private final Intake intake_sys;
 		private final CargoStates state;
 		private final double speed;
@@ -240,10 +278,16 @@ public class CargoSystem extends SubsystemBase {
 			this.last_lim = this.state.isCargoEntering();
 			super.addRequirements(i);
 		}
+		@Override public void initialize() {
+			System.out.println("IntakeCargo: Running...");
+		}
 		@Override public void execute() { 
 			if(this.state.spaceAvailable()) {
 				this.intake_sys.set(this.speed); 
 			}
+		}
+		@Override public void end(boolean i) {
+			System.out.println("IntakeCargo: Completed.");
 		}
 		@Override public boolean isFinished() {
 			boolean temp = this.last_lim;
@@ -251,7 +295,7 @@ public class CargoSystem extends SubsystemBase {
 			return !this.state.spaceAvailable() || (!temp && this.last_lim);	// << a ball triggered the limit switch
 		}
 	}
-	private static class AutomaticTransfer extends CommandBase {
+	private static class AutomaticTransfer extends CommandBase {	// runs transfer belts based on limit switches
 		private final Transfer transfer;
 		private final CargoStates state;
 		public AutomaticTransfer(Transfer t, CargoStates s) {
@@ -259,15 +303,51 @@ public class CargoSystem extends SubsystemBase {
 			this.state = s;
 			super.addRequirements(t);
 		}
+		@Override public void initialize() {
+			System.out.println("AutomaticTransfer: Running...");
+		}
 		@Override public void execute() {
 			if(this.state.isCargoEntering() && !this.state.isCargoExiting() && this.state.spaceAvailable()) {
 				this.transfer.set(Constants.transfer_speed);
 			}
 		}
-		@Override public void end(boolean i) { this.transfer.stop(); }
+		@Override public void end(boolean i) { 
+			this.transfer.stop();
+			System.out.println("AutomaticTransfer: Interrupted.");
+		}
 		@Override public boolean isFinished() { return false; }
 	}
-	public static class ShootAll extends CommandBase {
+	public static class ShootOne extends CommandBase {	// spins up shooter motor then feeds until a ball is shot
+		private final Shooter shooter;
+		private final CargoStates state;
+		private final double velocity;	// <- probably in meters per second
+		private final int initial_count;
+		public ShootOne(Shooter sh, CargoStates st, double v) {
+			this.shooter = sh;
+			this.state = st;
+			this.velocity = v;
+			this.initial_count = st.cargoCount();
+			super.addRequirements(sh);
+		}
+		@Override public void initialize() {
+			System.out.println("ShootOne: Running...");
+		}
+		@Override public void execute() {
+			this.shooter.setShooterVelocity(this.velocity);
+			if(Math.abs(this.velocity - this.shooter.getShooterVelocity()) < Constants.shooter_speed_tollerance && this.state.isCargoExiting()) {
+				this.shooter.setFeed(Constants.feed_speed);
+			}
+		}
+		@Override public void end(boolean i) {
+			this.shooter.stopFeed();
+			this.shooter.stopShooter();
+			System.out.println(i ? "ShootOne: Terminated." : "ShootAll: Completed.");
+		}
+		@Override public boolean isFinished() {
+			return !this.state.canShoot() || this.state.cargoCount() + 1 == this.initial_count;
+		}
+	}
+	public static class ShootAll extends CommandBase {	// shoots all balls currently in transfer system
 		private final Shooter shooter;
 		private final CargoStates state;
 		private final double velocity;	// <- probably in meters per second
@@ -277,18 +357,196 @@ public class CargoSystem extends SubsystemBase {
 			this.velocity = v;
 			super.addRequirements(sh);
 		}
-		@Override public void initialize() {}
+		@Override public void initialize() {
+			System.out.println("ShootAll: Running...");
+		}
 		@Override public void execute() {
 			this.shooter.setShooterVelocity(this.velocity);
 			if(Math.abs(this.velocity - this.shooter.getShooterVelocity()) < Constants.shooter_speed_tollerance && this.state.isCargoExiting()) {
 				this.shooter.setFeed(Constants.feed_speed);
 			}
 		}
+		@Override public void end(boolean i) {
+			this.shooter.stopFeed();
+			this.shooter.stopShooter();
+			System.out.println(i ? "ShootAll: Terminated." : "ShootAll: Completed.");
+		}
 		@Override public boolean isFinished() {
-			return this.state.cargoCount() == 0;
+			return !this.state.canShoot();
 		}
 	}
-	public static class ShootVision extends CommandBase {
+	public static class ShootVision extends CommandBase {	// shoot all balls in transfer system based on distance given by vision systems
+		private final Shooter shooter;
+		private final CargoStates state;
+		private double t_velocity = 0.0;
+		private boolean failed = false;
+		public ShootVision(Shooter sh, CargoStates st, DriveBase db) {
+			this.shooter = sh;
+			this.state = st;
+			super.addRequirements(sh, db);	// drivebase is required so we can garentee it isn't moving
+		}
+		@Override public void initialize() {
+			VisionServer.Get().applyCameraPreset(Constants.cam_hub_pipeline);
+			if(!RapidReactVision.verifyHubPipelineActive()) {
+				System.out.println("ShootVision: Failed to set UpperHub pipeline");
+				this.failed = true;
+				return;
+			}
+			System.out.println("ShootVision: Running...");
+		}
+		@Override public void execute() {
+			
+		}
+		@Override public void end(boolean i) {
+
+		}
+		@Override public boolean isFinished() {
+			return false;
+		}
+	}
+
+
+
+
+	// open loop because build team has let me down :(
+	
+	public static class OLIntake extends CommandBase {
+		private final Intake intake;
+		private final DigitalSupplier f;
+		public OLIntake(Intake i, DigitalSupplier finish) {
+			this.intake = i;
+			this.f = finish;
+			super.addRequirements(i);
+		}
+		@Override public void initialize() {
+			System.out.println("OLIntake: Running...");
+		}
+		@Override public void execute() {
+			this.intake.set(Constants.intake_speed);
+		}
+		@Override public void end(boolean i) {
+			System.out.println(i ? "OLIntake: Terminated." : "OLIntake: Finished.");
+			this.intake.stop();
+		}
+		@Override public boolean isFinished() {
+			return this.f.get();
+		}
+	}
+	public static class OLTransfer extends CommandBase {
+		private final Transfer transfer;
+		private final DigitalSupplier f;
+		public OLTransfer(Transfer i, DigitalSupplier finish) {
+			this.transfer = i;
+			this.f = finish;
+			super.addRequirements(i);
+		}
+		@Override public void initialize() {
+			System.out.println("OLTransfer: Running...");
+		}
+		@Override public void execute() {
+			this.transfer.set(Constants.transfer_speed);
+		}
+		@Override public void end(boolean i) {
+			System.out.println(i ? "OLTransfer: Terminated." : "OLTransfer: Finished.");
+			this.transfer.stop();
+		}
+		@Override public boolean isFinished() {
+			return this.f.get();
+		}
+	}
+	public static class OLShoot extends CommandBase {
+		private final Shooter shooter;
+		private final DigitalSupplier f, feed;
+		private final double velocity;
+		public OLShoot(Shooter s, DigitalSupplier feed, DigitalSupplier finish, double v) {
+			this.shooter = s;
+			this.f = finish;
+			this.feed = feed;
+			this.velocity = v;
+			super.addRequirements(s);
+		}
+		@Override public void initialize() {
+			System.out.println("OLShoot: Running...");
+		}
+		@Override public void execute() {
+			this.shooter.setShooterVelocity(this.velocity);
+			if(this.feed.get()) {
+				this.shooter.setFeed(Constants.feed_speed);
+			}
+		}
+		@Override public void end(boolean i) {
+			System.out.println(i ? "OLShoot: Terminated." : "OLShoot: Finished.");
+			this.shooter.stopFeed();
+			this.shooter.stopShooter();
+		}
+		@Override public boolean isFinished() {
+			return this.f.get();
+		}
+	}
+
+
+
+
+	public static class WeekZero extends SubsystemBase {
+
+		private static class W0_Intake extends Intake {
+			public W0_Intake(int p) { super(p); }
+		}
+		private static class W0_Transfer extends Transfer {
+			public W0_Transfer(int... ports) { super(null, null, ports); }
+			@Override protected boolean isIntakeTriggered() { return false; }
+			@Override protected boolean isShooterTriggered() { return false; }
+			@Override protected void enableAutomaticTransfer(CargoStates s) {}
+		}
+		private static class W0_Shooter extends Shooter {
+			private final PWMVictorSPX lp_main;	// "low-power" main -> currently the falcon is not installed :(
+			public W0_Shooter(int lpm, int f) {
+				super(null, null, f);
+				this.lp_main = new PWMVictorSPX(lpm);
+			}
+			protected void set(double s) { this.lp_main.set(s); }
+			protected void setVoltage(double v) { this.lp_main.setVoltage(v); }
+			protected void stop() { this.lp_main.stopMotor(); }
+			@Override protected void setShooterPercentage(double p) { this.set(p); }
+			@Override protected void setShooterVelocityRaw(double vr) {}
+			@Override protected void setShooterVelocity(double v) {}
+			@Override protected void stopShooter() { this.stop(); }
+			@Override public double  getShooterRawPosition() { return 0.0; }
+			@Override public double getShooterRawVelocity() { return 0.0; }
+			@Override public double getShooterVelocity() { return 0.0; }
+		}
+
+		private final W0_Intake intake;
+		private final W0_Transfer transfer;
+		private final W0_Shooter shooter;
+
+		public WeekZero(
+			int intake_port, int feed_port,
+			int lpmain_port, int... transfer_ports
+		) {
+			this.intake = new W0_Intake(intake_port);
+			this.transfer = new W0_Transfer(transfer_ports);
+			this.shooter = new W0_Shooter(lpmain_port, feed_port);
+		}
+
+
+
+		public static class IntakeEnable extends CommandBase {
+			
+		}
+		public static class TransferEnable extends CommandBase {
+
+		}
+		public static class BasicShoot extends SequentialCommandGroup {
+
+		}
+		public static class VisionShoot extends CommandBase {
+
+		}
+		public static class ManualOverride extends CommandBase {
+
+		}
+
 
 	}
 

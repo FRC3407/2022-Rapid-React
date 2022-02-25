@@ -36,7 +36,10 @@ import edu.wpi.first.networktables.NetworkTableInstance;
 
 public class Runtime extends TimedRobot {
 
-	private final InputDevice input = new InputDevice(0);
+	private final InputDevice
+		input = new InputDevice(0),		// controller
+		stick_left = new InputDevice(1),	// acrade stick (left)
+		stick_right = new InputDevice(2);	// arcade stick (right)
 	private final DriveBase drivebase = new DriveBase(Constants.drivebase_map_testbot);
 	private final CargoSystem cargo_sys = new CargoSystem(
 		Constants.intake_port,
@@ -56,7 +59,7 @@ public class Runtime extends TimedRobot {
 		this.drivebase.setSpeedSquaring(Constants.teleop_drivebase_speed_squaring);
 	}
 
-	private void buildRuntime() {	// schedules all button bindings and events for runtime
+	private void xboxControls() {	// schedules all button bindings and events for runtime
 
 		Xbox.Digital.DT.getCallbackFrom(input).whenPressed(VisionSubsystem.IncrementPipeline.Get());
 		Xbox.Digital.DB.getCallbackFrom(input).whenPressed(VisionSubsystem.DecrementPipeline.Get());
@@ -68,7 +71,8 @@ public class Runtime extends TimedRobot {
 			this.cargo_sys.manualOverride(
 				Xbox.Digital.X.getSupplier(input),	// manually operate intake (override)
 				Xbox.Digital.Y.getSupplier(input),	// manually operate transfer (override)
-				Xbox.Digital.B.getSupplier(input)	// manually shoot (override)
+				Xbox.Digital.A.getSupplier(input),	// manually feed (override)
+				Xbox.Digital.B.getSupplier(input)	// manually spin shooter (override)
 			)
 		);
 		Xbox.Digital.X.getCallbackFrom(input).and(TeleopTrigger.Get()).and(Xbox.Digital.BACK.getCallbackFrom(input).negate()).whileActiveOnce(
@@ -81,9 +85,6 @@ public class Runtime extends TimedRobot {
 			this.cargo_sys.shootAllCargo(Constants.shooter_default_speed)
 		);
 
-		AutonomousTrigger.Get().whenActive(
-			new Auto(this.drivebase, this.cargo_sys)
-		);
 		TeleopTrigger.Get().whenActive(
 			new SequentialCommandGroup(
 				new LambdaCommand(()->VisionServer.Get().setStatistics(false)),
@@ -105,22 +106,80 @@ public class Runtime extends TimedRobot {
 				)
 			), false	// not interruptable because the drivebase should always be drivable in teleop mode
 		);
-		//TestTrigger.Get().whenActive(null);
 
-		System.out.println("Bindings Scheduled.");
+		System.out.println("Xbox Bindings Scheduled.");
 
+	}
+	private void arcadeControls() {
+		// bindings for arcade board
+		// right stick top buttons control vision stuff -> basically the same as the bpad bindings
+		Attack3.Digital.TT.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.IncrementPipeline.Get());
+		Attack3.Digital.TB.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.DecrementPipeline.Get());
+		Attack3.Digital.TR.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.IncrementCamera.Get());
+		Attack3.Digital.TL.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.DecrementCamera.Get());
+		//Xbox.Digital.START.getCallbackFrom(input).whenPressed(VisionSubsystem.ToggleProcessing.Get());
+		//Xbox.Digital.BACK.getCallbackFrom(input).whenPressed(VisionSubsystem.ToggleStatistics.Get());
+		Attack3.Digital.TR.getCallbackFrom(this.stick_right).and(TeleopTrigger.Get()).whileActiveOnce(
+			this.cargo_sys.manualOverride(
+				Attack3.Digital.TL.getSupplier(this.stick_right),	// manually operate intake (override)
+				Attack3.Digital.TT.getSupplier(this.stick_right),	// manually operate transfer (override)
+				Attack3.Digital.TR.getSupplier(this.stick_right),	// manually feed (override)
+				Attack3.Digital.TB.getSupplier(this.stick_right)	// manually spin shooter (override)
+			)
+		);
+		Attack3.Digital.TL.getCallbackFrom(this.stick_right).and(TeleopTrigger.Get()).and(Attack3.Digital.TR.getCallbackFrom(this.stick_right).negate()).whileActiveOnce(
+			this.cargo_sys.intakeCargo(Constants.intake_speed)
+		);
+		Attack3.Digital.TT.getCallbackFrom(this.stick_right).and(TeleopTrigger.Get()).and(Attack3.Digital.TR.getCallbackFrom(this.stick_right).negate()).whileActiveOnce(
+			new LambdaCommand(()->System.out.println("Manual Transfer"))	// transfer command manual (~smart)
+		);
+		Attack3.Digital.TR.getCallbackFrom(this.stick_right).and(TeleopTrigger.Get()).and(Attack3.Digital.TR.getCallbackFrom(this.stick_right).negate()).whenActive(
+			this.cargo_sys.shootAllCargo(Constants.shooter_default_speed)
+		);
+
+		
+		TeleopTrigger.Get().whenActive(
+			new SequentialCommandGroup(
+				new LambdaCommand(()->VisionServer.Get().setStatistics(false)),
+				new LambdaCommand(()->VisionServer.Get().applyCameraPreset(Constants.cam_driving)),
+				new LambdaCommand(()->VisionServer.Get().setProcessingEnabled(false)),
+				// this.drivebase.tankDrive(
+				// 	Xbox.Analog.LY.getSupplier(input), 
+				// 	Xbox.Analog.RY.getSupplier(input)
+				// )
+				this.drivebase.modeDrive(
+					Attack3.Analog.X.getSupplier(this.stick_left),
+					Attack3.Analog.Y.getSupplier(this.stick_left),
+					Attack3.Analog.X.getSupplier(this.stick_right),
+					Attack3.Analog.Y.getSupplier(this.stick_right),
+					Attack3.Digital.B6.getPressedSupplier(this.stick_right),
+					Attack3.Digital.B1.getPressedSupplier(this.stick_left)
+				)
+			), false	// not interruptable because the drivebase should always be drivable in teleop mode
+		);
+		
+		System.out.println("Arcade Bindings Scheduled.");
 	}
 
 	@Override public void robotPeriodic() { CommandScheduler.getInstance().run(); }
 	@Override public void robotInit() {
+		AutonomousTrigger.Get().whenActive( new Auto(this.drivebase, this.cargo_sys) );
+		TestTrigger.Get().whenActive( new CargoFollow.Demo(this.drivebase, DriverStation.getAlliance()) );
+
 		if(!this.input.isConnected()) {
 			this.input.connectionTrigger().whenActive(new LambdaCommand.Singular(()->{
-				this.buildRuntime();
-				CommandScheduler.getInstance();
+				this.xboxControls();
 			}, true));
 		} else {
-			this.buildRuntime();
+			this.xboxControls();
 		}
+		// if(!(this.stick_left.isConnected() && this.stick_right.isConnected())) {
+		// 	this.stick_left.connectionTrigger().and(this.stick_right.connectionTrigger()).whenActive(new LambdaCommand.Singular(()->{
+		// 		this.arcadeControls();
+		// 	}));
+		// } else {
+		// 	this.arcadeControls();
+		// }
 	}
 
 	@Override public void disabledInit() {}
