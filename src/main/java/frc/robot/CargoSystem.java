@@ -622,9 +622,49 @@ public class CargoSystem extends SubsystemBase {
 			}
 			@Override public boolean isFinished() { return this.finish.get(); }
 		}
-		public static class VisionShootRoutine extends CommandBase {
-
-		}
+		// public static class VisionShootRoutine extends CommandBase {
+		// 	private final W0_Shooter shooter;
+		// 	private final DigitalSupplier feed, finish;
+		// 	private final VisionServer.Conversion to_voltage;
+		// 	private double last_calculated = Constants.shooter_default_speed;
+		// 	private final String camera;
+		// 	public VisionShootRoutine(W0_Shooter s) { this(s, ()->false, (double v)->v, ()->false, null); }
+		// 	public VisionShootRoutine(W0_Shooter s, String cam_name) { this(s, ()->false, ()->false, cam_name); }
+		// 	public VisionShootRoutine(W0_Shooter s, DigitalSupplier feed) { this(s, feed, ()->false, null); }
+		// 	public VisionShootRoutine(W0_Shooter s, DigitalSupplier feed, String cam_name) { this(s, feed, ()->false, cam_name); }
+		// 	public VisionShootRoutine(W0_Shooter s, DigitalSupplier feed, VisionServer.Conversion tv, DigitalSupplier finish, String cam_name) {
+		// 		this.shooter = s;
+		// 		this.feed = feed;
+		// 		this.finish = finish;
+		// 		this.camera = cam_name;
+		// 		this.to_voltage = tv;
+		// 		super.addRequirements(s);
+		// 	}
+		// 	@Override public void initialize() { 
+		// 		VisionServer.Get().applyCameraPreset(Constants.cam_hub_pipeline);
+		// 		if(this.camera != null) {
+		// 			VisionServer.Get().setCamera(this.camera);
+		// 		}
+		// 		if(!RapidReactVision.verifyHubPipelineActive()) {
+		// 			System.out.println("W0 VisionShoot: Failed to set UpperHub pipeline");
+		// 		}
+		// 		System.out.println("W0 VisionShoot: Running..."); 
+		// 	}
+		// 	@Override public void execute() { 
+		// 		this.shooter.set();
+		// 		if(this.feed.get()) {
+		// 			this.shooter.setFeed(Constants.feed_speed);
+		// 		} else {
+		// 			this.shooter.setFeed(0.0);
+		// 		}
+		// 	}
+		// 	@Override public void end(boolean i) {
+		// 		this.shooter.stop();
+		// 		this.shooter.stopFeed();
+		// 		System.out.println(i ? "W0 BasicShoot: Terminated." : "W0 BasicShoot: Completed.");
+		// 	}
+		// 	@Override public boolean isFinished() { return this.finish.get(); }
+		// }
 		public static class ManualOverride extends CommandBase {
 
 		}
