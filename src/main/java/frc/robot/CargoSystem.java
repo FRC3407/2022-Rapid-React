@@ -487,6 +487,7 @@ public class CargoSystem extends SubsystemBase {
 
 
 
+	// special week 0 subsystem because our robot is lacking
 	public static class WeekZero extends SubsystemBase {
 
 		private static class W0_Intake extends Intake {
@@ -531,16 +532,97 @@ public class CargoSystem extends SubsystemBase {
 
 
 
+		public IntakeEnable intakeControl(double s, DigitalSupplier finish) {
+			return new IntakeEnable(this.intake, s, finish);
+		}
+		public IntakeEnable intakeControl() {
+			return new IntakeEnable(this.intake);
+		}
+		public TransferEnable transferControl(double s, DigitalSupplier finish) {
+			return new TransferEnable(this.transfer, s, finish);
+		}
+		public TransferEnable transferControl() {
+			return new TransferEnable(this.transfer);
+		}
+		public ShootRoutine shooterControl(double s, DigitalSupplier feed, DigitalSupplier finish) {
+			return new ShootRoutine(this.shooter, s, feed, finish);
+		}
+		public ShootRoutine shooterControl() {
+			return new ShootRoutine(this.shooter);
+		}
+
+
 		public static class IntakeEnable extends CommandBase {
-			
+			private final W0_Intake intake;
+			private final DigitalSupplier finish;
+			private final double speed;	// percentage of max output
+			public IntakeEnable(W0_Intake i) { this(i, Constants.intake_speed, ()->false); }
+			public IntakeEnable(W0_Intake i, double s) { this(i, s, ()->false); }
+			public IntakeEnable(W0_Intake i, double s, DigitalSupplier finish) {
+				this.intake = i;
+				this.speed = s;
+				this.finish = finish;
+				super.addRequirements(i);
+			}
+			@Override public void initialize() { System.out.println("W0 IntakeEnable: Running..."); }
+			@Override public void execute() { this.intake.set(this.speed); }
+			@Override public void end(boolean i) {
+				this.intake.stop();
+				System.out.println(i ? "W0 IntakeEnable: Terminated." : "W0 IntakeEnable: Completed.");
+			}
+			@Override public boolean isFinished() { return this.finish.get(); }
 		}
 		public static class TransferEnable extends CommandBase {
-
+			private final W0_Transfer transfer;
+			private final DigitalSupplier finish;
+			private final double speed;	// percentage of max output
+			public TransferEnable(W0_Transfer t) { this(t, Constants.transfer_speed, ()->false); }
+			public TransferEnable(W0_Transfer t, double s) { this(t, s, ()->false); }
+			public TransferEnable(W0_Transfer t, double s, DigitalSupplier finish) {
+				this.transfer = t;
+				this.speed = s;
+				this.finish = finish;
+				super.addRequirements(t);
+			}
+			@Override public void initialize() { System.out.println("W0 TransferEnable: Running..."); }
+			@Override public void execute() { this.transfer.set(this.speed); }
+			@Override public void end(boolean i) {
+				this.transfer.stop();
+				System.out.println(i ? "W0 TransferEnable: Terminated." : "W0 TransferEnable: Completed.");
+			}
+			@Override public boolean isFinished() { return this.finish.get(); }
 		}
-		public static class BasicShoot extends SequentialCommandGroup {
-
+		public static class ShootRoutine extends CommandBase {
+			private final W0_Shooter shooter;
+			private final DigitalSupplier feed, finish;
+			private final double percentage;
+			public ShootRoutine(W0_Shooter s) { this(s, 0.8, ()->false, ()->false); }
+			public ShootRoutine(W0_Shooter s, double p) { this(s, p, ()->false, ()->false); }
+			public ShootRoutine(W0_Shooter s, DigitalSupplier feed) { this(s, 0.8, feed, ()->false); }
+			public ShootRoutine(W0_Shooter s, double p, DigitalSupplier feed, DigitalSupplier finish) {
+				this.shooter = s;
+				this.percentage = p;
+				this.feed = feed;
+				this.finish = finish;
+				super.addRequirements(s);
+			}
+			@Override public void initialize() { System.out.println("W0 BasicShoot: Running..."); }
+			@Override public void execute() { 
+				this.shooter.set(this.percentage);
+				if(this.feed.get()) {
+					this.shooter.setFeed(Constants.feed_speed);
+				} else {
+					this.shooter.setFeed(0.0);
+				}
+			}
+			@Override public void end(boolean i) {
+				this.shooter.stop();
+				this.shooter.stopFeed();
+				System.out.println(i ? "W0 BasicShoot: Terminated." : "W0 BasicShoot: Completed.");
+			}
+			@Override public boolean isFinished() { return this.finish.get(); }
 		}
-		public static class VisionShoot extends CommandBase {
+		public static class VisionShootRoutine extends CommandBase {
 
 		}
 		public static class ManualOverride extends CommandBase {

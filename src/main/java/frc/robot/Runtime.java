@@ -12,6 +12,7 @@ import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
+import edu.wpi.first.wpilibj2.command.button.Trigger;
 import edu.wpi.first.networktables.NetworkTableInstance;
 
 // import frc.robot.modules.common.drive.Types.*;
@@ -40,13 +41,19 @@ public class Runtime extends TimedRobot {
 		input = new InputDevice(0),		// controller
 		stick_left = new InputDevice(1),	// acrade stick (left)
 		stick_right = new InputDevice(2);	// arcade stick (right)
-	private final DriveBase drivebase = new DriveBase(Constants.drivebase_map_testbot);
-	private final CargoSystem cargo_sys = new CargoSystem(
+	private final DriveBase drivebase = new DriveBase(Constants.drivebase_map_2022);
+	// private final CargoSystem cargo_sys = new CargoSystem(
+	// 	Constants.intake_port,
+	// 	Constants.feed_port,
+	// 	Constants.shooter_canid,
+	// 	Constants.lim_entering_dio,
+	// 	Constants.lim_exiting_dio,
+	// 	Constants.transfer_ports
+	// );
+	private final CargoSystem.WeekZero w0_cargo_sys = new CargoSystem.WeekZero(
 		Constants.intake_port,
 		Constants.feed_port,
-		Constants.shooter_canid,
-		Constants.lim_entering_dio,
-		Constants.lim_exiting_dio,
+		Constants.w0_shooter_port,
 		Constants.transfer_ports
 	);
 
@@ -59,30 +66,33 @@ public class Runtime extends TimedRobot {
 		this.drivebase.setSpeedSquaring(Constants.teleop_drivebase_speed_squaring);
 	}
 
-	private void xboxControls() {	// schedules all button bindings and events for runtime
+	private void xboxControls() {	// bindings for xbox controller
 
-		Xbox.Digital.DT.getCallbackFrom(input).whenPressed(VisionSubsystem.IncrementPipeline.Get());
-		Xbox.Digital.DB.getCallbackFrom(input).whenPressed(VisionSubsystem.DecrementPipeline.Get());
-		Xbox.Digital.DR.getCallbackFrom(input).whenPressed(VisionSubsystem.IncrementCamera.Get());
-		Xbox.Digital.DL.getCallbackFrom(input).whenPressed(VisionSubsystem.DecrementCamera.Get());
-		Xbox.Digital.START.getCallbackFrom(input).whenPressed(VisionSubsystem.ToggleProcessing.Get());
-		//Xbox.Digital.BACK.getCallbackFrom(input).whenPressed(VisionSubsystem.ToggleStatistics.Get());
-		Xbox.Digital.BACK.getCallbackFrom(input).and(TeleopTrigger.Get()).whileActiveOnce(
-			this.cargo_sys.manualOverride(
-				Xbox.Digital.X.getSupplier(input),	// manually operate intake (override)
-				Xbox.Digital.Y.getSupplier(input),	// manually operate transfer (override)
-				Xbox.Digital.A.getSupplier(input),	// manually feed (override)
-				Xbox.Digital.B.getSupplier(input)	// manually spin shooter (override)
-			)
+		Xbox.Digital.DT.getCallbackFrom(input).whenPressed(VisionSubsystem.IncrementPipeline.Get());	// dpad top -> increment pipeline
+		Xbox.Digital.DB.getCallbackFrom(input).whenPressed(VisionSubsystem.DecrementPipeline.Get());	// dpad bottom -> decrement pipeline
+		Xbox.Digital.DR.getCallbackFrom(input).whenPressed(VisionSubsystem.IncrementCamera.Get());		// dpad right -> increment camera
+		Xbox.Digital.DL.getCallbackFrom(input).whenPressed(VisionSubsystem.DecrementCamera.Get());		// dpad left -> decrement camera
+		Xbox.Digital.START.getCallbackFrom(input).whenPressed(VisionSubsystem.ToggleProcessing.Get());	// toggle visionserver processing
+		Xbox.Digital.BACK.getCallbackFrom(input).whenPressed(VisionSubsystem.ToggleStatistics.Get());	// toggle statistics in camera view
+		// Xbox.Digital.BACK.getCallbackFrom(input).and(TeleopTrigger.Get()).whileActiveOnce(
+		// 	this.cargo_sys.manualOverride(
+		// 		Xbox.Digital.X.getSupplier(input),	// manually operate intake (override)
+		// 		Xbox.Digital.Y.getSupplier(input),	// manually operate transfer (override)
+		// 		Xbox.Digital.A.getSupplier(input),	// manually feed (override)
+		// 		Xbox.Digital.B.getSupplier(input)	// manually spin shooter (override)
+		// 	)
+		// );
+		Xbox.Digital.X.getCallbackFrom(input).and(TeleopTrigger.Get())/*.and(Xbox.Digital.BACK.getCallbackFrom(input).negate())*/.whileActiveOnce(
+			//this.cargo_sys.intakeCargo(Constants.intake_speed)
+			this.w0_cargo_sys.intakeControl()						// run the intake when 'X' is pressed
 		);
-		Xbox.Digital.X.getCallbackFrom(input).and(TeleopTrigger.Get()).and(Xbox.Digital.BACK.getCallbackFrom(input).negate()).whileActiveOnce(
-			this.cargo_sys.intakeCargo(Constants.intake_speed)
+		Xbox.Digital.Y.getCallbackFrom(input).and(TeleopTrigger.Get())/*.and(Xbox.Digital.BACK.getCallbackFrom(input).negate())*/.whileActiveOnce(
+			//new LambdaCommand(()->System.out.println("Manual Transfer"))	// transfer command manual (~smart)
+			this.w0_cargo_sys.transferControl()						// move the transfer belt when 'Y' is pressed
 		);
-		Xbox.Digital.Y.getCallbackFrom(input).and(TeleopTrigger.Get()).and(Xbox.Digital.BACK.getCallbackFrom(input).negate()).whileActiveOnce(
-			new LambdaCommand(()->System.out.println("Manual Transfer"))	// transfer command manual (~smart)
-		);
-		Xbox.Digital.B.getCallbackFrom(input).and(TeleopTrigger.Get()).and(Xbox.Digital.BACK.getCallbackFrom(input).negate()).whenActive(
-			this.cargo_sys.shootAllCargo(Constants.shooter_default_speed)
+		Xbox.Digital.B.getCallbackFrom(input).and(TeleopTrigger.Get())/*.and(Xbox.Digital.BACK.getCallbackFrom(input).negate())*/.toggleWhenActive(
+			//this.cargo_sys.shootAllCargo(Constants.shooter_default_speed)
+			this.w0_cargo_sys.shooterControl(1.0, Xbox.Digital.A.getSupplier(input), ()->false)	// spin up the shooter when B is pressed, run feed when A is pressed, stop when B is pressed again
 		);
 
 		TeleopTrigger.Get().whenActive(
@@ -110,8 +120,8 @@ public class Runtime extends TimedRobot {
 		System.out.println("Xbox Bindings Scheduled.");
 
 	}
-	private void arcadeControls() {
-		// bindings for arcade board
+	private void arcadeControls() {	// bindings for arcade board
+
 		// right stick top buttons control vision stuff -> basically the same as the bpad bindings
 		Attack3.Digital.TT.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.IncrementPipeline.Get());
 		Attack3.Digital.TB.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.DecrementPipeline.Get());
@@ -119,22 +129,25 @@ public class Runtime extends TimedRobot {
 		Attack3.Digital.TL.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.DecrementCamera.Get());
 		//Xbox.Digital.START.getCallbackFrom(input).whenPressed(VisionSubsystem.ToggleProcessing.Get());
 		//Xbox.Digital.BACK.getCallbackFrom(input).whenPressed(VisionSubsystem.ToggleStatistics.Get());
-		Attack3.Digital.TR.getCallbackFrom(this.stick_right).and(TeleopTrigger.Get()).whileActiveOnce(
-			this.cargo_sys.manualOverride(
-				Attack3.Digital.TL.getSupplier(this.stick_right),	// manually operate intake (override)
-				Attack3.Digital.TT.getSupplier(this.stick_right),	// manually operate transfer (override)
-				Attack3.Digital.TR.getSupplier(this.stick_right),	// manually feed (override)
-				Attack3.Digital.TB.getSupplier(this.stick_right)	// manually spin shooter (override)
-			)
+		// Attack3.Digital.TR.getCallbackFrom(this.stick_right).and(TeleopTrigger.Get()).whileActiveOnce(
+		// 	this.cargo_sys.manualOverride(
+		// 		Attack3.Digital.TL.getSupplier(this.stick_right),	// manually operate intake (override)
+		// 		Attack3.Digital.TT.getSupplier(this.stick_right),	// manually operate transfer (override)
+		// 		Attack3.Digital.TR.getSupplier(this.stick_right),	// manually feed (override)
+		// 		Attack3.Digital.TB.getSupplier(this.stick_right)	// manually spin shooter (override)
+		// 	)
+		// );
+		Attack3.Digital.TL.getCallbackFrom(this.stick_right).and(TeleopTrigger.Get())/*.and(Attack3.Digital.TR.getCallbackFrom(this.stick_right).negate())*/.whileActiveOnce(
+			//this.cargo_sys.intakeCargo(Constants.intake_speed)
+			this.w0_cargo_sys.intakeControl()
 		);
-		Attack3.Digital.TL.getCallbackFrom(this.stick_right).and(TeleopTrigger.Get()).and(Attack3.Digital.TR.getCallbackFrom(this.stick_right).negate()).whileActiveOnce(
-			this.cargo_sys.intakeCargo(Constants.intake_speed)
+		Attack3.Digital.TT.getCallbackFrom(this.stick_right).and(TeleopTrigger.Get())/*.and(Attack3.Digital.TR.getCallbackFrom(this.stick_right).negate())*/.whileActiveOnce(
+			//new LambdaCommand(()->System.out.println("Manual Transfer"))	// transfer command manual (~smart)
+			this.w0_cargo_sys.transferControl()
 		);
-		Attack3.Digital.TT.getCallbackFrom(this.stick_right).and(TeleopTrigger.Get()).and(Attack3.Digital.TR.getCallbackFrom(this.stick_right).negate()).whileActiveOnce(
-			new LambdaCommand(()->System.out.println("Manual Transfer"))	// transfer command manual (~smart)
-		);
-		Attack3.Digital.TR.getCallbackFrom(this.stick_right).and(TeleopTrigger.Get()).and(Attack3.Digital.TR.getCallbackFrom(this.stick_right).negate()).whenActive(
-			this.cargo_sys.shootAllCargo(Constants.shooter_default_speed)
+		Attack3.Digital.TR.getCallbackFrom(this.stick_right).and(TeleopTrigger.Get())/*.and(Attack3.Digital.TR.getCallbackFrom(this.stick_right).negate())*/.whenActive(
+			//this.cargo_sys.shootAllCargo(Constants.shooter_default_speed)
+			this.w0_cargo_sys.shooterControl(1.0, Attack3.Digital.TB.getSupplier(this.stick_right), ()->false)
 		);
 
 		
@@ -152,8 +165,8 @@ public class Runtime extends TimedRobot {
 					Attack3.Analog.Y.getSupplier(this.stick_left),
 					Attack3.Analog.X.getSupplier(this.stick_right),
 					Attack3.Analog.Y.getSupplier(this.stick_right),
-					Attack3.Digital.B6.getPressedSupplier(this.stick_right),
-					Attack3.Digital.B1.getPressedSupplier(this.stick_left)
+					Attack3.Digital.TRI.getPressedSupplier(this.stick_right),
+					Attack3.Digital.TRI.getPressedSupplier(this.stick_left)
 				)
 			), false	// not interruptable because the drivebase should always be drivable in teleop mode
 		);
@@ -163,8 +176,10 @@ public class Runtime extends TimedRobot {
 
 	@Override public void robotPeriodic() { CommandScheduler.getInstance().run(); }
 	@Override public void robotInit() {
-		AutonomousTrigger.Get().whenActive( new Auto(this.drivebase, this.cargo_sys) );
-		TestTrigger.Get().whenActive( new CargoFollow.Demo(this.drivebase, DriverStation.getAlliance()) );
+		AutonomousTrigger.Get().whenActive( new Auto.WeekZero(this.drivebase, this.w0_cargo_sys) );
+		TestTrigger.Get().whenActive( new CargoFollow.Demo(this.drivebase, DriverStation.getAlliance(), Constants.cargo_cam_name) );
+
+		new Trigger(()->VisionServer.Get().isConnected()).whenActive(new LambdaCommand(()->System.out.println("VisionServer Connected")));
 
 		if(!this.input.isConnected()) {
 			this.input.connectionTrigger().whenActive(new LambdaCommand.Singular(()->{

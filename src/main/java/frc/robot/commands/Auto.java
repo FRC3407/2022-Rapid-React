@@ -50,5 +50,48 @@ public class Auto extends SequentialCommandGroup {
 		);
 	}
 
+	public static class WeekZero extends SequentialCommandGroup {
+
+		public WeekZero(DriveBase db, CargoSystem.WeekZero cs) {
+			super.addCommands(
+				new LambdaCommand(()->VisionServer.Get().setStatistics(true)),
+				new LambdaCommand(()->VisionServer.Get().setProcessingEnabled(true)),
+
+				new ConditionalCommand(
+					new ParallelCommandGroup(	// cargo detected -> drive towards it and intake
+						new CargoFollow(db, DriverStation.getAlliance(), Constants.cargo_cam_name).withTimeout(5),
+						cs.intakeControl().withTimeout(6),
+						new SequentialCommandGroup(
+							new WaitCommand(4),
+							cs.transferControl().withTimeout(2)
+						)
+					),
+					new ParallelCommandGroup(	// cargo not detected -> drive forward for "taxi" points, spin intake just incase
+						new BasicAutoDrive(db, 0.25, 0.25).withTimeout(2),
+						cs.intakeControl().withTimeout(3),
+						new SequentialCommandGroup(
+							new WaitCommand(1),
+							cs.transferControl().withTimeout(2)
+						)
+					),
+					()->VisionServer.Get().isConnected() && RapidReactVision.isAllianceCargoDetected(DriverStation.getAlliance())
+				),
+
+				new HubFind(db, Constants.hub_cam_name).withTimeout(5),		// turn to look for the hub, 5 seconds should put the robot @ 180 degrees, so good for a shot even if vision fails
+				new HubTurn(db, Constants.hub_cam_name).withTimeout(1),		// fine-tune angle to hub
+				new ParallelCommandGroup(
+					cs.shooterControl().withTimeout(8),	// ramp up the shooter
+					new SequentialCommandGroup(			// wait for shooter to ramp up then send cargo to be shot
+						new WaitCommand(1),
+						cs.transferControl().withTimeout(5)
+					)
+				),
+				new LambdaCommand(()->System.out.println("Autonomous Completed."))
+			);
+		}
+
+
+	}
+
 
 }
