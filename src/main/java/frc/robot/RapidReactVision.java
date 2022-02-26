@@ -229,6 +229,9 @@ public class RapidReactVision {
 		verifyHubPipelineActive();
 		return vs.getTargetDataIfMatching("Upper-Hub");
 	}
+	public static boolean isHubDetected() {
+		return getHubPosition() != null;
+	}
 
 	public static VisionServer.TargetData getClosestAllianceCargo(DriverStation.Alliance a) {	// returns null on incorrect target
 		verifyCargoPipelineActive();

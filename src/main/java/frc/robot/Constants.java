@@ -20,6 +20,7 @@ public final class Constants {
 		intake_port = 4,		// port for intake motor
 		feed_port = 6,			// port for transfer system feed motor
 		shooter_canid = 4,		// port for shooter motor (can id for falcon)
+		w0_shooter_port = 7,
 		lim_entering_dio = 0,
 		lim_exiting_dio = 1;
 
@@ -72,6 +73,9 @@ public final class Constants {
 		teleop_drivebase_speed_squaring = false;
 
 
+	public static final String
+		cargo_cam_name = "Cargo",
+		hub_cam_name = "Hub";
 	public static final CameraPreset
 		cam_driving = new CameraPreset(50, -1, -1),
 		cam_hub_pipeline = new CameraPreset(50, 10, 3500),

@@ -15,6 +15,26 @@
         "header": {
           "open": true
         }
+      },
+      "Talon SRX[0]": {
+        "header": {
+          "open": true
+        }
+      },
+      "Talon SRX[1]": {
+        "header": {
+          "open": true
+        }
+      },
+      "Talon SRX[2]": {
+        "header": {
+          "open": true
+        }
+      },
+      "Talon SRX[3]": {
+        "header": {
+          "open": true
+        }
       }
     },
     "PWM Outputs": {
@@ -57,7 +77,11 @@
       "/LiveWindow/Ungrouped/Talon SRX [0]": "Motor Controller",
       "/LiveWindow/Ungrouped/Talon SRX [1]": "Motor Controller",
       "/LiveWindow/Ungrouped/Talon SRX [2]": "Motor Controller",
-      "/LiveWindow/Ungrouped/Talon SRX [3]": "Motor Controller"
+      "/LiveWindow/Ungrouped/Talon SRX [3]": "Motor Controller",
+      "/LiveWindow/W0_Intake": "Subsystem",
+      "/LiveWindow/W0_Shooter": "Subsystem",
+      "/LiveWindow/W0_Transfer": "Subsystem",
+      "/LiveWindow/WeekZero": "Subsystem"
     }
   },
   "NetworkTables": {
@@ -92,6 +116,12 @@
     },
     "Vision Server": {
       "Cameras": {
+        "Cargo": {
+          "open": true
+        },
+        "Hub": {
+          "open": true
+        },
         "MAIN": {
           "open": true
         },

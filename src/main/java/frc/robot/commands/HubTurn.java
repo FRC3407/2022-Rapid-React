@@ -8,15 +8,21 @@ import frc.robot.RapidReactVision;
 
 public class HubTurn extends DriveBase.DriveCommandBase {
 
+	private final String camera;
 	private boolean failed = false;
 	private VisionServer.TargetData position;
 
-	public HubTurn(DriveBase db) {
+	public HubTurn(DriveBase db) { this(db, null); }
+	public HubTurn(DriveBase db, String cam_name) {
 		super(db);
+		this.camera = cam_name;
 	}
 
 	@Override public void initialize() {
 		VisionServer.Get().applyCameraPreset(Constants.cam_hub_pipeline);
+		if(this.camera != null) {
+			VisionServer.Get().setCamera(this.camera);
+		}
 		if(!RapidReactVision.verifyHubPipelineActive()) {
 			System.out.println("HubTurn: Failed to set UpperHub pipeline");
 			this.failed = true;

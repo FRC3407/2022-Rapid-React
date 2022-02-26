@@ -12,16 +12,22 @@ public class CargoFollow extends DriveBase.DriveCommandBase {
 
 	private boolean failed = false;
 	private final Alliance team;
+	private final String camera;
 	private VisionServer.TargetData position;
 
-	public CargoFollow(DriveBase db, Alliance a) {
+	public CargoFollow(DriveBase db, Alliance a) { this(db, a, null); }
+	public CargoFollow(DriveBase db, Alliance a, String cam_name) {
 		super(db);
 		this.team = a;
+		this.camera = cam_name;
 	}
 
 	@Override public void initialize() {
 		RapidReactVision.setCargoPipelineScaling(4);
 		VisionServer.Get().applyCameraPreset(Constants.cam_cargo_pipeline);
+		if(this.camera != null) {
+			VisionServer.Get().setCamera(this.camera);
+		}
 		if(!RapidReactVision.verifyCargoPipelineActive()) {
 			System.out.println("CargoFollow: Failed to set Cargo pipeline");
 			this.failed = true;
@@ -55,6 +61,7 @@ public class CargoFollow extends DriveBase.DriveCommandBase {
 	public static class Demo extends CargoFollow {
 
 		public Demo(DriveBase db, Alliance a) { super(db, a); }
+		public Demo(DriveBase db, Alliance a, String cam_name) { super(db, a, cam_name); }
 
 		@Override public boolean isFinished() { return false; }
 
