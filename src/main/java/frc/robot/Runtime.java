@@ -90,9 +90,9 @@ public class Runtime extends TimedRobot {
 			//new LambdaCommand(()->System.out.println("Manual Transfer"))	// transfer command manual (~smart)
 			this.w0_cargo_sys.transferControl()						// move the transfer belt when 'Y' is pressed
 		);
-		Xbox.Digital.B.getCallbackFrom(input).and(TeleopTrigger.Get())/*.and(Xbox.Digital.BACK.getCallbackFrom(input).negate())*/.toggleWhenActive(
+		Xbox.Digital.B.getCallbackFrom(input).and(TeleopTrigger.Get())/*.and(Xbox.Digital.BACK.getCallbackFrom(input).negate())*/.toggleWhenActive(	// toggleWhenActive
 			//this.cargo_sys.shootAllCargo(Constants.shooter_default_speed)
-			this.w0_cargo_sys.shooterControl(1.0, Xbox.Digital.A.getSupplier(input), ()->false)	// spin up the shooter when B is pressed, run feed when A is pressed, stop when B is pressed again
+			this.w0_cargo_sys.shooterControl(0.75, Xbox.Digital.A.getSupplier(input), ()->false)	// spin up the shooter when B is pressed, run feed when A is pressed, stop when B is pressed again
 		);
 
 		TeleopTrigger.Get().whenActive(
@@ -127,27 +127,17 @@ public class Runtime extends TimedRobot {
 		Attack3.Digital.TB.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.DecrementPipeline.Get());
 		Attack3.Digital.TR.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.IncrementCamera.Get());
 		Attack3.Digital.TL.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.DecrementCamera.Get());
-		//Xbox.Digital.START.getCallbackFrom(input).whenPressed(VisionSubsystem.ToggleProcessing.Get());
-		//Xbox.Digital.BACK.getCallbackFrom(input).whenPressed(VisionSubsystem.ToggleStatistics.Get());
-		// Attack3.Digital.TR.getCallbackFrom(this.stick_right).and(TeleopTrigger.Get()).whileActiveOnce(
-		// 	this.cargo_sys.manualOverride(
-		// 		Attack3.Digital.TL.getSupplier(this.stick_right),	// manually operate intake (override)
-		// 		Attack3.Digital.TT.getSupplier(this.stick_right),	// manually operate transfer (override)
-		// 		Attack3.Digital.TR.getSupplier(this.stick_right),	// manually feed (override)
-		// 		Attack3.Digital.TB.getSupplier(this.stick_right)	// manually spin shooter (override)
-		// 	)
-		// );
-		Attack3.Digital.TL.getCallbackFrom(this.stick_right).and(TeleopTrigger.Get())/*.and(Attack3.Digital.TR.getCallbackFrom(this.stick_right).negate())*/.whileActiveOnce(
-			//this.cargo_sys.intakeCargo(Constants.intake_speed)
+		Attack3.Digital.TB.getCallbackFrom(this.stick_right).whenPressed(VisionSubsystem.ToggleProcessing.Get());
+		//Attack3.Digital.TB.getCallbackFrom(this.stick_right).whenPressed(VisionSubsystem.ToggleStatistics.Get());
+		
+		Attack3.Digital.TRI.getCallbackFrom(this.stick_left).and(TeleopTrigger.Get()).whileActiveOnce(
 			this.w0_cargo_sys.intakeControl()
 		);
-		Attack3.Digital.TT.getCallbackFrom(this.stick_right).and(TeleopTrigger.Get())/*.and(Attack3.Digital.TR.getCallbackFrom(this.stick_right).negate())*/.whileActiveOnce(
-			//new LambdaCommand(()->System.out.println("Manual Transfer"))	// transfer command manual (~smart)
+		Attack3.Digital.TT.getCallbackFrom(this.stick_right).and(TeleopTrigger.Get()).whileActiveOnce(
 			this.w0_cargo_sys.transferControl()
 		);
-		Attack3.Digital.TR.getCallbackFrom(this.stick_right).and(TeleopTrigger.Get())/*.and(Attack3.Digital.TR.getCallbackFrom(this.stick_right).negate())*/.whenActive(
-			//this.cargo_sys.shootAllCargo(Constants.shooter_default_speed)
-			this.w0_cargo_sys.shooterControl(1.0, Attack3.Digital.TB.getSupplier(this.stick_right), ()->false)
+		Attack3.Digital.TRI.getCallbackFrom(this.stick_right).and(TeleopTrigger.Get()).toggleWhenActive(
+			this.w0_cargo_sys.shooterControl(0.85, /*Attack3.Digital.TB.getSupplier(this.stick_right)*/()->false, ()->false)
 		);
 
 		
@@ -156,17 +146,13 @@ public class Runtime extends TimedRobot {
 				new LambdaCommand(()->VisionServer.Get().setStatistics(false)),
 				new LambdaCommand(()->VisionServer.Get().applyCameraPreset(Constants.cam_driving)),
 				new LambdaCommand(()->VisionServer.Get().setProcessingEnabled(false)),
-				// this.drivebase.tankDrive(
-				// 	Xbox.Analog.LY.getSupplier(input), 
-				// 	Xbox.Analog.RY.getSupplier(input)
-				// )
 				this.drivebase.modeDrive(
 					Attack3.Analog.X.getSupplier(this.stick_left),
 					Attack3.Analog.Y.getSupplier(this.stick_left),
 					Attack3.Analog.X.getSupplier(this.stick_right),
 					Attack3.Analog.Y.getSupplier(this.stick_right),
-					Attack3.Digital.TRI.getPressedSupplier(this.stick_right),
-					Attack3.Digital.TRI.getPressedSupplier(this.stick_left)
+					Attack3.Digital.TR.getPressedSupplier(this.stick_right),
+					Attack3.Digital.TL.getPressedSupplier(this.stick_right)
 				)
 			), false	// not interruptable because the drivebase should always be drivable in teleop mode
 		);
@@ -177,24 +163,24 @@ public class Runtime extends TimedRobot {
 	@Override public void robotPeriodic() { CommandScheduler.getInstance().run(); }
 	@Override public void robotInit() {
 		AutonomousTrigger.Get().whenActive( new Auto.WeekZero(this.drivebase, this.w0_cargo_sys) );
-		TestTrigger.Get().whenActive( new CargoFollow.Demo(this.drivebase, DriverStation.getAlliance(), Constants.cargo_cam_name) );
+		//TestTrigger.Get().whenActive( new CargoFollow.Demo(this.drivebase, DriverStation.getAlliance(), Constants.cargo_cam_name) );
 
 		new Trigger(()->VisionServer.Get().isConnected()).whenActive(new LambdaCommand(()->System.out.println("VisionServer Connected")));
 
-		if(!this.input.isConnected()) {
-			this.input.connectionTrigger().whenActive(new LambdaCommand.Singular(()->{
-				this.xboxControls();
-			}, true));
-		} else {
-			this.xboxControls();
-		}
-		// if(!(this.stick_left.isConnected() && this.stick_right.isConnected())) {
-		// 	this.stick_left.connectionTrigger().and(this.stick_right.connectionTrigger()).whenActive(new LambdaCommand.Singular(()->{
-		// 		this.arcadeControls();
-		// 	}));
+		// if(!this.input.isConnected()) {
+		// 	this.input.connectionTrigger().whenActive(new LambdaCommand.Singular(()->{
+		// 		this.xboxControls();
+		// 	}, true));
 		// } else {
-		// 	this.arcadeControls();
+		// 	this.xboxControls();
 		// }
+		if(!(this.stick_left.isConnected() && this.stick_right.isConnected())) {
+			this.stick_left.connectionTrigger().and(this.stick_right.connectionTrigger()).whenActive(new LambdaCommand.Singular(()->{
+				this.arcadeControls();
+			}));
+		} else {
+			this.arcadeControls();
+		}
 	}
 
 	@Override public void disabledInit() {}
