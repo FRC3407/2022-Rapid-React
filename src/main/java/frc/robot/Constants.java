@@ -1,6 +1,7 @@
 package frc.robot;
 
 import frc.robot.modules.common.drive.Types.*;
+import frc.robot.modules.common.drive.*;
 import frc.robot.modules.vision.java.VisionServer.*;
 
 import com.ctre.phoenix.motorcontrol.can.WPI_TalonSRX;
@@ -14,7 +15,7 @@ public final class Constants {
         //drivebase_map_testbot = new DriveMap_4<>(3, 1, 2, 0, (int p)->new PWMVictorSPX(p), Inversions.RIGHT, DriveLayout.DIFFERENTIAL)/*,
         //drivebase_map_2019 = new DriveMap_4<>(6, 8, 9, 7, (int p)->new PWMVictorSPX(p), Inversions.RIGHT, DriveLayout.DIFFERENTIAL)*/;
 	public static final DriveMap_4<WPI_TalonSRX>
-		drivebase_map_2022 = new DriveMap_4<>(0, 3, 1, 2, (int p)->new WPI_TalonSRX(p), Inversions.RIGHT, DriveLayout.DIFFERENTIAL);
+		drivebase_map_2022 = new DriveMap_4<>(0, 3, 1, 2, Motors.can_talonsrx, Inversions.RIGHT, DriveLayout.DIFFERENTIAL);
 
 	public static final int 
 		intake_port = 1,		// port for intake motor
@@ -30,7 +31,7 @@ public final class Constants {
 
 	public static final double 
 // degrees
-		turn_thresh = 1.0,				// threshold targeting angle
+		turn_thresh = 1.0,				// threshold for targeting angle
 		target_angle_range_lr = 20.0,	// maximum angle range that a target could be offset (used as divisor for P-loop)
 // inches
 		cargo_thresh = 20.0,			// threshold distance for a cargo to be considered close enough to influenced by intake
