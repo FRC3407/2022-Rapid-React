@@ -23,7 +23,7 @@ public class HubFind extends DriveBase.DriveCommandBase {
 			VisionServer.Get().setCamera(this.camera);
 		}
 		if(!RapidReactVision.verifyHubPipelineActive()) {
-			System.out.println("HubFind: Failed to set UpperHub pipeline");
+			System.out.println("HubFind: Failed to set UpperHub pipeline.");
 			this.failed = true;
 			return;
 		}

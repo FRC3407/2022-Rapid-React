@@ -44,11 +44,13 @@ public final class Constants {
 
 		teleop_drivebase_scaling = -0.5,
 		teleop_drivebase_deadband = 0.05,
+
 		intake_speed = 0.65,
 		transfer_speed = 0.4,
 		feed_speed = 0.4,
+		shooter_default_speed = 0.85,
 
-		shooter_default_speed = 0.15,		// in meters per second
+		shooter_velocity = 8.0,				// in meters per second
 		shooter_speed_tollerance = 0.1,		// in meters per second
 
 // DriveBase closed-loop params
