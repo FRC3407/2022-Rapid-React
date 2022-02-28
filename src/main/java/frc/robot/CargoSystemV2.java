@@ -1,9 +1,11 @@
 package frc.robot;
 
+import java.util.function.BooleanSupplier;
 import java.util.function.DoubleSupplier;
 
 import frc.robot.modules.common.drive.Motors;
 import frc.robot.modules.common.drive.Motors.MotorSupplier;
+import frc.robot.modules.vision.java.VisionServer;
 
 import com.ctre.phoenix.motorcontrol.*;
 import com.ctre.phoenix.motorcontrol.can.*;
@@ -59,7 +61,9 @@ public final class CargoSystemV2 {
 		private final MotorControllerGroup motors;
 		private final DigitalInput input, output;
 		private int cargo_cnt = 0;
-		private boolean last_input = false, last_output = false;
+		private boolean
+			now_input = false, now_output = false,
+			last_input = false, last_output = false;
 
 		public TransferSubsystem(MotorController... ms) { this(null, null, ms); }
 		public TransferSubsystem(DigitalInput i, DigitalInput o, MotorController... ms) {
@@ -95,16 +99,18 @@ public final class CargoSystemV2 {
 		}
 
 		@Override public void periodic() {
-			//if(this.input != null && this.output != null) {	// should be safe because of check within constructors -> uncomment if issue
-				if(this.last_input && !this.input.get()) {
-					this.cargo_cnt++;
-				}
-				if(this.last_output && !this.output.get()) {
-					this.cargo_cnt--;
-				}
-				this.last_input = this.input.get();
-				this.last_output = this.output.get();
-			//}
+			if(this.input != null && this.output != null) {	// should be safe because of check within constructors -> uncomment if issue
+				this.last_input = this.now_input;
+				this.last_output = this.now_output;
+				this.now_input = this.input.get();
+				this.now_output = this.output.get();
+				if(this.isInputFallingEdge()) { this.cargo_cnt++; }
+				if(this.isOutputFallingEdge()) { this.cargo_cnt--; }
+			}
+		}
+
+		public void startAutomaticTransfer(double s) {
+			this.setDefaultCommand(new AutomaticTransfer(this, s));
 		}
 
 		public void set(double s, TransferCommand c) {
@@ -115,6 +121,9 @@ public final class CargoSystemV2 {
 		}
 		public void stop(TransferCommand c) {
 			this.motors.stopMotor();
+		}
+		public boolean hasFeedback() {
+			return this.input != null && this.output != null;
 		}
 		public boolean getCurrentInput() {
 			if(this.input != null) {
@@ -127,6 +136,18 @@ public final class CargoSystemV2 {
 				return this.output.get();
 			}
 			return false;
+		}
+		public boolean isInputRisingEdge() {
+			return !this.last_input && this.now_input;
+		}
+		public boolean isInputFallingEdge() {
+			return this.last_input && !this.now_input;
+		}
+		public boolean isOutputRisingEdge() {
+			return !this.last_output && this.now_output;
+		}
+		public boolean isOutputFallingEdge() {
+			return this.last_output && !this.now_output;
 		}
 		public int getCargoCount() {
 			return this.cargo_cnt;
@@ -268,6 +289,12 @@ public final class CargoSystemV2 {
 			}
 			return 0.0;
 		}
+		public boolean hasTalonShooter() {
+			return this.main != null;
+		}
+		public boolean hasFeedMotor() {
+			return this.feed != null;
+		}
 
 		public static abstract class ShooterCommand extends CommandBase {
 
@@ -289,6 +316,8 @@ public final class CargoSystemV2 {
 
 
 
+
+
 	private final IntakeSubsystem intake;
 	private final TransferSubsystem transfer;
 	private final ShooterSubsystem shooter;
@@ -299,13 +328,37 @@ public final class CargoSystemV2 {
 		this.shooter = s;
 	}
 
+	public void startAutomaticTransfer(double s) { this.transfer.startAutomaticTransfer(s); }
+
 	public BasicIntake basicIntake(double s) { return new BasicIntake(this.intake, s); }
+	public BasicIntake basicIntake(DoubleSupplier s) { return new BasicIntake(this.intake, s); }
+	public ManagedIntake managedIntake(double s) { return new ManagedIntake(this.intake, this.transfer, s); }
+	public ManagedIntake managedIntake(DoubleSupplier s) { return new ManagedIntake(this.intake, this.transfer, s); }
+	public BasicTransfer basicTransfer(double s) { return new BasicTransfer(this.transfer, s); }
+	public BasicTransfer basicTransfer(DoubleSupplier s) { return new BasicTransfer(this.transfer, s); }
+
+	public BasicShoot basicShoot(BooleanSupplier f, double fs, double ss) { return new BasicShoot(this.shooter, f, fs, ss); }
+	public BasicShoot basicShoot(BooleanSupplier f, DoubleSupplier fs, DoubleSupplier ss) { return new BasicShoot(this.shooter, f, fs, ss); }
+	public ManagedShoot managedShoot(BooleanSupplier f, double fs, double ss) { return new ManagedShoot(this.shooter, this.transfer, f, fs, ss); }
+	public ManagedShoot managedShoot(BooleanSupplier f, DoubleSupplier fs, DoubleSupplier ss) { return new ManagedShoot(this.shooter, this.transfer, f, fs, ss); }
+	public ShootOne shootSingle(double fs, double ss, double ts) { return new ShootOne(this.shooter, this.transfer, fs, ss, ts); }
+	public ShootAll shootAll(double fs, double ss, double ts) { return new ShootAll(this.shooter, this.transfer, fs, ss, ts); }
+	public BasicShootCL basicShootVelocity(BooleanSupplier f, double fs, double sv) { return new BasicShootCL(this.shooter, f, fs, sv); }
+	public BasicShootCL basicShootVelocity(BooleanSupplier f, DoubleSupplier fs, DoubleSupplier sv) { return new BasicShootCL(this.shooter, f, fs, sv); }
+	public ManagedShootCL managedShootVelocity(BooleanSupplier f, double fs, double sv) { return new ManagedShootCL(this.shooter, this.transfer, f, fs, sv); }
+	public ManagedShootCL managedShootVelocity(BooleanSupplier f, DoubleSupplier fs, DoubleSupplier sv) { return new ManagedShootCL(this.shooter, this.transfer, f, fs, sv); }
+	public VisionShoot visionShoot(BooleanSupplier f, double fs, VisionServer.Conversion in2vlt) { return new VisionShoot(this.shooter, this.transfer, f, fs, in2vlt); }
+	public VisionShootOne visionShootSingle(double fs, double ts, VisionServer.Conversion in2vlt) { return new VisionShootOne(this.shooter, this.transfer, fs, ts, in2vlt); }
+	public VisionShootAll visionShootAll(double fs, double ts, VisionServer.Conversion in2vlt) { return new VisionShootAll(this.shooter, this.transfer, fs, ts, in2vlt); }
+
+
 
 
 
 	public static class BasicIntake extends IntakeSubsystem.IntakeCommand {
 
 		private final DoubleSupplier speed;
+
 		private BasicIntake(IntakeSubsystem i, double s) { this(i, ()->s); }
 		private BasicIntake(IntakeSubsystem i, DoubleSupplier s) {
 			super(i);
@@ -313,19 +366,434 @@ public final class CargoSystemV2 {
 		}
 
 		@Override public void initialize() {
-			System.out.println(getName() + ": Running...");
+			System.out.println("BasicIntake: Running...");
 		}
 		@Override public void execute() {
 			super.intake_sys.set(this.speed.getAsDouble(), this);
 		}
 		@Override public void end(boolean i) {
-			System.out.println(i ? getName() + ": Terminated." : getName() + "Completed.");
-			super.end(i);
+			super.intake_sys.stop(this);
+			System.out.println(i ? "BasicIntake: Terminated." : "BasicIntake: Completed.");
 		}
 		@Override public boolean isFinished() { return false; }
 
 
 	}
+	public static class ManagedIntake extends BasicIntake {
+
+		private final TransferSubsystem transfer_sys;
+
+		private ManagedIntake(IntakeSubsystem i, TransferSubsystem t, double s) { this(i, t, ()->s); }
+		private ManagedIntake(IntakeSubsystem i, TransferSubsystem t, DoubleSupplier s) {
+			super(i, s);
+			this.transfer_sys = t;
+		}
+
+		@Override public void initialize() {
+			if(!this.transfer_sys.hasFeedback()) {
+				System.out.println("ManagedIntake: No feedback sensors detected. Defaulting to BasicIntake.");
+			}
+			System.out.println("ManagedIntake: Running...");
+		}
+		@Override public void execute() {
+			if(this.transfer_sys.cargo_cnt < 2) {
+				super.execute();
+			} else {
+				super.intake_sys.set(0, this);
+			}
+		}
+		@Override public void end(boolean i) {
+			super.intake_sys.stop(this);
+			System.out.println(i ? "ManagedIntake: Terminated." : "ManagedIntake: Completed.");
+		}
+		@Override public boolean isFinished() { return false; }
+
+
+	}
+	public static class BasicTransfer extends TransferSubsystem.TransferCommand {
+
+		private final DoubleSupplier speed;
+
+		private BasicTransfer(TransferSubsystem t, double s) { this(t, ()->s); }
+		private BasicTransfer(TransferSubsystem t, DoubleSupplier s) {
+			super(t);
+			this.speed = s;
+		}
+
+		@Override public void initialize() {
+			System.out.println("BasicTransfer: Running...");
+		}
+		@Override public void execute() {
+			super.transfer_sys.set(this.speed.getAsDouble(), this);
+		}
+		@Override public void end(boolean i) {
+			super.transfer_sys.stop(this);
+			System.out.println(i ? "BasicTransfer: Terminated." : "BasicTransfer: Completed.");
+		}
+		@Override public boolean isFinished() { return false; }
+
+
+	}
+	private static class AutomaticTransfer extends BasicTransfer {
+
+		private AutomaticTransfer(TransferSubsystem t, double s) { super(t, s); }
+		private AutomaticTransfer(TransferSubsystem t, DoubleSupplier s) { super(t, s); }
+
+		@Override public void initialize() {
+			if(!super.transfer_sys.hasFeedback()) {
+				System.out.println("AutomoaticTransfer: No feedback sensors detected. Automatic transfer disabled.");
+			} else {
+				System.out.println("AutomaticTransfer: Running...");
+			}
+		}
+		@Override public void execute() {
+			if(super.transfer_sys.getCurrentInput() && !super.transfer_sys.getCurrentOutput() && super.transfer_sys.getCargoCount() <= 2) {
+				super.execute();
+			} else {
+				super.transfer_sys.set(0, this);
+			}
+		}
+		@Override public void end(boolean i) {
+			super.transfer_sys.stop(this);
+			System.out.println(i ? "AutomaticTransfer: Terminated." : "AutomaticTransfer: Completed.");
+		}
+		@Override public boolean isFinished() {
+			//return !super.transfer_sys.hasFeedback();
+			return false; 	// "default commands should not end"
+		}
+
+
+	}
+
+
+
+	public static class BasicShoot extends ShooterSubsystem.ShooterCommand {
+
+		protected final DoubleSupplier sspeed, fspeed;
+		protected final BooleanSupplier feed;
+
+		private BasicShoot(ShooterSubsystem s, BooleanSupplier f, double fs, double ss) { this(s, f, ()->fs, ()->ss); }
+		private BasicShoot(ShooterSubsystem s, BooleanSupplier f, DoubleSupplier fs, DoubleSupplier ss) {
+			super(s);
+			this.sspeed = ss;
+			this.fspeed = fs;
+			this.feed = f;
+		}
+
+		@Override public void initialize() {
+			System.out.println("BasicShoot: Running...");
+		}
+		@Override public void execute() {
+			super.shooter_sys.setShooter(this.sspeed.getAsDouble(), this);
+			if(this.feed.getAsBoolean()) {
+				super.shooter_sys.setFeed(this.fspeed.getAsDouble(), this);
+			} else {
+				super.shooter_sys.setFeed(0, this);
+			}
+		}
+		@Override public void end(boolean i) {
+			this.shooter_sys.stopShooter(this);
+			this.shooter_sys.stopFeed(this);
+			System.out.println(i ? "BasicShoot: Terminated." : "BasicShoot: Completed.");
+		}
+		@Override public boolean isFinished() { return false; }
+
+
+	}
+	public static class ManagedShoot extends BasicShoot {	// basicshoot except that this only runs when there is no feedback system or when there is and cargo is present in the transfer system
+
+		private final TransferSubsystem transfer_sys;
+
+		private ManagedShoot(ShooterSubsystem s, TransferSubsystem t, BooleanSupplier f, double fs, double ss) {
+			super(s, f, fs, ss);
+			this.transfer_sys = t;
+		}
+		private ManagedShoot(ShooterSubsystem s, TransferSubsystem t, BooleanSupplier f, DoubleSupplier fs, DoubleSupplier ss) {
+			super(s, f, fs, ss);
+			this.transfer_sys = t;
+		}
+
+		@Override public void initialize() {
+			if(!this.transfer_sys.hasFeedback()) {
+				System.out.println("ManagedShoot: No feedback sensors detected. Defaulting to BasicShoot.");
+			}
+			System.out.println("ManagedShoot: Running...");
+		}
+		// @Override public void execute() {
+		// 	if(!this.transfer_sys.hasFeedback() || this.transfer_sys.getCargoCount() > 0) {
+		// 		super.execute();
+		// 	} else {
+		// 		super.shooter_sys.setShooter(0, this);
+		// 		super.shooter_sys.setFeed(0, this);
+		// 	}
+		// }
+		@Override public void end(boolean i) {
+			this.shooter_sys.stopShooter(this);
+			this.shooter_sys.stopFeed(this);
+			System.out.println(i ? "ManagedShoot: Terminated." : "ManagedShoot: Completed.");
+		}
+		@Override public boolean isFinished() {
+			return this.transfer_sys.hasFeedback() && this.transfer_sys.getCargoCount() <= 0;
+		}
+
+
+	}
+	public static class ShootOne extends ShooterSubsystem.ShooterCommand {	// shoots a single cargo with the given speed - transfer sensors required
+
+		protected final TransferSubsystem transfer_sys;
+		private final BasicTransfer transfer_command;
+		private final double feed, shoot;
+
+		private ShootOne(ShooterSubsystem s, TransferSubsystem t, double fs, double ss, double ts) {
+			super(s);
+			this.transfer_sys = t;
+			this.transfer_command = new BasicTransfer(t, ts);	// command for setting transfer belt to 'ts' during the duration of this command
+			this.feed = fs;
+			this.shoot = ss;
+		}
+
+		@Override public void initialize() {
+			this.transfer_command.schedule(false);
+			System.out.println("ShootOne: Running...");
+		}
+		@Override public void execute() {
+			super.shooter_sys.setShooter(this.shoot, this);		// spin up shooter
+			super.shooter_sys.setFeed(this.transfer_sys.getCurrentOutput() ? this.feed : 0, this);	// set feed if output limit triggered
+		}
+		@Override public void end(boolean i) {
+			this.transfer_command.cancel();
+			super.shooter_sys.stopFeed(this);
+			super.shooter_sys.stopShooter(this);
+			System.out.println(i ? "ShootOne: Terminated." : "ShootOne: Completed.");
+		}
+		@Override public boolean isFinished() {
+			return !this.transfer_sys.hasFeedback() ||	// no feedback devices detected, or...
+				(this.transfer_sys.hasFeedback() && this.transfer_sys.isOutputFallingEdge());	// cargo leaving transfer system
+		}
+
+
+	}
+	public static class ShootAll extends ShootOne {		// shoots all cargo in the transfer system - transfer sensors required
+
+		private ShootAll(ShooterSubsystem s, TransferSubsystem t, double fs, double ss, double ts) { super(s, t, fs, ss, ts); }
+
+		@Override public void initialize() {
+			super.transfer_command.schedule(false);
+			System.out.println("ShootAll: Running...");
+		}
+		@Override public void end(boolean i) {
+			super.transfer_command.cancel();
+			super.shooter_sys.stopFeed(this);
+			super.shooter_sys.stopShooter(this);
+			System.out.println(i ? "ShootAll: Terminated." : "ShootAll: Completed.");
+		}
+		@Override public boolean isFinished() {
+			return !super.transfer_sys.hasFeedback() ||	// no feedback devices detected, or...
+				(super.transfer_sys.hasFeedback() && super.transfer_sys.getCargoCount() <= 0);	// no cargo left to shoot
+		}
+
+
+	}
+	/*
+		Speed units for shooter are in encoder units per second (see Constants for resolution).
+		Does nothing if shooter is not a talon (no encoder)
+	*/
+	public static class BasicShootCL extends BasicShoot {	// meant for manual control but with closed-loop velocity
+
+		private BasicShootCL(ShooterSubsystem s, BooleanSupplier f, double fs, double sv) { super(s, f, fs, sv); }
+		private BasicShootCL(ShooterSubsystem s, BooleanSupplier f, DoubleSupplier fs, DoubleSupplier sv) { super(s, f, fs, sv); }
+
+		@Override public void initialize() {
+			if(!super.shooter_sys.hasTalonShooter()) {
+				System.out.println("BasicShootCL: TalonFX shooter not detected. Shooter disabled.");
+				return;
+			}
+			System.out.println("BasicShoot: Running...");
+		}
+		@Override public void execute() {
+			if(super.shooter_sys.hasTalonShooter()) {	// if no talon, do nothing, else set to given speed
+				super.shooter_sys.setShooterVelocity(super.sspeed.getAsDouble() / 10, this);	// divide by ten to get units/100ms
+				if(super.feed.getAsBoolean() && super.shooter_sys.getShooterRawVelocity() >= super.sspeed.getAsDouble() / 10) {
+					super.shooter_sys.setFeed(super.fspeed.getAsDouble(), this);
+				} else {
+					super.shooter_sys.setFeed(0, this);
+				}
+			}
+		}
+		@Override public void end(boolean i) {
+			super.shooter_sys.stopShooter(this);
+			super.shooter_sys.stopFeed(this);
+			System.out.println(i ? "BasicShootCL: Terminated." : "BasicShootCL: Completed.");
+		}
+
+
+	}
+	/*
+		Speed units for shooter are in encoder units per second (see Constants for resolution).
+		Does nothing if shooter is not a talon (no encoder)
+	*/
+	public static class ManagedShootCL extends BasicShootCL {
+
+		private final TransferSubsystem transfer_sys;
+
+		private ManagedShootCL(ShooterSubsystem s, TransferSubsystem t, BooleanSupplier f, double fs, double sv) { this(s, t, f, ()->fs, ()->sv); }
+		private ManagedShootCL(ShooterSubsystem s, TransferSubsystem t, BooleanSupplier f, DoubleSupplier fs, DoubleSupplier sv) {
+			super(s, f, fs, sv);
+			this.transfer_sys = t;
+		}
+
+		@Override public void initialize() {
+			if(!this.transfer_sys.hasFeedback()) {
+				System.out.println("ManagedShootCL: No feedback sensors detected. Defaulting to BasicShootCL.");
+			}
+			if(!super.shooter_sys.hasTalonShooter()) {
+				System.out.println("ManagedShootCL: TalonFX shooter not detected. Shooter disabled.");
+				return;
+			}
+			System.out.println("ManagedShootCL: Running...");
+		}
+		// @Override public void execute() {
+		// 	if(super.shooter_sys.hasTalonShooter()) {	// if no talon, do nothing, else set to given speed
+		// 		super.shooter_sys.setShooterVelocity(super.sspeed.getAsDouble() / 10, this);	// divide by ten to get units/100ms
+		// 		if(super.feed.getAsBoolean() && super.shooter_sys.getShooterRawVelocity() >= super.sspeed.getAsDouble() / 10) {
+		// 			super.shooter_sys.setFeed(super.fspeed.getAsDouble(), this);
+		// 		} else {
+		// 			super.shooter_sys.setFeed(0, this);
+		// 		}
+		// 	}
+		// }
+		@Override public void end(boolean i) {
+			this.shooter_sys.stopShooter(this);
+			this.shooter_sys.stopFeed(this);
+			System.out.println(i ? "ManagedShootCL: Terminated." : "ManagedShootCL: Completed.");
+		}
+		@Override public boolean isFinished() {
+			return this.transfer_sys.hasFeedback() && this.transfer_sys.getCargoCount() <= 0;
+		}
+
+
+	}
+	// public static class ShootOneCL extends ShootOne {
+
+	// }
+	// public static class ShootAllCL extends ShootAll {
+
+	// }
+	public static class VisionShoot extends ManagedShoot {
+
+		private final VisionServer.Conversion inches2voltage;
+		private VisionServer.TargetData position = null;
+		private double last_speed = 0.0;
+		private boolean failed = false;
+
+		private VisionShoot(ShooterSubsystem s, TransferSubsystem t, BooleanSupplier f, double fs, VisionServer.Conversion in2vlt) {
+			super(s, t, f, fs, 0);
+			this.inches2voltage = in2vlt;
+		}
+
+		@Override public void initialize() {
+			VisionServer.Get().applyCameraPreset(Constants.cam_hub_pipeline);
+			VisionServer.Get().setCamera(Constants.hub_cam_name);
+			if(!RapidReactVision.verifyHubPipelineActive()) {
+				System.out.println("VisionShoot: Failed to set UpperHub pipeline.");
+				this.failed = true;
+				return;
+			}
+			System.out.println("VisionShoot: Running...");
+		}
+		@Override public void execute() {
+			if(!super.transfer_sys.hasFeedback() || super.transfer_sys.getCargoCount() > 0) {	// if sensors not detected or cargo in transfer system
+				this.position = RapidReactVision.getHubPosition();
+				if(this.position != null) {
+					this.last_speed = this.inches2voltage.convert(this.position.distance);	// updated calculated voltage
+				}
+				super.shooter_sys.setShooterVoltage(this.last_speed, this);		// set shooter speed
+				super.shooter_sys.setFeed(super.feed.getAsBoolean() ? super.fspeed.getAsDouble() : 0, this);	// set feed if booleansupplier allows
+			} else {	// otherwise stop motors
+				super.shooter_sys.setShooter(0, this);
+				super.shooter_sys.setFeed(0, this);
+			}
+		}
+		@Override public void end(boolean i) {
+			super.shooter_sys.stopShooter(this);
+			super.shooter_sys.stopFeed(this);
+			System.out.println(i ? "VisionShoot: Terminated." : "VisionShoot: Completed.");
+		}
+		@Override public boolean isFinished() {
+			if(this.position != null) {
+				return super.isFinished();
+			}
+			return this.failed;
+		}
+
+
+	}
+	public static class VisionShootOne extends ShootOne {
+
+		private final VisionServer.Conversion inches2voltage;
+		private VisionServer.TargetData position = null;
+		private double last_speed = 0.0;
+		private boolean failed = false;
+
+		private VisionShootOne(ShooterSubsystem s, TransferSubsystem t, double fs, double ts, VisionServer.Conversion in2vlt) {
+			super(s, t, fs, 0, ts);
+			this.inches2voltage = in2vlt;
+		}
+
+		@Override public void initialize() {
+			VisionServer.Get().applyCameraPreset(Constants.cam_hub_pipeline);
+			VisionServer.Get().setCamera(Constants.hub_cam_name);
+			if(!RapidReactVision.verifyHubPipelineActive()) {
+				System.out.println("VisionShootOne: Failed to set UpperHub pipeline.");
+				this.failed = true;
+				return;
+			}
+			super.transfer_command.schedule(false);
+			System.out.println("VisionShootOne: Running...");
+		}
+		@Override public void execute() {
+			this.position = RapidReactVision.getHubPosition();
+			if(this.position != null) {
+				this.last_speed = this.inches2voltage.convert(this.position.distance);
+			}
+			super.shooter_sys.setShooterVoltage(this.last_speed, this);
+			super.shooter_sys.setFeed(super.transfer_sys.getCurrentOutput() ? super.feed : 0, this);
+		}
+		@Override public void end(boolean i) {
+			super.transfer_command.cancel();
+			super.shooter_sys.stopFeed(this);
+			super.shooter_sys.stopShooter(this);
+			System.out.println(i ? "VisionShootOne: Terminated." : "VisionShootOne: Completed.");
+		}
+		@Override public boolean isFinished() {
+			if(this.position != null) {
+				return super.isFinished();
+			}
+			return this.failed;
+		}
+
+
+	}
+	public static class VisionShootAll extends VisionShootOne {
+
+		private VisionShootAll(ShooterSubsystem s, TransferSubsystem t, double fs, double ts, VisionServer.Conversion in2vlt) { super(s, t, fs, ts, in2vlt); }
+		// wrong print statements -> needs better solution that just copying from the previous command
+		@Override public boolean isFinished() {
+			if(super.position != null) {
+				return !super.transfer_sys.hasFeedback() ||	// no feedback devices detected, or...
+					(super.transfer_sys.hasFeedback() && super.transfer_sys.getCargoCount() <= 0);	// no cargo left to shoot
+			}
+			return super.failed;
+		}
+
+
+	}
+	// public static class VisionShootOneCL extends ShootOne {
+
+	// }
+	// public static class VisionShootAllCL extends ShootAll {
+
+	// }
 
 
 }
