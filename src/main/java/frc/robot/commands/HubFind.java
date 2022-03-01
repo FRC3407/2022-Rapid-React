@@ -1,5 +1,6 @@
 package frc.robot.commands;
 
+import frc.robot.modules.common.Input.AnalogSupplier;
 import frc.robot.modules.common.drive.*;
 import frc.robot.modules.vision.java.VisionServer;
 import frc.robot.Constants;
@@ -23,20 +24,38 @@ public class HubFind extends DriveBase.DriveCommandBase {
 			VisionServer.Get().setCamera(this.camera);
 		}
 		if(!RapidReactVision.verifyHubPipelineActive()) {
-			System.out.println("HubFind: Failed to set UpperHub pipeline.");
+			System.out.println(getClass().getSimpleName() + ": Failed to set UpperHub pipeline.");
 			this.failed = true;
 			return;
 		}
-		System.out.println("HubFind: Running...");
+		System.out.println(getClass().getSimpleName() + ": Running...");
 	}
 	@Override public void execute() {
 		super.autoTurn(Constants.auto_max_turn_speed * 0.75);
 	}
 	@Override public void end(boolean i) {
-		System.out.println(this.failed || i ? "HubFind: Terminated." : "HubFind: Completed.");
+		System.out.println(getClass().getSimpleName() + (this.failed || i ? ": Terminated." : ": Completed."));
 	}
 	@Override public boolean isFinished() {
-		return this.failed || RapidReactVision.getHubPosition() != null;	// initializing pipeline failed or the hub is visible
+		return this.failed || RapidReactVision.isHubDetected();		// initializing pipeline failed or the hub is visible
+	}
+
+
+
+	public static class TeleopAssist extends HubFind {
+
+		private final AnalogSupplier turnvec;
+
+		public TeleopAssist(DriveBase db, AnalogSupplier tv) {
+			super(db, Constants.hub_cam_name);
+			this.turnvec = tv;
+		}
+
+		@Override public void execute() {
+			super.autoTurn(Constants.auto_max_turn_speed * this.turnvec.get());
+		}
+
+
 	}
 
 

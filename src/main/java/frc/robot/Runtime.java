@@ -11,6 +11,7 @@ import frc.robot.modules.vision.java.*;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
+import edu.wpi.first.wpilibj2.command.ParallelCommandGroup;
 import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import edu.wpi.first.networktables.NetworkTableInstance;
@@ -30,7 +31,8 @@ import edu.wpi.first.networktables.NetworkTableInstance;
  x max output/scaling method for drivebase
  - make a spreadsheet for camera presets (each pipeline) under different lighting conditions
  x? fix controls being f'ed when not in sim mode and not connected on program startup
- - Teleop vision shoot controls and p-loop
+ - finalize/test Velocity-CL (TalonFX) shooter commands
+ - Polish cargo manipulation controls
  - AUTO!!!!
 
  - Tune hubturn p-loop
@@ -69,10 +71,13 @@ public class Runtime extends TimedRobot {
 
 	private void xboxControls() {	// bindings for xbox controller
 
-		SequentialCommandGroup drive = new SequentialCommandGroup(
-			new LambdaCommand(()->VisionServer.Get().setStatistics(false)),
-			new LambdaCommand(()->VisionServer.Get().applyCameraPreset(Constants.cam_driving)),
-			new LambdaCommand(()->VisionServer.Get().setProcessingEnabled(false)),
+		TeleopTrigger.Get().whenActive(
+			new SequentialCommandGroup(
+				new LambdaCommand(()->VisionServer.Get().setStatistics(false)),
+				new LambdaCommand(()->VisionServer.Get().setProcessingEnabled(false)),
+				new LambdaCommand(()->VisionServer.Get().applyCameraPreset(Constants.cam_driving))
+			)
+		).whenActive(
 			this.drivebase.modeDrive(
 				Xbox.Analog.LX.getSupplier(input),
 				Xbox.Analog.LY.getSupplier(input),
@@ -83,7 +88,7 @@ public class Runtime extends TimedRobot {
 				Xbox.Digital.RS.getPressedSupplier(input),
 				Xbox.Digital.LS.getPressedSupplier(input)
 			)
-		);
+		);	// schedule mode drive when in teleop mode
 
 		Xbox.Digital.DT.getCallbackFrom(this.input).whenPressed(VisionSubsystem.IncrementPipeline.Get());	// dpad top -> increment pipeline
 		Xbox.Digital.DB.getCallbackFrom(this.input).whenPressed(VisionSubsystem.DecrementPipeline.Get());	// dpad bottom -> decrement pipeline
@@ -102,6 +107,7 @@ public class Runtime extends TimedRobot {
 		).and( TeleopTrigger.Get() ).whileActiveOnce(				// and in teleop mode...
 			this.cargo_sys.basicIntake(Constants.intake_speed)		// override the intake (unmanaged)
 		);
+
 		Xbox.Digital.Y.getCallbackFrom(this.input).and(				// when 'Y' is pressed...
 			Xbox.Digital.LB.getCallbackFrom(this.input)				// and 'LB' IS pressed...
 		).and( TeleopTrigger.Get() ).whileActiveOnce(				// and in teleop mode...
@@ -110,7 +116,7 @@ public class Runtime extends TimedRobot {
 		Xbox.Digital.B.getCallbackFrom(this.input).and(				// when 'B' is pressed...
 			Xbox.Digital.LB.getCallbackFrom(this.input).negate()	// and 'LB' IS NOT pressed...
 		).and(
-			Xbox.Digital.RB.getCallbackFrom(this.input).negate()	// and 'RB' IS NOT pressed...
+			Xbox.Digital.RB.getToggleFrom(this.input).negate()		// and 'RB' IS NOT toggled...
 		).and( TeleopTrigger.Get() ).toggleWhenActive(				// and in teleop mode...
 			this.cargo_sys.managedShoot(							// control the shooter (managed)
 				()->Xbox.Digital.A.getValueOf(this.input),
@@ -127,32 +133,53 @@ public class Runtime extends TimedRobot {
 				Constants.shooter_default_speed
 			)
 		);
-		Xbox.Digital.RB.getCallbackFrom(this.input).and(				// when 'RB' is pressed...
-			/*Xbox.Digital.B.getCallbackFrom(this.input)				// and 'B' is pressed...
-		).and(*/TeleopTrigger.Get() ).toggleWhenActive(				// and in teleop mode...
-			this.cargo_sys.visionShoot(								// control the shooter with velocity determined by vision
-				()->Xbox.Digital.A.getValueOf(this.input),
-				Constants.feed_speed,
-				(double in)-> in / 200.0 * 12.0						// 200 inches @ max power, 12v max voltage (obviously needs to be tuned)
-			)
-		);
-		Xbox.Digital.Y.getCallbackFrom(this.input).and(
-			Xbox.Digital.LB.getCallbackFrom(this.input).negate()
-		).and( TeleopTrigger.Get() ).whenActive(
+
+		Xbox.Digital.RB.getToggleFrom(this.input).and(
+			TeleopTrigger.Get()
+		).whenActive(
 			new SequentialCommandGroup(
-				new LambdaCommand(()->drive.cancel()),
-				new LambdaCommand(()->System.out.println("Driving disabled."))
+				new LambdaCommand(()->System.out.println("VISION ASSIST RUNNING...")),
+				new LambdaCommand(()->this.drivebase.modeDrive().cancel()),		// disable driving
+				new LambdaCommand(()->VisionServer.Get().setStatistics(true)),
+				new LambdaCommand(()->VisionServer.Get().setProcessingEnabled(true)),
+				new LambdaCommand(()->VisionServer.Get().applyCameraPreset(Constants.cam_hub_pipeline))
+			)
+		).whileActiveOnce(
+			new ParallelCommandGroup(
+				this.cargo_sys.visionShoot(							// control the shooter with velocity determined by vision
+					()->Xbox.Digital.A.getValueOf(this.input),		// press 'A' to feed
+					Constants.feed_speed,
+					(double inches)-> inches / 200.0 * 12.0			// 200 inches @ max power, 12v max voltage (obviously needs to be tuned)
+				),
+				new SequentialCommandGroup(							// LT and RT control turning speed of aim assist
+					new HubFind.TeleopAssist(this.drivebase, ()->Xbox.Analog.RT.getValueOf(this.input) - Xbox.Analog.LT.getValueOf(this.input)),
+					new HubTurn.TeleopAssist(this.drivebase, ()->Xbox.Analog.RT.getValueOf(this.input) - Xbox.Analog.LT.getValueOf(this.input))
+				)
 			)
 		).whenInactive(
 			new SequentialCommandGroup(
-				new LambdaCommand(()->drive.schedule(false)),
-				new LambdaCommand(()->System.out.println("Driving enabled."))
+				new LambdaCommand(()->System.out.println("VISION ASSIST TERMINATED.")),
+				new LambdaCommand(()->this.drivebase.modeDrive().schedule()),		// re-enable driving
+				new LambdaCommand(()->VisionServer.Get().setStatistics(false)),
+				new LambdaCommand(()->VisionServer.Get().setProcessingEnabled(false)),
+				new LambdaCommand(()->VisionServer.Get().applyCameraPreset(Constants.cam_driving))
 			)
-		).whileActiveOnce(
-			new HubTurn(this.drivebase, Constants.hub_cam_name)
 		);
-
-		TeleopTrigger.Get().whenActive( drive, false );
+		// Xbox.Digital.Y.getCallbackFrom(this.input).and(
+		// 	Xbox.Digital.LB.getCallbackFrom(this.input).negate()
+		// ).and( TeleopTrigger.Get() ).whenActive(
+		// 	new SequentialCommandGroup(
+		// 		new LambdaCommand(()->this.drivebase.modeDrive().cancel()),
+		// 		new LambdaCommand(()->System.out.println("Driving disabled."))
+		// 	)
+		// ).whenInactive(
+		// 	new SequentialCommandGroup(
+		// 		new LambdaCommand(()->this.drivebase.modeDrive().schedule(false)),
+		// 		new LambdaCommand(()->System.out.println("Driving enabled."))
+		// 	)
+		// ).whileActiveOnce(
+		// 	new HubTurn(this.drivebase, Constants.hub_cam_name)
+		// );
 
 		System.out.println("Xbox Bindings Scheduled.");
 

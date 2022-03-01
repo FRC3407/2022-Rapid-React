@@ -259,4 +259,11 @@ public class RapidReactVision {
 		return getClosestAllianceCargo(a) != null;
 	}
 
+
+
+	public static double getHubBaseDistance(VisionServer.TargetData d, double height) {		// output in inches
+		return Math.sqrt(Math.pow(d.distance, 2) - Math.pow(height, 2));	// pythagorean solved for A (sqrt(C^2 - B^2) = A)
+	}
+
+
 }
