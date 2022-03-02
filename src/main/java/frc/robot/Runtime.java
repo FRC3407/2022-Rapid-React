@@ -16,9 +16,6 @@ import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import edu.wpi.first.networktables.NetworkTableInstance;
 
-// import frc.robot.modules.common.drive.Types.*;
-// import edu.wpi.first.wpilibj.motorcontrol.PWMVictorSPX;
-
 
 /* TODO:
  x Split VisionServer into base and an extension that integrates command-based structure (this would extend SubsystemBase)
@@ -42,25 +39,23 @@ import edu.wpi.first.networktables.NetworkTableInstance;
 public class Runtime extends TimedRobot {
 
 	private final InputDevice
-		input = new InputDevice(0),		// controller
+		input = new InputDevice(0),			// xbox controller
+
 		stick_left = new InputDevice(1),	// acrade stick (left)
 		stick_right = new InputDevice(2);	// arcade stick (right)
+
 	private final DriveBase drivebase = new DriveBase(Constants.drivebase_map_2022);
 	private final CargoSystemV2 cargo_sys = new CargoSystemV2(
 		new CargoSystemV2.IntakeSubsystem(Constants.intake_port),
 		new CargoSystemV2.TransferSubsystem(Constants.transfer_ports),
 		new CargoSystemV2.ShooterSubsystem(Motors.pwm_victorspx, Constants.w0_shooter_port, Motors.pwm_victorspx, Constants.feed_port)
 	);
-	// private final CargoSystem.WeekZero w0_cargo_sys = new CargoSystem.WeekZero(
-	// 	Constants.intake_port,
-	// 	Constants.feed_port,
-	// 	Constants.w0_shooter_port,
-	// 	Constants.transfer_ports
-	// );
+
+	//private boolean has_bindings = false;
+
 
 	public Runtime() {
 		System.out.println("RUNTIME INITIALIZATION");
-		VisionServer.Get();		// init VS before it needs to be used
 
 		this.drivebase.setSpeedScaling(Constants.teleop_drivebase_scaling);
 		this.drivebase.setSpeedDeadband(Constants.teleop_drivebase_deadband);
@@ -69,13 +64,84 @@ public class Runtime extends TimedRobot {
 		this.cargo_sys.startAutomaticTransfer(Constants.transfer_speed);
 	}
 
+	@Override public void robotPeriodic() { CommandScheduler.getInstance().run(); }
+	@Override public void robotInit() {
+		//AutonomousTrigger.Get().whenActive( new Auto.WeekZero(this.drivebase, this.w0_cargo_sys) );
+		//TestTrigger.Get().whenActive( new CargoFollow.Demo(this.drivebase, DriverStation.getAlliance(), Constants.cargo_cam_name) );
+
+		new Trigger(()->VisionServer.isConnected()).whenActive(new LambdaCommand(()->System.out.println("VisionServer Connected")));
+
+		if(this.input.isConnected()) {
+			this.xboxControls();
+		} else {
+			this.input.connectionTrigger().whenActive(
+				new LambdaCommand.Singular(()->{
+					this.xboxControls();
+					System.out.println("Xbox Bindings Scheduled.");
+				}, true)
+			);
+		}
+		// if(this.stick_left.isConnected() && this.stick_right.isConnected()) {
+		// 	this.arcadeControls();
+		// } else {
+		// 	this.stick_left.connectionTrigger().and(this.stick_right.connectionTrigger()).whenActive(
+		// 		new LambdaCommand.Singular(()->{
+		// 			this.arcadeControls();
+		// 			System.out.println("Arcade Bindings Scheduled.");
+		// 		}, true)
+		// 	);
+		// }
+
+		// this.input.connectionTrigger().and(
+		// 	this.stick_left.connectionTrigger().and(this.stick_right.connectionTrigger()).negate()
+		// ).and(
+		// 	new Trigger(()->this.has_bindings).negate()
+		// ).whenActive(
+		// 	new LambdaCommand.Singular(()->{
+		// 		this.xboxControls();
+		// 		System.out.println("Xbox Bindings Scheduled.");
+		// 		this.has_bindings = true;
+		// 	}, true)
+		// );
+		// this.stick_left.connectionTrigger().and(this.stick_right.connectionTrigger()).and(
+		// 	this.input.connectionTrigger().negate()
+		// ).and(
+		// 	new Trigger(()->this.has_bindings).negate()
+		// ).whenActive(
+		// 	new LambdaCommand.Singular(()->{
+		// 		this.arcadeControls();
+		// 		System.out.println("Arcade Bindings Scheduled.");
+		// 		this.has_bindings = true;
+		// 	}, true)
+		// );
+
+	}
+
+	@Override public void disabledInit() {}
+	@Override public void disabledPeriodic() {}
+	@Override public void disabledExit() {}
+
+	@Override public void autonomousInit() {}
+	@Override public void autonomousPeriodic() {}
+	@Override public void autonomousExit() {}
+
+	@Override public void teleopInit() {}
+	@Override public void teleopPeriodic() {}
+	@Override public void teleopExit() {}
+
+	@Override public void testInit() {}
+	@Override public void testPeriodic() {}
+	@Override public void testExit() {}
+
+
+
 	private void xboxControls() {	// bindings for xbox controller
 
 		TeleopTrigger.Get().whenActive(
 			new SequentialCommandGroup(
-				new LambdaCommand(()->VisionServer.Get().setStatistics(false)),
-				new LambdaCommand(()->VisionServer.Get().setProcessingEnabled(false)),
-				new LambdaCommand(()->VisionServer.Get().applyCameraPreset(Constants.cam_driving))
+				new LambdaCommand(()->VisionServer.setStatistics(false)),
+				new LambdaCommand(()->VisionServer.setProcessingEnabled(false)),
+				new LambdaCommand(()->VisionServer.applyCameraPreset(Constants.cam_driving))
 			)
 		).whenActive(
 			this.drivebase.modeDrive(
@@ -87,7 +153,7 @@ public class Runtime extends TimedRobot {
 				Xbox.Analog.RT.getSupplier(input),
 				Xbox.Digital.RS.getPressedSupplier(input),
 				Xbox.Digital.LS.getPressedSupplier(input)
-			)
+			), false
 		);	// schedule mode drive when in teleop mode
 
 		Xbox.Digital.DT.getCallbackFrom(this.input).whenPressed(VisionSubsystem.IncrementPipeline.Get());	// dpad top -> increment pipeline
@@ -126,6 +192,8 @@ public class Runtime extends TimedRobot {
 		);
 		Xbox.Digital.B.getCallbackFrom(this.input).and(				// when 'B' is pressed...
 			Xbox.Digital.LB.getCallbackFrom(this.input)				// and 'LB' IS pressed...
+		).and(
+			Xbox.Digital.RB.getToggleFrom(this.input).negate()		// and 'RB IS NOT toggled...'
 		).and( TeleopTrigger.Get() ).toggleWhenActive(				// and in teleop mode...
 			this.cargo_sys.basicShoot(								// control the shooter (unmanaged)
 				()->Xbox.Digital.A.getValueOf(this.input),
@@ -140,9 +208,9 @@ public class Runtime extends TimedRobot {
 			new SequentialCommandGroup(
 				new LambdaCommand(()->System.out.println("VISION ASSIST RUNNING...")),
 				new LambdaCommand(()->this.drivebase.modeDrive().cancel()),		// disable driving
-				new LambdaCommand(()->VisionServer.Get().setStatistics(true)),
-				new LambdaCommand(()->VisionServer.Get().setProcessingEnabled(true)),
-				new LambdaCommand(()->VisionServer.Get().applyCameraPreset(Constants.cam_hub_pipeline))
+				new LambdaCommand(()->VisionServer.setStatistics(true)),
+				new LambdaCommand(()->VisionServer.setProcessingEnabled(true)),
+				new LambdaCommand(()->VisionServer.applyCameraPreset(Constants.cam_hub_pipeline))
 			)
 		).whileActiveOnce(
 			new ParallelCommandGroup(
@@ -160,108 +228,111 @@ public class Runtime extends TimedRobot {
 			new SequentialCommandGroup(
 				new LambdaCommand(()->System.out.println("VISION ASSIST TERMINATED.")),
 				new LambdaCommand(()->this.drivebase.modeDrive().schedule()),		// re-enable driving
-				new LambdaCommand(()->VisionServer.Get().setStatistics(false)),
-				new LambdaCommand(()->VisionServer.Get().setProcessingEnabled(false)),
-				new LambdaCommand(()->VisionServer.Get().applyCameraPreset(Constants.cam_driving))
+				new LambdaCommand(()->VisionServer.setStatistics(false)),
+				new LambdaCommand(()->VisionServer.setProcessingEnabled(false)),
+				new LambdaCommand(()->VisionServer.applyCameraPreset(Constants.cam_driving))
 			)
 		);
-		// Xbox.Digital.Y.getCallbackFrom(this.input).and(
-		// 	Xbox.Digital.LB.getCallbackFrom(this.input).negate()
-		// ).and( TeleopTrigger.Get() ).whenActive(
-		// 	new SequentialCommandGroup(
-		// 		new LambdaCommand(()->this.drivebase.modeDrive().cancel()),
-		// 		new LambdaCommand(()->System.out.println("Driving disabled."))
-		// 	)
-		// ).whenInactive(
-		// 	new SequentialCommandGroup(
-		// 		new LambdaCommand(()->this.drivebase.modeDrive().schedule(false)),
-		// 		new LambdaCommand(()->System.out.println("Driving enabled."))
-		// 	)
-		// ).whileActiveOnce(
-		// 	new HubTurn(this.drivebase, Constants.hub_cam_name)
-		// );
-
-		System.out.println("Xbox Bindings Scheduled.");
 
 	}
 	private void arcadeControls() {	// bindings for arcade board
 
-		// right stick top buttons control vision stuff -> basically the same as the dpad bindings
+		TeleopTrigger.Get().whenActive(
+			new SequentialCommandGroup(
+				new LambdaCommand(()->VisionServer.setStatistics(false)),
+				new LambdaCommand(()->VisionServer.setProcessingEnabled(false)),
+				new LambdaCommand(()->VisionServer.applyCameraPreset(Constants.cam_driving))
+			)
+		).whenActive(
+			this.drivebase.modeDrive(
+				Attack3.Analog.X.getSupplier(this.stick_left),
+				Attack3.Analog.Y.getSupplier(this.stick_left),
+				Attack3.Analog.X.getSupplier(this.stick_right),
+				Attack3.Analog.Y.getSupplier(this.stick_right),
+				Attack3.Digital.TR.getPressedSupplier(this.stick_right),
+				Attack3.Digital.TL.getPressedSupplier(this.stick_right)
+			), false
+		);	// schedule mode drive when in teleop mode
+
 		Attack3.Digital.TT.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.IncrementPipeline.Get());
 		Attack3.Digital.TB.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.DecrementPipeline.Get());
 		Attack3.Digital.TR.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.IncrementCamera.Get());
 		Attack3.Digital.TL.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.DecrementCamera.Get());
-		Attack3.Digital.TB.getCallbackFrom(this.stick_right).whenPressed(VisionSubsystem.ToggleProcessing.Get());
+		//Attack3.Digital.TB.getCallbackFrom(this.stick_right).whenPressed(VisionSubsystem.ToggleProcessing.Get());
 		//Attack3.Digital.TB.getCallbackFrom(this.stick_right).whenPressed(VisionSubsystem.ToggleStatistics.Get());
-		
-		// Attack3.Digital.TRI.getCallbackFrom(this.stick_left).and(TeleopTrigger.Get()).whileActiveOnce(
-		// 	this.w0_cargo_sys.intakeControl()
-		// );
-		// Attack3.Digital.TT.getCallbackFrom(this.stick_right).and(TeleopTrigger.Get()).whileActiveOnce(
-		// 	this.w0_cargo_sys.transferControl()
-		// );
-		// Attack3.Digital.TRI.getCallbackFrom(this.stick_right).and(TeleopTrigger.Get()).toggleWhenActive(
-		// 	this.w0_cargo_sys.shooterControl(0.85, /*Attack3.Digital.TB.getSupplier(this.stick_right)*/()->false, ()->false)
-		// );
 
-		
-		TeleopTrigger.Get().whenActive(
-			new SequentialCommandGroup(
-				new LambdaCommand(()->VisionServer.Get().setStatistics(false)),
-				new LambdaCommand(()->VisionServer.Get().applyCameraPreset(Constants.cam_driving)),
-				new LambdaCommand(()->VisionServer.Get().setProcessingEnabled(false)),
-				this.drivebase.modeDrive(
-					Attack3.Analog.X.getSupplier(this.stick_left),
-					Attack3.Analog.Y.getSupplier(this.stick_left),
-					Attack3.Analog.X.getSupplier(this.stick_right),
-					Attack3.Analog.Y.getSupplier(this.stick_right),
-					Attack3.Digital.TR.getPressedSupplier(this.stick_right),
-					Attack3.Digital.TL.getPressedSupplier(this.stick_right)
-				)
-			), false	// not interruptable because the drivebase should always be drivable in teleop mode
+		Attack3.Digital.TL.getCallbackFrom(this.stick_right).and(
+			Attack3.Digital.TRI.getCallbackFrom(this.stick_left).negate()
+		).and( TeleopTrigger.Get() ).whileActiveOnce(
+			this.cargo_sys.managedIntake(Constants.intake_speed)
 		);
-		
-		System.out.println("Arcade Bindings Scheduled.");
+		Attack3.Digital.TL.getCallbackFrom(this.stick_right).and(
+			Attack3.Digital.TRI.getCallbackFrom(this.stick_left)
+		).and( TeleopTrigger.Get() ).whileActiveOnce(
+			this.cargo_sys.basicIntake(Constants.intake_speed)
+		);
+
+		Attack3.Digital.TT.getCallbackFrom(this.stick_right).and(
+			Attack3.Digital.TRI.getCallbackFrom(this.stick_left)
+		).and( TeleopTrigger.Get() ).whileActiveOnce(
+			this.cargo_sys.basicTransfer(Constants.transfer_speed)
+		);
+		Attack3.Digital.TR.getCallbackFrom(this.stick_right).and(
+			Attack3.Digital.TRI.getCallbackFrom(this.stick_left).negate()
+		).and(
+			Attack3.Digital.TRI.getToggleFrom(this.stick_right).negate()
+		).and( TeleopTrigger.Get() ).toggleWhenActive(
+			this.cargo_sys.managedShoot(
+				()->Attack3.Digital.TB.getValueOf(this.stick_right),
+				Constants.feed_speed,
+				Constants.shooter_default_speed
+			)
+		);
+		Attack3.Digital.TR.getCallbackFrom(this.stick_right).and(
+			Attack3.Digital.TRI.getCallbackFrom(this.stick_left)
+		).and(
+			Attack3.Digital.TRI.getToggleFrom(this.stick_right).negate()
+		).and( TeleopTrigger.Get() ).toggleWhenActive(
+			this.cargo_sys.basicShoot(
+				()->Attack3.Digital.TB.getValueOf(this.stick_right),
+				Constants.feed_speed,
+				Constants.shooter_default_speed
+			)
+		);
+
+		Attack3.Digital.TRI.getToggleFrom(this.stick_right).and(
+			TeleopTrigger.Get()
+		).whenActive(
+			new SequentialCommandGroup(
+				new LambdaCommand(()->System.out.println("VISION ASSIST RUNNING...")),
+				new LambdaCommand(()->this.drivebase.modeDrive().cancel()),
+				new LambdaCommand(()->VisionServer.setStatistics(true)),
+				new LambdaCommand(()->VisionServer.setProcessingEnabled(true)),
+				new LambdaCommand(()->VisionServer.applyCameraPreset(Constants.cam_hub_pipeline))
+			)
+		).whileActiveOnce(
+			new ParallelCommandGroup(
+				this.cargo_sys.visionShoot(
+					()->Attack3.Digital.TB.getValueOf(this.stick_right),
+					Constants.feed_speed,
+					(double inches)-> inches / 200.0 * 12.0			// 200 inches @ max power, 12v max voltage (obviously needs to be tuned)
+				),
+				new SequentialCommandGroup(
+					new HubFind.TeleopAssist(this.drivebase, Attack3.Analog.X.getSupplier(this.stick_left)),
+					new HubTurn.TeleopAssist(this.drivebase, Attack3.Analog.X.getSupplier(this.stick_left))
+				)
+			)
+		).whenInactive(
+			new SequentialCommandGroup(
+				new LambdaCommand(()->System.out.println("VISION ASSIST TERMINATED.")),
+				new LambdaCommand(()->this.drivebase.modeDrive().schedule()),		// re-enable driving
+				new LambdaCommand(()->VisionServer.setStatistics(false)),
+				new LambdaCommand(()->VisionServer.setProcessingEnabled(false)),
+				new LambdaCommand(()->VisionServer.applyCameraPreset(Constants.cam_driving))
+			)
+		);
+
 	}
-
-	@Override public void robotPeriodic() { CommandScheduler.getInstance().run(); }
-	@Override public void robotInit() {
-		//AutonomousTrigger.Get().whenActive( new Auto.WeekZero(this.drivebase, this.w0_cargo_sys) );
-		//TestTrigger.Get().whenActive( new CargoFollow.Demo(this.drivebase, DriverStation.getAlliance(), Constants.cargo_cam_name) );
-
-		new Trigger(()->VisionServer.Get().isConnected()).whenActive(new LambdaCommand(()->System.out.println("VisionServer Connected")));
-
-		if(!this.input.isConnected()) {
-			this.input.connectionTrigger().whenActive(new LambdaCommand.Singular(()->{
-				this.xboxControls();
-			}, true));
-		} else {
-			this.xboxControls();
-		}
-		// if(!(this.stick_left.isConnected() && this.stick_right.isConnected())) {
-		// 	this.stick_left.connectionTrigger().and(this.stick_right.connectionTrigger()).whenActive(new LambdaCommand.Singular(()->{
-		// 		this.arcadeControls();
-		// 	}));
-		// } else {
-		// 	this.arcadeControls();
-		// }
-	}
-
-	@Override public void disabledInit() {}
-	@Override public void disabledPeriodic() {}
-	@Override public void disabledExit() {}
-
-	@Override public void autonomousInit() {}
-	@Override public void autonomousPeriodic() {}
-	@Override public void autonomousExit() {}
-
-	@Override public void teleopInit() {}
-	@Override public void teleopPeriodic() {}
-	@Override public void teleopExit() {}
-
-	@Override public void testInit() {}
-	@Override public void testPeriodic() {}
-	@Override public void testExit() {}
 
 
 }

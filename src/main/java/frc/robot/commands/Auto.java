@@ -18,8 +18,8 @@ public class Auto extends SequentialCommandGroup {
 
 	public Auto(DriveBase db, CargoSystem cs) {
 		super.addCommands(
-			new LambdaCommand(()->VisionServer.Get().setStatistics(true)),
-			new LambdaCommand(()->VisionServer.Get().setProcessingEnabled(true)),
+			new LambdaCommand(()->VisionServer.setStatistics(true)),
+			new LambdaCommand(()->VisionServer.setProcessingEnabled(true)),
 			new LambdaCommand(()->RapidReactVision.setCargoPipelineActive()),
 			//new LambdaCommand(()->RapidReactVision.setCargoAllianceColorMode(DriverStation.getAlliance())),
 		// move based on position on field and where a ball likely will be -> replace with trajectory movement when closed-loop is functional
@@ -55,8 +55,8 @@ public class Auto extends SequentialCommandGroup {
 		public WeekZero(DriveBase db, CargoSystem.WeekZero cs) {
 			super.addCommands(
 				new LambdaCommand(()->System.out.println("Autonomous Running...")),
-				new LambdaCommand(()->VisionServer.Get().setStatistics(true)),
-				new LambdaCommand(()->VisionServer.Get().setProcessingEnabled(true)),
+				new LambdaCommand(()->VisionServer.setStatistics(true)),
+				new LambdaCommand(()->VisionServer.setProcessingEnabled(true)),
 
 				// new ConditionalCommand(
 				// 	new ParallelCommandGroup(	// cargo detected -> drive towards it and intake
@@ -75,13 +75,13 @@ public class Auto extends SequentialCommandGroup {
 				// 			cs.transferControl().withTimeout(2)
 				// 		)
 				// 	),
-				// 	()->VisionServer.Get().isConnected() && RapidReactVision.isAllianceCargoDetected(DriverStation.getAlliance())
+				// 	()->VisionServer.isConnected() && RapidReactVision.isAllianceCargoDetected(DriverStation.getAlliance())
 				// ),
 				new ParallelRaceGroup(
 					new ConditionalCommand(
 						new CargoFollow(db, DriverStation.getAlliance(), Constants.cargo_cam_name).withTimeout(5),
 						new BasicAutoDrive(db, 0.25, 0.25).withTimeout(2),
-						()->VisionServer.Get().isConnected() && RapidReactVision.isAllianceCargoDetected(DriverStation.getAlliance())
+						()->VisionServer.isConnected() && RapidReactVision.isAllianceCargoDetected(DriverStation.getAlliance())
 					),
 					cs.intakeControl()
 				),

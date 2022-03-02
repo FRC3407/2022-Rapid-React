@@ -86,8 +86,28 @@
     }
   },
   "NetworkTables": {
+    "CameraPublisher": {
+      "Vision Stream": {
+        "open": true
+      }
+    },
     "LiveWindow": {
       "DriveBase": {
+        "open": true
+      },
+      "Ungrouped": {
+        "DifferentialDrive[1]": {
+          "open": true
+        },
+        "PWMVictorSPX[0]": {
+          "open": true
+        },
+        "PWMVictorSPX[1]": {
+          "open": true
+        },
+        "Scheduler": {
+          "open": true
+        },
         "open": true
       }
     },
