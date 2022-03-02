@@ -40,7 +40,7 @@ public final class Test {
 			this.preset = p;
 		}
 		@Override public void initialize() { 
-			VisionServer.Get().getCurrentCamera().applyPreset(this.preset); 
+			VisionServer.getCurrentCamera().applyPreset(this.preset); 
 		}
 		@Override public boolean isFinished() { return true; }
 		@Override public boolean runsWhenDisabled() { return true; }

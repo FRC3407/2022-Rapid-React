@@ -20,9 +20,9 @@ public class HubTurn extends DriveBase.DriveCommandBase {
 	}
 
 	@Override public void initialize() {
-		VisionServer.Get().applyCameraPreset(Constants.cam_hub_pipeline);
+		VisionServer.applyCameraPreset(Constants.cam_hub_pipeline);
 		if(this.camera != null) {
-			VisionServer.Get().setCamera(this.camera);
+			VisionServer.setCamera(this.camera);
 		}
 		if(!RapidReactVision.verifyHubPipelineActive()) {
 			System.out.println(getClass().getSimpleName() + ": Failed to set UpperHub pipeline");

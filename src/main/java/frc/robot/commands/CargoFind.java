@@ -25,9 +25,9 @@ public class CargoFind extends DriveBase.DriveCommandBase {
 
 	@Override public void initialize() {
 		RapidReactVision.setCargoPipelineScaling(4);
-		VisionServer.Get().applyCameraPreset(Constants.cam_cargo_pipeline);
+		VisionServer.applyCameraPreset(Constants.cam_cargo_pipeline);
 		if(this.camera != null) {
-			VisionServer.Get().setCamera(this.camera);
+			VisionServer.setCamera(this.camera);
 		}
 		if(!RapidReactVision.verifyCargoPipelineActive()) {
 			System.out.println("CargoFind: Failed to set Cargo pipeline");
