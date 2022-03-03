@@ -3,7 +3,7 @@
 name: Build Robot Code
 
 # Controls when the action will run. Triggers the workflow on push or pull request
-# events but only for the master branch.
+# events but only for the main branch.
 on:
   push:
     branches: [ main ]
@@ -23,7 +23,10 @@ jobs:
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-    - uses: actions/checkout@v2
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        submodules: recursive
 
     # Grant execute permission for gradlew
     - name: Grant execute permission for gradlew
