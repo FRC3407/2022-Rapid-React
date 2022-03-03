@@ -29,8 +29,9 @@ import edu.wpi.first.networktables.NetworkTableInstance;
  - make a spreadsheet for camera presets (each pipeline) under different lighting conditions
  x? fix controls being f'ed when not in sim mode and not connected on program startup
  - finalize/test Velocity-CL (TalonFX) shooter commands
- - Polish cargo manipulation controls
+ x? Polish cargo manipulation controls
  - AUTO!!!!
+ - make AnalogSupplier and DigitalSupplier extend BooleanSupplier and DigitalSupplier respectively
 
  - Tune hubturn p-loop
  - Change camera params / configure switching when camera positions are finalized
@@ -71,26 +72,26 @@ public class Runtime extends TimedRobot {
 
 		new Trigger(()->VisionServer.isConnected()).whenActive(new LambdaCommand(()->System.out.println("VisionServer Connected")));
 
-		if(this.input.isConnected()) {
-			this.xboxControls();
-		} else {
-			this.input.connectionTrigger().whenActive(
-				new LambdaCommand.Singular(()->{
-					this.xboxControls();
-					System.out.println("Xbox Bindings Scheduled.");
-				}, true)
-			);
-		}
-		// if(this.stick_left.isConnected() && this.stick_right.isConnected()) {
-		// 	this.arcadeControls();
+		// if(this.input.isConnected()) {
+		// 	this.xboxControls();
 		// } else {
-		// 	this.stick_left.connectionTrigger().and(this.stick_right.connectionTrigger()).whenActive(
+		// 	this.input.connectionTrigger().whenActive(
 		// 		new LambdaCommand.Singular(()->{
-		// 			this.arcadeControls();
-		// 			System.out.println("Arcade Bindings Scheduled.");
+		// 			this.xboxControls();
+		// 			System.out.println("Xbox Bindings Scheduled.");
 		// 		}, true)
 		// 	);
 		// }
+		if(this.stick_left.isConnected() && this.stick_right.isConnected()) {
+			this.arcadeControls();
+		} else {
+			this.stick_left.connectionTrigger().and(this.stick_right.connectionTrigger()).whenActive(
+				new LambdaCommand.Singular(()->{
+					this.arcadeControls();
+					System.out.println("Arcade Bindings Scheduled.");
+				}, true)
+			);
+		}
 
 		// this.input.connectionTrigger().and(
 		// 	this.stick_left.connectionTrigger().and(this.stick_right.connectionTrigger()).negate()
@@ -249,15 +250,15 @@ public class Runtime extends TimedRobot {
 				Attack3.Analog.Y.getSupplier(this.stick_left),
 				Attack3.Analog.X.getSupplier(this.stick_right),
 				Attack3.Analog.Y.getSupplier(this.stick_right),
-				Attack3.Digital.TR.getPressedSupplier(this.stick_right),
-				Attack3.Digital.TL.getPressedSupplier(this.stick_right)
+				Attack3.Digital.TR.getPressedSupplier(this.stick_left),
+				Attack3.Digital.TL.getPressedSupplier(this.stick_left)
 			), false
 		);	// schedule mode drive when in teleop mode
 
-		Attack3.Digital.TT.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.IncrementPipeline.Get());
-		Attack3.Digital.TB.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.DecrementPipeline.Get());
-		Attack3.Digital.TR.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.IncrementCamera.Get());
-		Attack3.Digital.TL.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.DecrementCamera.Get());
+		//Attack3.Digital.TT.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.IncrementPipeline.Get());
+		//Attack3.Digital.TB.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.DecrementPipeline.Get());
+		Attack3.Digital.TT.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.IncrementCamera.Get());
+		Attack3.Digital.TB.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.DecrementCamera.Get());
 		//Attack3.Digital.TB.getCallbackFrom(this.stick_right).whenPressed(VisionSubsystem.ToggleProcessing.Get());
 		//Attack3.Digital.TB.getCallbackFrom(this.stick_right).whenPressed(VisionSubsystem.ToggleStatistics.Get());
 
