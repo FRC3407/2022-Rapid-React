@@ -40,11 +40,13 @@ public final class Constants {
 		uncertainty_continuation_percentage = 0.95,	// if break in target detection, keep powering motors at this percent of the last values used
 		auto_max_turn_speed = 0.2,		// maximum speed when turning in place during auto
 		auto_max_forward_speed = 0.4,	// maximum speed when driving forward during auto
+		auto_max_acceleration = 2.5,	// maximum acceleration in percent output/sec^2
 		teleop_assist_turn_speed = 0.4,
 		motors_thresh_tozero = 0.1,		// the point where it is safe to go straight to zero (deceleration)
 
 		teleop_drivebase_scaling = -0.5,
 		teleop_drivebase_deadband = 0.05,
+		teleop_max_acceleration = 3.0,	// maximum acceleration in percent output/sec^2
 
 		intake_speed = 0.65,
 		transfer_speed = 0.6,

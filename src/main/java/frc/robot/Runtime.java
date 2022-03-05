@@ -8,13 +8,11 @@ import frc.robot.modules.common.drive.*;
 import frc.robot.modules.common.EventTriggers.*;
 import frc.robot.modules.vision.java.*;
 
-import edu.wpi.first.wpilibj.DriverStation;
-import edu.wpi.first.wpilibj.TimedRobot;
-import edu.wpi.first.wpilibj2.command.CommandScheduler;
-import edu.wpi.first.wpilibj2.command.ParallelCommandGroup;
-import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
-import edu.wpi.first.wpilibj2.command.button.Trigger;
-import edu.wpi.first.networktables.NetworkTableInstance;
+import edu.wpi.first.wpilibj.*;
+import edu.wpi.first.wpilibj.smartdashboard.*;
+import edu.wpi.first.wpilibj2.command.*;
+import edu.wpi.first.wpilibj2.command.button.*;
+//import edu.wpi.first.networktables.*;
 
 
 /* TODO:
@@ -51,8 +49,9 @@ public class Runtime extends TimedRobot {
 		new CargoSystemV2.TransferSubsystem(Constants.transfer_ports),
 		new CargoSystemV2.ShooterSubsystem(Motors.pwm_victorspx, Constants.w0_shooter_port, Motors.pwm_victorspx, Constants.feed_port)
 	);
+	private final ADIS16470 spi_imu = new ADIS16470();
 
-	//private boolean has_bindings = false;
+	//private final SendableChooser<Command> auto_command = new SendableChooser<>();
 
 
 	public Runtime() {
@@ -69,52 +68,30 @@ public class Runtime extends TimedRobot {
 	@Override public void robotInit() {
 		//AutonomousTrigger.Get().whenActive( new Auto.WeekZero(this.drivebase, this.w0_cargo_sys) );
 		//TestTrigger.Get().whenActive( new CargoFollow.Demo(this.drivebase, DriverStation.getAlliance(), Constants.cargo_cam_name) );
+		TestTrigger.Get().whileActiveContinuous(()->System.out.println("IMU Angle: " + this.spi_imu.getAngle()));
 
 		new Trigger(()->VisionServer.isConnected()).whenActive(new LambdaCommand(()->System.out.println("VisionServer Connected")));
 
-		// if(this.input.isConnected()) {
-		// 	this.xboxControls();
-		// } else {
-		// 	this.input.connectionTrigger().whenActive(
-		// 		new LambdaCommand.Singular(()->{
-		// 			this.xboxControls();
-		// 			System.out.println("Xbox Bindings Scheduled.");
-		// 		}, true)
-		// 	);
-		// }
-		if(this.stick_left.isConnected() && this.stick_right.isConnected()) {
-			this.arcadeControls();
+		if(this.input.isConnected()) {
+			this.xboxControls();
 		} else {
-			this.stick_left.connectionTrigger().and(this.stick_right.connectionTrigger()).whenActive(
+			this.input.connectionTrigger().whenActive(
 				new LambdaCommand.Singular(()->{
-					this.arcadeControls();
-					System.out.println("Arcade Bindings Scheduled.");
+					this.xboxControls();
+					System.out.println("Xbox Bindings Scheduled.");
 				}, true)
 			);
 		}
-
-		// this.input.connectionTrigger().and(
-		// 	this.stick_left.connectionTrigger().and(this.stick_right.connectionTrigger()).negate()
-		// ).and(
-		// 	new Trigger(()->this.has_bindings).negate()
-		// ).whenActive(
-		// 	new LambdaCommand.Singular(()->{
-		// 		this.xboxControls();
-		// 		System.out.println("Xbox Bindings Scheduled.");
-		// 		this.has_bindings = true;
-		// 	}, true)
-		// );
-		// this.stick_left.connectionTrigger().and(this.stick_right.connectionTrigger()).and(
-		// 	this.input.connectionTrigger().negate()
-		// ).and(
-		// 	new Trigger(()->this.has_bindings).negate()
-		// ).whenActive(
-		// 	new LambdaCommand.Singular(()->{
-		// 		this.arcadeControls();
-		// 		System.out.println("Arcade Bindings Scheduled.");
-		// 		this.has_bindings = true;
-		// 	}, true)
-		// );
+		// if(this.stick_left.isConnected() && this.stick_right.isConnected()) {
+		// 	this.arcadeControls();
+		// } else {
+		// 	this.stick_left.connectionTrigger().and(this.stick_right.connectionTrigger()).whenActive(
+		// 		new LambdaCommand.Singular(()->{
+		// 			this.arcadeControls();
+		// 			System.out.println("Arcade Bindings Scheduled.");
+		// 		}, true)
+		// 	);
+		// }
 
 	}
 
@@ -146,12 +123,12 @@ public class Runtime extends TimedRobot {
 			)
 		).whenActive(
 			this.drivebase.modeDrive(
-				Xbox.Analog.LX.getSupplier(input),
-				Xbox.Analog.LY.getSupplier(input),
-				Xbox.Analog.LT.getSupplier(input),
-				Xbox.Analog.RX.getSupplier(input),
-				Xbox.Analog.RY.getSupplier(input),
-				Xbox.Analog.RT.getSupplier(input),
+				Xbox.Analog.LX.getLimitedSupplier(input, Constants.teleop_max_acceleration),
+				Xbox.Analog.LY.getLimitedSupplier(input, Constants.teleop_max_acceleration),
+				Xbox.Analog.LT.getLimitedSupplier(input, Constants.teleop_max_acceleration),
+				Xbox.Analog.RX.getLimitedSupplier(input, Constants.teleop_max_acceleration),
+				Xbox.Analog.RY.getLimitedSupplier(input, Constants.teleop_max_acceleration),
+				Xbox.Analog.RT.getLimitedSupplier(input, Constants.teleop_max_acceleration),
 				Xbox.Digital.RS.getPressedSupplier(input),
 				Xbox.Digital.LS.getPressedSupplier(input)
 			), false
@@ -246,10 +223,10 @@ public class Runtime extends TimedRobot {
 			)
 		).whenActive(
 			this.drivebase.modeDrive(
-				Attack3.Analog.X.getSupplier(this.stick_left),
-				Attack3.Analog.Y.getSupplier(this.stick_left),
-				Attack3.Analog.X.getSupplier(this.stick_right),
-				Attack3.Analog.Y.getSupplier(this.stick_right),
+				Attack3.Analog.X.getLimitedSupplier(this.stick_left, Constants.teleop_max_acceleration),
+				Attack3.Analog.Y.getLimitedSupplier(this.stick_left, Constants.teleop_max_acceleration),
+				Attack3.Analog.X.getLimitedSupplier(this.stick_right, Constants.teleop_max_acceleration),
+				Attack3.Analog.Y.getLimitedSupplier(this.stick_right, Constants.teleop_max_acceleration),
 				Attack3.Digital.TR.getPressedSupplier(this.stick_left),
 				Attack3.Digital.TL.getPressedSupplier(this.stick_left)
 			), false
