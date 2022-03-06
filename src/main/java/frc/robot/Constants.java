@@ -11,15 +11,15 @@ import edu.wpi.first.wpilibj.motorcontrol.PWMVictorSPX;
 public final class Constants {
 
     //        descriptions >>  {fl fr bl br} {MotorController Instantiation}  {inversion settings}  {Drive layout}
-    //public static final DriveMap_4<PWMVictorSPX> 
-        //drivebase_map_testbot = new DriveMap_4<>(3, 1, 2, 0, (int p)->new PWMVictorSPX(p), Inversions.RIGHT, DriveLayout.DIFFERENTIAL)/*,
-        //drivebase_map_2019 = new DriveMap_4<>(6, 8, 9, 7, (int p)->new PWMVictorSPX(p), Inversions.RIGHT, DriveLayout.DIFFERENTIAL)*/;
+    public static final DriveMap_4<PWMVictorSPX> 
+        drivebase_map_testbot = new DriveMap_4<>(8, 6, 7, 5, Motors.pwm_victorspx, Inversions.RIGHT, DriveLayout.DIFFERENTIAL)/*,
+        //drivebase_map_2019 = new DriveMap_4<>(6, 8, 9, 7, Motors.pwm_victorsp, Inversions.RIGHT, DriveLayout.DIFFERENTIAL)*/;
 	public static final DriveMap_4<WPI_TalonSRX>
 		drivebase_map_2022 = new DriveMap_4<>(0, 3, 1, 2, Motors.can_talonsrx, Inversions.RIGHT, DriveLayout.DIFFERENTIAL);
 
 	public static final int 
 		intake_port = 1,		// port for intake motor
-		feed_port = 6,			// port for transfer system feed motor
+		feed_port = 3,			// port for transfer system feed motor
 		shooter_canid = 4,		// port for shooter motor (can id for falcon)
 		w0_shooter_port = 0,
 		lim_entering_dio = 0,
@@ -46,7 +46,7 @@ public final class Constants {
 
 		teleop_drivebase_scaling = -0.5,
 		teleop_drivebase_deadband = 0.05,
-		teleop_max_acceleration = 3.0,	// maximum acceleration in percent output/sec^2
+		teleop_max_acceleration = 2.0,	// maximum acceleration in percent output/sec^2
 
 		intake_speed = 0.65,
 		transfer_speed = 0.6,
