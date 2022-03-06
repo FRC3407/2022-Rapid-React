@@ -43,7 +43,7 @@ public class Runtime extends TimedRobot {
 		stick_left = new InputDevice(1),	// acrade stick (left)
 		stick_right = new InputDevice(2);	// arcade stick (right)
 
-	private final DriveBase drivebase = new DriveBase(Constants.drivebase_map_2022);
+	private final DriveBase drivebase = new DriveBase(Constants.drivebase_map_testbot);
 	private final CargoSystemV2 cargo_sys = new CargoSystemV2(
 		new CargoSystemV2.IntakeSubsystem(Constants.intake_port),
 		new CargoSystemV2.TransferSubsystem(Constants.transfer_ports),
@@ -66,9 +66,8 @@ public class Runtime extends TimedRobot {
 
 	@Override public void robotPeriodic() { CommandScheduler.getInstance().run(); }
 	@Override public void robotInit() {
-		//AutonomousTrigger.Get().whenActive( new Auto.WeekZero(this.drivebase, this.w0_cargo_sys) );
-		//TestTrigger.Get().whenActive( new CargoFollow.Demo(this.drivebase, DriverStation.getAlliance(), Constants.cargo_cam_name) );
-		TestTrigger.Get().whileActiveContinuous(()->System.out.println("IMU Angle: " + this.spi_imu.getAngle()));
+		//AutonomousTrigger.Get().whenActive( new Auto.GyroCL(this.drivebase, this.spi_imu) );
+		AutonomousTrigger.Get().whenActive( new CargoFollow.Demo(this.drivebase, DriverStation.getAlliance(), Constants.cargo_cam_name) );
 
 		new Trigger(()->VisionServer.isConnected()).whenActive(new LambdaCommand(()->System.out.println("VisionServer Connected")));
 
@@ -108,7 +107,9 @@ public class Runtime extends TimedRobot {
 	@Override public void teleopExit() {}
 
 	@Override public void testInit() {}
-	@Override public void testPeriodic() {}
+	@Override public void testPeriodic() {
+		System.out.println("IMU Angle: " + this.spi_imu.getAngle());
+	}
 	@Override public void testExit() {}
 
 

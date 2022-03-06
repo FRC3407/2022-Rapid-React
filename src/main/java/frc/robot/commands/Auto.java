@@ -8,6 +8,7 @@ import frc.robot.modules.common.drive.DriveBase;
 import frc.robot.modules.vision.java.VisionServer;
 
 import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.interfaces.Gyro;
 import edu.wpi.first.wpilibj2.command.*;
 
 
@@ -18,6 +19,17 @@ public class Auto {
 		public Basic(DriveBase db) {
 			super.addCommands(
 				new BasicDriveControl(db, 0.25, 0.25, Constants.auto_max_acceleration)
+			);
+		}
+
+	}
+
+	public static class GyroCL extends SequentialCommandGroup {
+		
+		public GyroCL(DriveBase db, Gyro gy) {
+			super.addCommands(
+				//new GyroDrive.Straight(db, gy, 0.25).withTimeout(3)
+				new GyroDrive.TurnInPlace(db, gy, 90)
 			);
 		}
 
