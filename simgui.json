@@ -1,11 +1,6 @@
 {
   "HALProvider": {
     "Other Devices": {
-      "ADIS16470[0]": {
-        "header": {
-          "open": true
-        }
-      },
       "BuiltInAccel": {
         "header": {
           "open": true
@@ -52,6 +47,7 @@
     "types": {
       "/FMSInfo": "FMSInfo",
       "/LiveWindow/BallManagement": "Subsystem",
+      "/LiveWindow/CLDifferentialBase": "Subsystem",
       "/LiveWindow/CargoSystem": "Subsystem",
       "/LiveWindow/DriveBase": "Subsystem",
       "/LiveWindow/GenericSubsystem": "Subsystem",
@@ -68,6 +64,7 @@
       "/LiveWindow/Ungrouped/PWMVictorSPX[2]": "Motor Controller",
       "/LiveWindow/Ungrouped/PWMVictorSPX[3]": "Motor Controller",
       "/LiveWindow/Ungrouped/PWMVictorSPX[4]": "Motor Controller",
+      "/LiveWindow/Ungrouped/PWMVictorSPX[5]": "Motor Controller",
       "/LiveWindow/Ungrouped/PWMVictorSPX[6]": "Motor Controller",
       "/LiveWindow/Ungrouped/PWMVictorSPX[7]": "Motor Controller",
       "/LiveWindow/Ungrouped/PWMVictorSPX[8]": "Motor Controller",

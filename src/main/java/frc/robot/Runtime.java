@@ -25,11 +25,12 @@ import edu.wpi.first.wpilibj2.command.button.*;
  - Methods/impelemtation to search DriverStation for a certain input (common.Input.InputDevice) and return object/port
  x max output/scaling method for drivebase
  - make a spreadsheet for camera presets (each pipeline) under different lighting conditions
- x? fix controls being f'ed when not in sim mode and not connected on program startup
+ x fix controls being f'ed when not in sim mode and not connected on program startup
  - finalize/test Velocity-CL (TalonFX) shooter commands
- x? Polish cargo manipulation controls
+ x Polish cargo manipulation controls
  - AUTO!!!!
- - make AnalogSupplier and DigitalSupplier extend BooleanSupplier and DigitalSupplier respectively
+ x make AnalogSupplier and DigitalSupplier extend BooleanSupplier and DigitalSupplier respectively
+ - Path planning and drivebase cl (all of it...)
 
  - Tune hubturn p-loop
  - Change camera params / configure switching when camera positions are finalized
@@ -43,13 +44,18 @@ public class Runtime extends TimedRobot {
 		stick_left = new InputDevice(1),	// acrade stick (left)
 		stick_right = new InputDevice(2);	// arcade stick (right)
 
-	private final DriveBase drivebase = new DriveBase(Constants.drivebase_map_testbot);
-	private final CargoSystemV2 cargo_sys = new CargoSystemV2(
-		new CargoSystemV2.IntakeSubsystem(Constants.intake_port),
-		new CargoSystemV2.TransferSubsystem(Constants.transfer_ports),
-		new CargoSystemV2.ShooterSubsystem(Motors.pwm_victorspx, Constants.w0_shooter_port, Motors.pwm_victorspx, Constants.feed_port)
-	);
 	private final ADIS16470 spi_imu = new ADIS16470();
+	//private final DriveBase drivebase = new DriveBase(Constants.drivebase_map_testbot);
+	private final CLDifferentialBase drivebase = new CLDifferentialBase(
+		Constants.drivebase_map_2022,
+		this.spi_imu,
+		Constants.cl_params
+	);
+	private final CargoSystem cargo_sys = new CargoSystem(
+		new CargoSystem.IntakeSubsystem(Constants.intake_port),
+		new CargoSystem.TransferSubsystem(Constants.transfer_ports),
+		new CargoSystem.ShooterSubsystem(Motors.pwm_victorspx, Constants.w0_shooter_port, Motors.pwm_victorspx, Constants.feed_port)
+	);
 
 	//private final SendableChooser<Command> auto_command = new SendableChooser<>();
 
@@ -107,9 +113,7 @@ public class Runtime extends TimedRobot {
 	@Override public void teleopExit() {}
 
 	@Override public void testInit() {}
-	@Override public void testPeriodic() {
-		System.out.println("IMU Angle: " + this.spi_imu.getAngle());
-	}
+	@Override public void testPeriodic() {}
 	@Override public void testExit() {}
 
 
@@ -164,7 +168,7 @@ public class Runtime extends TimedRobot {
 			Xbox.Digital.RB.getToggleFrom(this.input).negate()		// and 'RB' IS NOT toggled...
 		).and( TeleopTrigger.Get() ).toggleWhenActive(				// and in teleop mode...
 			this.cargo_sys.managedShoot(							// control the shooter (managed)
-				()->Xbox.Digital.A.getValueOf(this.input),
+				Xbox.Digital.A.getSupplier(this.input),
 				Constants.feed_speed,
 				Constants.shooter_default_speed
 			)
@@ -175,7 +179,7 @@ public class Runtime extends TimedRobot {
 			Xbox.Digital.RB.getToggleFrom(this.input).negate()		// and 'RB IS NOT toggled...'
 		).and( TeleopTrigger.Get() ).toggleWhenActive(				// and in teleop mode...
 			this.cargo_sys.basicShoot(								// control the shooter (unmanaged)
-				()->Xbox.Digital.A.getValueOf(this.input),
+			Xbox.Digital.A.getSupplier(this.input),
 				Constants.feed_speed,
 				Constants.shooter_default_speed
 			)
@@ -194,7 +198,7 @@ public class Runtime extends TimedRobot {
 		).whileActiveOnce(
 			new ParallelCommandGroup(
 				this.cargo_sys.visionShoot(							// control the shooter with velocity determined by vision
-					()->Xbox.Digital.A.getValueOf(this.input),		// press 'A' to feed
+				Xbox.Digital.A.getSupplier(this.input),				// press 'A' to feed
 					Constants.feed_speed,
 					(double inches)-> inches / 200.0 * 12.0			// 200 inches @ max power, 12v max voltage (obviously needs to be tuned)
 				),
@@ -262,7 +266,7 @@ public class Runtime extends TimedRobot {
 			Attack3.Digital.TRI.getToggleFrom(this.stick_right).negate()
 		).and( TeleopTrigger.Get() ).toggleWhenActive(
 			this.cargo_sys.managedShoot(
-				()->Attack3.Digital.TB.getValueOf(this.stick_right),
+				Attack3.Digital.TB.getSupplier(this.stick_right),
 				Constants.feed_speed,
 				Constants.shooter_default_speed
 			)
@@ -273,7 +277,7 @@ public class Runtime extends TimedRobot {
 			Attack3.Digital.TRI.getToggleFrom(this.stick_right).negate()
 		).and( TeleopTrigger.Get() ).toggleWhenActive(
 			this.cargo_sys.basicShoot(
-				()->Attack3.Digital.TB.getValueOf(this.stick_right),
+				Attack3.Digital.TB.getSupplier(this.stick_right),
 				Constants.feed_speed,
 				Constants.shooter_default_speed
 			)
@@ -292,7 +296,7 @@ public class Runtime extends TimedRobot {
 		).whileActiveOnce(
 			new ParallelCommandGroup(
 				this.cargo_sys.visionShoot(
-					()->Attack3.Digital.TB.getValueOf(this.stick_right),
+					Attack3.Digital.TB.getSupplier(this.stick_right),
 					Constants.feed_speed,
 					(double inches)-> inches / 200.0 * 12.0			// 200 inches @ max power, 12v max voltage (obviously needs to be tuned)
 				),
