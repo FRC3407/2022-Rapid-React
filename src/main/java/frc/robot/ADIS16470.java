@@ -34,4 +34,5 @@ public class ADIS16470 extends ADIS16470_IMU implements Gyro, Accelerometer {
 
 	}
 
+
 }

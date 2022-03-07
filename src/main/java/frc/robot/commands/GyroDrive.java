@@ -72,31 +72,42 @@ public class GyroDrive {
 	public static class ArcTurn extends DriveBase.RateLimitedAutoDrive {
 
 		private final Gyro gyro;
-		private final double target, speed;
+		private final double target, left, right;
 		private double calculated;
+		private boolean failed = false;
 
-		public ArcTurn(DriveBase db, Gyro gy, double s, double deg) {
+		public ArcTurn(DriveBase db, Gyro gy, double l, double r, double deg) {
 			super(db);
 			this.gyro = gy;
-			this.speed = s;
+			this.left = l;
+			this.right = r;
 			this.target = deg;
 		}
-		public ArcTurn(DriveBase db, Gyro gy, double s, double deg, double m) {
+		public ArcTurn(DriveBase db, Gyro gy, double l, double r, double deg, double m) {
 			super(db, m);
 			this.gyro = gy;
-			this.speed = s;
+			this.left = l;
+			this.right = r;
 			this.target = deg;
 		}
 
 		@Override public void initialize() {
-			this.calculated = this.gyro.getAngle() + this.target;
+			this.failed = false;
+			double ratio = this.left / this.right;
+			if(Math.abs(ratio - 1.0) < 0.05) {	// tune this -> if not enough difference to turn substancially
+				System.out.println("ArcTurn: Drivespeed ratio of " + ratio + " will not produce tight enough turn. Exitting...");
+				this.failed = true;
+				return;
+			}
+			this.calculated = (ratio < 1.0) ? (this.gyro.getAngle() - this.target) : (this.gyro.getAngle() + this.target);
+			System.out.println("ArcTurn: Running...");
 		}
 		@Override public void execute() {
-			double o = this.target - this.gyro.getAngle();
-			super.autoDrive(speed + (o / 360 * (speed/2.0)), speed - (o / 360 * (speed/2.0)));	// this will need to be fixed
+			double o = this.calculated - this.gyro.getAngle();
+			super.autoDrive(this.left - MathUtil.clamp(1.0 / o, -1.0, 1.0) * this.left, this.right - MathUtil.clamp(1.0 / o, -1.0, 1.0) * this.right);	// this will need to be fixed
 		}
 		@Override public boolean isFinished() {
-			return Math.abs(this.calculated - this.gyro.getAngle()) < 1.0;
+			return this.failed || Math.abs(this.calculated - this.gyro.getAngle()) < 1.0;
 		}
 
 
