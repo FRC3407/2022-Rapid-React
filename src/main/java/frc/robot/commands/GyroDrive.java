@@ -29,10 +29,14 @@ public class GyroDrive {
 
 		@Override public void initialize() {
 			this.initial = this.gyro.getAngle();
+			System.out.println("Gyro-Straight: Running...");
 		}
 		@Override public void execute() {
 			double o = this.gyro.getAngle() - this.initial;
 			super.autoDrive(this.speed - (o / 90.0 * speed), this.speed + (o / 90.0 * speed));	// probably needs tuning
+		}
+		@Override public void end(boolean i) {
+			System.out.println("Gyro-Straight: " + (i ? "Terminated." : "Completed."));
 		}
 
 
@@ -57,10 +61,14 @@ public class GyroDrive {
 
 		@Override public void initialize() {
 			this.calculated = this.gyro.getAngle() + this.target;
+			System.out.println("TurnInPlace: Running...");
 		}
 		@Override public void execute() {
-			System.out.println(((this.calculated - this.gyro.getAngle()) / 90.0) * Constants.auto_max_turn_speed);
+			//System.out.println(((this.calculated - this.gyro.getAngle()) / 90.0) * Constants.auto_max_turn_speed);
 			super.autoTurn(MathUtil.clamp(((this.calculated - this.gyro.getAngle()) / 90.0), -1.0, 1.0) * Constants.auto_max_turn_speed);	// also probably needs tuning
+		}
+		@Override public void end(boolean i) {
+			System.out.println("TurnInPlace: " + (i ? "Terminated." : "Completed."));
 		}
 		@Override public boolean isFinished() {
 			return Math.abs(this.calculated - this.gyro.getAngle()) < 1.0;
@@ -105,6 +113,9 @@ public class GyroDrive {
 		@Override public void execute() {
 			double o = this.calculated - this.gyro.getAngle();
 			super.autoDrive(this.left - MathUtil.clamp(1.0 / o, -1.0, 1.0) * this.left, this.right - MathUtil.clamp(1.0 / o, -1.0, 1.0) * this.right);	// this will need to be fixed
+		}
+		@Override public void end(boolean i) {
+			System.out.println("ArcTurn: " + (i ? "Terminated." : "Completed."));
 		}
 		@Override public boolean isFinished() {
 			return this.failed || Math.abs(this.calculated - this.gyro.getAngle()) < 1.0;

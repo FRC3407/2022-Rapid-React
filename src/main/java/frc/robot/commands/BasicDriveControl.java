@@ -18,10 +18,15 @@ public class BasicDriveControl extends DriveBase.RateLimitedAutoDrive {
 		this.right = r;
 	}
 
+	@Override public void initialize() {
+		System.out.println("BasicDrive: Running...");
+	}
 	@Override public void execute() {
 		super.autoDrive(this.left, this.right);
 	}
-	@Override public void end(boolean interrupted) {}
+	@Override public void end(boolean i) {
+		System.out.println("BasicDrive: " + (i ? "Terminated." : "Completed."));
+	}
 	@Override public boolean isFinished() { return false; }
 
 

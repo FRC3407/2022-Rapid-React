@@ -1,5 +1,7 @@
 package frc.robot;
 
+import java.nio.file.Path;
+
 import frc.robot.modules.common.drive.Types.*;
 import frc.robot.modules.common.drive.*;
 import frc.robot.modules.vision.java.VisionServer.*;
@@ -7,11 +9,12 @@ import frc.robot.modules.vision.java.VisionServer.*;
 import com.ctre.phoenix.motorcontrol.can.WPI_TalonSRX;
 import edu.wpi.first.wpilibj.motorcontrol.PWMVictorSPX;
 import edu.wpi.first.math.util.Units;
+import edu.wpi.first.wpilibj.Filesystem;
 
 
 public final class Constants {
 
-    //        descriptions >>  {fl fr bl br} {MotorController Instantiation}  {inversion settings}  {Drive layout}
+    //       				 descriptions >>  {fl fr bl br} {MotorController Instantiation}  {inversion settings}  {Drive layout}
     public static final DriveMap_4<PWMVictorSPX> 
         drivebase_map_testbot = new DriveMap_4<>(8, 6, 7, 5, Motors.pwm_victorspx, Inversions.RIGHT, DriveLayout.DIFFERENTIAL)/*,
         //drivebase_map_2019 = new DriveMap_4<>(6, 8, 9, 7, Motors.pwm_victorsp, Inversions.RIGHT, DriveLayout.DIFFERENTIAL)*/;
@@ -61,9 +64,9 @@ public final class Constants {
 		// shooter_speed_tollerance = 0.1,		// in meters per second
 
 // Physical properties
-		drivetrack_width_inches = 25.0,		// track width of drivebase
+		drivetrack_width_inches = 21.819,		// track width of drivebase
 		drivewheel_diameter_inches = 6.0,	// wheel diameter for drivebase
-		shooter_diameter_inches = 8.0,
+		shooter_diameter_inches = 8.0,		// diameter of shooter wheel
 
 // DriveBase closed-loop params
 		ramsete_B = 2.0,
@@ -72,18 +75,23 @@ public final class Constants {
 		srx_mag_units_per_revolution = 4096,	// self explainatory (12 bit precision)
 		falcon_units_per_revolution = 2048;		// self explainatory (11 bit precision)
 
-	public static final CLDifferentialBase.CLParams cl_params = new CLDifferentialBase.CLParams(
+	// K-VALUES NEED TO BE FOUND IN CHARACTERIZATION >>>
+	public static final ClosedLoopDifferentialDrive.CLDriveParams cl_params = new ClosedLoopDifferentialDrive.CLDriveParams(
 		Units.inchesToMeters(drivetrack_width_inches),		// drivebase track width in meters
 		Units.inchesToMeters(drivewheel_diameter_inches),	// drivebase wheel diameter in meters
 		0.0,	// "kS"(volts) -> base voltage required to overcome static friction -> from SysID characterization
 		0.0,	// "kV"(volts * seconds / meters) -> voltage required for each additional meter/second of velocity -> from SysID characterization
 		0.0,	// "kA"(volts * seconds^2 / meters) -> voltage required for each additional meter/second^2 of acceleration -> from SysID characterization
 		0.0,	// "kP"(volts * seconds / meters) -> voltage added to correct for error
-		3.0,	// maximum velocity in meters per second
-		3.0		// maximum acceleration in meters per second squared
+		10.0,	// (volts) maximum voltage that can be supplied
+		1.5,	// (meters per second) maximum velocity in meters per second
+		2.0		// (meters per second^2) maximum acceleration in meters per second squared
 	);
 
 
+
+
+// Vision presets
 	public static final String
 		cargo_cam_name = "Cargo",
 		hub_cam_name = "Hub";
@@ -98,6 +106,11 @@ public final class Constants {
 		hub_pipeline_options = new EntryPreset[]{
 
 		};
+
+
+
+// PathWeaver filesystem locations / Generated paths
+	public static final Path test_fromjson = Filesystem.getDeployDirectory().toPath().resolve("./pathweaver/json/Test.wpilib.json");
 
 
 }
