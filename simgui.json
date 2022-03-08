@@ -1,6 +1,11 @@
 {
   "HALProvider": {
     "Other Devices": {
+      "ADIS16470[0]": {
+        "header": {
+          "open": true
+        }
+      },
       "BuiltInAccel": {
         "header": {
           "open": true
@@ -49,6 +54,7 @@
       "/LiveWindow/BallManagement": "Subsystem",
       "/LiveWindow/CLDifferentialBase": "Subsystem",
       "/LiveWindow/CargoSystem": "Subsystem",
+      "/LiveWindow/ClosedLoopDifferentialDrive": "Subsystem",
       "/LiveWindow/DriveBase": "Subsystem",
       "/LiveWindow/GenericSubsystem": "Subsystem",
       "/LiveWindow/Intake": "Subsystem",
@@ -59,6 +65,8 @@
       "/LiveWindow/Ungrouped/DigitalInput[0]": "Digital Input",
       "/LiveWindow/Ungrouped/DigitalInput[1]": "Digital Input",
       "/LiveWindow/Ungrouped/MotorControllerGroup[3]": "Motor Controller",
+      "/LiveWindow/Ungrouped/PIDController[1]": "PIDController",
+      "/LiveWindow/Ungrouped/PIDController[2]": "PIDController",
       "/LiveWindow/Ungrouped/PWMVictorSPX[0]": "Motor Controller",
       "/LiveWindow/Ungrouped/PWMVictorSPX[1]": "Motor Controller",
       "/LiveWindow/Ungrouped/PWMVictorSPX[2]": "Motor Controller",
@@ -79,7 +87,9 @@
       "/LiveWindow/W0_Intake": "Subsystem",
       "/LiveWindow/W0_Shooter": "Subsystem",
       "/LiveWindow/W0_Transfer": "Subsystem",
-      "/LiveWindow/WeekZero": "Subsystem"
+      "/LiveWindow/WeekZero": "Subsystem",
+      "/SmartDashboard/Auto Command": "String Chooser",
+      "/SmartDashboard/Auto Mode": "String Chooser"
     }
   },
   "NetworkTables": {
@@ -106,13 +116,20 @@
           "open": true
         },
         "open": true
-      }
+      },
+      "open": true
     },
     "Motion": {
       "Position": {
         "open": true
       },
       "Velocity": {
+        "open": true
+      },
+      "open": true
+    },
+    "SmartDashboard": {
+      "Auto Mode": {
         "open": true
       },
       "open": true

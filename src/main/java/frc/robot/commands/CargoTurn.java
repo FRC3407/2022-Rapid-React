@@ -61,7 +61,7 @@ public class CargoTurn extends DriveBase.DriveCommandBase {
 		public Demo(DriveBase db, Alliance a) { super(db, a); }
 		public Demo(DriveBase db, Alliance a, String cam_name) { super(db, a, cam_name); }
 
-		@Override public boolean isFinished() { return false; }
+		@Override public boolean isFinished() { return super.failed; }
 
 	}
 

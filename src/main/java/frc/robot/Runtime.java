@@ -30,7 +30,7 @@ import edu.wpi.first.wpilibj2.command.button.*;
  x Polish cargo manipulation controls
  - AUTO!!!!
  x make AnalogSupplier and DigitalSupplier extend BooleanSupplier and DigitalSupplier respectively
- - Path planning and drivebase cl (all of it...)
+ x? Path planning and drivebase cl (all of it...)
 
  - Tune hubturn p-loop
  - Change camera params / configure switching when camera positions are finalized
@@ -44,20 +44,25 @@ public class Runtime extends TimedRobot {
 		stick_left = new InputDevice(1),	// acrade stick (left)
 		stick_right = new InputDevice(2);	// arcade stick (right)
 
-	private final ADIS16470 spi_imu = new ADIS16470();
-	//private final DriveBase drivebase = new DriveBase(Constants.drivebase_map_testbot);
-	private final CLDifferentialBase drivebase = new CLDifferentialBase(
-		Constants.drivebase_map_2022,
-		this.spi_imu,
-		Constants.cl_params
-	);
-	private final CargoSystem cargo_sys = new CargoSystem(
-		new CargoSystem.IntakeSubsystem(Constants.intake_port),
-		new CargoSystem.TransferSubsystem(Constants.transfer_ports),
-		new CargoSystem.ShooterSubsystem(Motors.pwm_victorspx, Constants.w0_shooter_port, Motors.pwm_victorspx, Constants.feed_port)
-	);
+	private final ADIS16470
+		spi_imu = new ADIS16470();
+	//private final DriveBase
+	//	drivebase = new DriveBase(Constants.drivebase_map_testbot);
+	private final ClosedLoopDifferentialDrive
+		drivebase = new ClosedLoopDifferentialDrive(
+			Constants.drivebase_map_2022,
+			this.spi_imu,
+			Constants.cl_params
+		);
+	private final CargoSystem
+		cargo_sys = new CargoSystem(
+			new CargoSystem.IntakeSubsystem(Constants.intake_port),
+			new CargoSystem.TransferSubsystem(Constants.transfer_ports),
+			new CargoSystem.ShooterSubsystem(Motors.pwm_victorspx, Constants.w0_shooter_port, Motors.pwm_victorspx, Constants.feed_port)
+		);
 
-	//private final SendableChooser<Command> auto_command = new SendableChooser<>();
+	private final SendableChooser<Command>
+		auto_command = new SendableChooser<>();
 
 
 	public Runtime() {
@@ -68,12 +73,18 @@ public class Runtime extends TimedRobot {
 		this.drivebase.setSpeedSquaring(Constants.teleop_drivebase_speed_squaring);
 
 		this.cargo_sys.startAutomaticTransfer(Constants.transfer_speed);
+
+		this.auto_command.setDefaultOption("Basic-Taxi", new Auto.Basic(this.drivebase));
+		this.auto_command.addOption("Gyro-Taxi", new Auto.GyroCL(this.drivebase, this.spi_imu));
+		this.auto_command.addOption("Test Trajectory", this.drivebase.followTrajectory(Constants.test_fromjson));
+		this.auto_command.addOption("Demo-Follow", new CargoFollow.Demo(this.drivebase, DriverStation.getAlliance(), Constants.cargo_cam_name));
+		SmartDashboard.putData("Auto Command", this.auto_command);
 	}
 
 	@Override public void robotPeriodic() { CommandScheduler.getInstance().run(); }
 	@Override public void robotInit() {
-		//AutonomousTrigger.Get().whenActive( new Auto.GyroCL(this.drivebase, this.spi_imu) );
-		AutonomousTrigger.Get().whenActive( new CargoFollow.Demo(this.drivebase, DriverStation.getAlliance(), Constants.cargo_cam_name) );
+		AutonomousTrigger.Get().whenActive(()->this.auto_command.getSelected().schedule());
+		//AutonomousTrigger.Get().whenActive( new CargoFollow.Demo(this.drivebase, DriverStation.getAlliance(), Constants.cargo_cam_name) );
 
 		new Trigger(()->VisionServer.isConnected()).whenActive(new LambdaCommand(()->System.out.println("VisionServer Connected")));
 
@@ -198,7 +209,7 @@ public class Runtime extends TimedRobot {
 		).whileActiveOnce(
 			new ParallelCommandGroup(
 				this.cargo_sys.visionShoot(							// control the shooter with velocity determined by vision
-				Xbox.Digital.A.getSupplier(this.input),				// press 'A' to feed
+					Xbox.Digital.A.getSupplier(this.input),				// press 'A' to feed
 					Constants.feed_speed,
 					(double inches)-> inches / 200.0 * 12.0			// 200 inches @ max power, 12v max voltage (obviously needs to be tuned)
 				),

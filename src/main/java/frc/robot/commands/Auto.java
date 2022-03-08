@@ -18,17 +18,16 @@ public class Auto {
 
 		public Basic(DriveBase db) {
 			super.addCommands(
-				new BasicDriveControl(db, 0.25, 0.25, Constants.auto_max_acceleration)
+				new BasicDriveControl(db, 0.25, 0.25, Constants.auto_max_acceleration).withTimeout(3.0)
 			);
 		}
 
 	}
-
 	public static class GyroCL extends SequentialCommandGroup {
 		
 		public GyroCL(DriveBase db, Gyro gy) {
 			super.addCommands(
-				//new GyroDrive.Straight(db, gy, 0.25).withTimeout(3)
+				new GyroDrive.Straight(db, gy, 0.25).withTimeout(3),
 				new GyroDrive.TurnInPlace(db, gy, 90)
 			);
 		}
