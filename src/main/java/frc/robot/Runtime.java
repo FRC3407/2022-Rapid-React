@@ -8,13 +8,11 @@ import frc.robot.modules.common.drive.*;
 import frc.robot.modules.common.EventTriggers.*;
 import frc.robot.modules.vision.java.*;
 
-import edu.wpi.first.wpilibj.DriverStation;
-import edu.wpi.first.wpilibj.TimedRobot;
-import edu.wpi.first.wpilibj2.command.CommandScheduler;
-import edu.wpi.first.wpilibj2.command.ParallelCommandGroup;
-import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
-import edu.wpi.first.wpilibj2.command.button.Trigger;
-import edu.wpi.first.networktables.NetworkTableInstance;
+import edu.wpi.first.wpilibj.*;
+import edu.wpi.first.wpilibj.smartdashboard.*;
+import edu.wpi.first.wpilibj2.command.*;
+import edu.wpi.first.wpilibj2.command.button.*;
+//import edu.wpi.first.networktables.*;
 
 
 /* TODO:
@@ -27,10 +25,12 @@ import edu.wpi.first.networktables.NetworkTableInstance;
  - Methods/impelemtation to search DriverStation for a certain input (common.Input.InputDevice) and return object/port
  x max output/scaling method for drivebase
  - make a spreadsheet for camera presets (each pipeline) under different lighting conditions
- x? fix controls being f'ed when not in sim mode and not connected on program startup
+ x fix controls being f'ed when not in sim mode and not connected on program startup
  - finalize/test Velocity-CL (TalonFX) shooter commands
- - Polish cargo manipulation controls
+ x Polish cargo manipulation controls
  - AUTO!!!!
+ x make AnalogSupplier and DigitalSupplier extend BooleanSupplier and DigitalSupplier respectively
+ x? Path planning and drivebase cl (all of it...)
 
  - Tune hubturn p-loop
  - Change camera params / configure switching when camera positions are finalized
@@ -44,14 +44,25 @@ public class Runtime extends TimedRobot {
 		stick_left = new InputDevice(1),	// acrade stick (left)
 		stick_right = new InputDevice(2);	// arcade stick (right)
 
-	private final DriveBase drivebase = new DriveBase(Constants.drivebase_map_2022);
-	private final CargoSystemV2 cargo_sys = new CargoSystemV2(
-		new CargoSystemV2.IntakeSubsystem(Constants.intake_port),
-		new CargoSystemV2.TransferSubsystem(Constants.transfer_ports),
-		new CargoSystemV2.ShooterSubsystem(Motors.pwm_victorspx, Constants.w0_shooter_port, Motors.pwm_victorspx, Constants.feed_port)
-	);
+	private final ADIS16470
+		spi_imu = new ADIS16470();
+	//private final DriveBase
+	//	drivebase = new DriveBase(Constants.drivebase_map_testbot);
+	private final ClosedLoopDifferentialDrive
+		drivebase = new ClosedLoopDifferentialDrive(
+			Constants.drivebase_map_2022,
+			this.spi_imu,
+			Constants.cl_params
+		);
+	private final CargoSystem
+		cargo_sys = new CargoSystem(
+			new CargoSystem.IntakeSubsystem(Constants.intake_port),
+			new CargoSystem.TransferSubsystem(Constants.transfer_ports),
+			new CargoSystem.ShooterSubsystem(Motors.pwm_victorspx, Constants.w0_shooter_port, Motors.pwm_victorspx, Constants.feed_port)
+		);
 
-	//private boolean has_bindings = false;
+	private final SendableChooser<Command>
+		auto_command = new SendableChooser<>();
 
 
 	public Runtime() {
@@ -62,12 +73,18 @@ public class Runtime extends TimedRobot {
 		this.drivebase.setSpeedSquaring(Constants.teleop_drivebase_speed_squaring);
 
 		this.cargo_sys.startAutomaticTransfer(Constants.transfer_speed);
+
+		this.auto_command.setDefaultOption("Basic-Taxi", new Auto.Basic(this.drivebase));
+		this.auto_command.addOption("Gyro-Taxi", new Auto.GyroCL(this.drivebase, this.spi_imu));
+		this.auto_command.addOption("Test Trajectory", this.drivebase.followTrajectory(Constants.test_fromjson));
+		this.auto_command.addOption("Demo-Follow", new CargoFollow.Demo(this.drivebase, DriverStation.getAlliance(), Constants.cargo_cam_name));
+		SmartDashboard.putData("Auto Command", this.auto_command);
 	}
 
 	@Override public void robotPeriodic() { CommandScheduler.getInstance().run(); }
 	@Override public void robotInit() {
-		//AutonomousTrigger.Get().whenActive( new Auto.WeekZero(this.drivebase, this.w0_cargo_sys) );
-		//TestTrigger.Get().whenActive( new CargoFollow.Demo(this.drivebase, DriverStation.getAlliance(), Constants.cargo_cam_name) );
+		AutonomousTrigger.Get().whenActive(()->this.auto_command.getSelected().schedule());
+		//AutonomousTrigger.Get().whenActive( new CargoFollow.Demo(this.drivebase, DriverStation.getAlliance(), Constants.cargo_cam_name) );
 
 		new Trigger(()->VisionServer.isConnected()).whenActive(new LambdaCommand(()->System.out.println("VisionServer Connected")));
 
@@ -91,29 +108,6 @@ public class Runtime extends TimedRobot {
 		// 		}, true)
 		// 	);
 		// }
-
-		// this.input.connectionTrigger().and(
-		// 	this.stick_left.connectionTrigger().and(this.stick_right.connectionTrigger()).negate()
-		// ).and(
-		// 	new Trigger(()->this.has_bindings).negate()
-		// ).whenActive(
-		// 	new LambdaCommand.Singular(()->{
-		// 		this.xboxControls();
-		// 		System.out.println("Xbox Bindings Scheduled.");
-		// 		this.has_bindings = true;
-		// 	}, true)
-		// );
-		// this.stick_left.connectionTrigger().and(this.stick_right.connectionTrigger()).and(
-		// 	this.input.connectionTrigger().negate()
-		// ).and(
-		// 	new Trigger(()->this.has_bindings).negate()
-		// ).whenActive(
-		// 	new LambdaCommand.Singular(()->{
-		// 		this.arcadeControls();
-		// 		System.out.println("Arcade Bindings Scheduled.");
-		// 		this.has_bindings = true;
-		// 	}, true)
-		// );
 
 	}
 
@@ -145,12 +139,12 @@ public class Runtime extends TimedRobot {
 			)
 		).whenActive(
 			this.drivebase.modeDrive(
-				Xbox.Analog.LX.getSupplier(input),
-				Xbox.Analog.LY.getSupplier(input),
-				Xbox.Analog.LT.getSupplier(input),
-				Xbox.Analog.RX.getSupplier(input),
-				Xbox.Analog.RY.getSupplier(input),
-				Xbox.Analog.RT.getSupplier(input),
+				Xbox.Analog.LX.getLimitedSupplier(input, Constants.teleop_max_acceleration),
+				Xbox.Analog.LY.getLimitedSupplier(input, Constants.teleop_max_acceleration),
+				Xbox.Analog.LT.getLimitedSupplier(input, Constants.teleop_max_acceleration),
+				Xbox.Analog.RX.getLimitedSupplier(input, Constants.teleop_max_acceleration),
+				Xbox.Analog.RY.getLimitedSupplier(input, Constants.teleop_max_acceleration),
+				Xbox.Analog.RT.getLimitedSupplier(input, Constants.teleop_max_acceleration),
 				Xbox.Digital.RS.getPressedSupplier(input),
 				Xbox.Digital.LS.getPressedSupplier(input)
 			), false
@@ -185,7 +179,7 @@ public class Runtime extends TimedRobot {
 			Xbox.Digital.RB.getToggleFrom(this.input).negate()		// and 'RB' IS NOT toggled...
 		).and( TeleopTrigger.Get() ).toggleWhenActive(				// and in teleop mode...
 			this.cargo_sys.managedShoot(							// control the shooter (managed)
-				()->Xbox.Digital.A.getValueOf(this.input),
+				Xbox.Digital.A.getSupplier(this.input),
 				Constants.feed_speed,
 				Constants.shooter_default_speed
 			)
@@ -196,7 +190,7 @@ public class Runtime extends TimedRobot {
 			Xbox.Digital.RB.getToggleFrom(this.input).negate()		// and 'RB IS NOT toggled...'
 		).and( TeleopTrigger.Get() ).toggleWhenActive(				// and in teleop mode...
 			this.cargo_sys.basicShoot(								// control the shooter (unmanaged)
-				()->Xbox.Digital.A.getValueOf(this.input),
+			Xbox.Digital.A.getSupplier(this.input),
 				Constants.feed_speed,
 				Constants.shooter_default_speed
 			)
@@ -215,7 +209,7 @@ public class Runtime extends TimedRobot {
 		).whileActiveOnce(
 			new ParallelCommandGroup(
 				this.cargo_sys.visionShoot(							// control the shooter with velocity determined by vision
-					()->Xbox.Digital.A.getValueOf(this.input),		// press 'A' to feed
+					Xbox.Digital.A.getSupplier(this.input),				// press 'A' to feed
 					Constants.feed_speed,
 					(double inches)-> inches / 200.0 * 12.0			// 200 inches @ max power, 12v max voltage (obviously needs to be tuned)
 				),
@@ -245,19 +239,19 @@ public class Runtime extends TimedRobot {
 			)
 		).whenActive(
 			this.drivebase.modeDrive(
-				Attack3.Analog.X.getSupplier(this.stick_left),
-				Attack3.Analog.Y.getSupplier(this.stick_left),
-				Attack3.Analog.X.getSupplier(this.stick_right),
-				Attack3.Analog.Y.getSupplier(this.stick_right),
-				Attack3.Digital.TR.getPressedSupplier(this.stick_right),
-				Attack3.Digital.TL.getPressedSupplier(this.stick_right)
+				Attack3.Analog.X.getLimitedSupplier(this.stick_left, Constants.teleop_max_acceleration),
+				Attack3.Analog.Y.getLimitedSupplier(this.stick_left, Constants.teleop_max_acceleration),
+				Attack3.Analog.X.getLimitedSupplier(this.stick_right, Constants.teleop_max_acceleration),
+				Attack3.Analog.Y.getLimitedSupplier(this.stick_right, Constants.teleop_max_acceleration),
+				Attack3.Digital.TR.getPressedSupplier(this.stick_left),
+				Attack3.Digital.TL.getPressedSupplier(this.stick_left)
 			), false
 		);	// schedule mode drive when in teleop mode
 
-		Attack3.Digital.TT.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.IncrementPipeline.Get());
-		Attack3.Digital.TB.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.DecrementPipeline.Get());
-		Attack3.Digital.TR.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.IncrementCamera.Get());
-		Attack3.Digital.TL.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.DecrementCamera.Get());
+		//Attack3.Digital.TT.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.IncrementPipeline.Get());
+		//Attack3.Digital.TB.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.DecrementPipeline.Get());
+		Attack3.Digital.TT.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.IncrementCamera.Get());
+		Attack3.Digital.TB.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.DecrementCamera.Get());
 		//Attack3.Digital.TB.getCallbackFrom(this.stick_right).whenPressed(VisionSubsystem.ToggleProcessing.Get());
 		//Attack3.Digital.TB.getCallbackFrom(this.stick_right).whenPressed(VisionSubsystem.ToggleStatistics.Get());
 
@@ -283,7 +277,7 @@ public class Runtime extends TimedRobot {
 			Attack3.Digital.TRI.getToggleFrom(this.stick_right).negate()
 		).and( TeleopTrigger.Get() ).toggleWhenActive(
 			this.cargo_sys.managedShoot(
-				()->Attack3.Digital.TB.getValueOf(this.stick_right),
+				Attack3.Digital.TB.getSupplier(this.stick_right),
 				Constants.feed_speed,
 				Constants.shooter_default_speed
 			)
@@ -294,7 +288,7 @@ public class Runtime extends TimedRobot {
 			Attack3.Digital.TRI.getToggleFrom(this.stick_right).negate()
 		).and( TeleopTrigger.Get() ).toggleWhenActive(
 			this.cargo_sys.basicShoot(
-				()->Attack3.Digital.TB.getValueOf(this.stick_right),
+				Attack3.Digital.TB.getSupplier(this.stick_right),
 				Constants.feed_speed,
 				Constants.shooter_default_speed
 			)
@@ -313,7 +307,7 @@ public class Runtime extends TimedRobot {
 		).whileActiveOnce(
 			new ParallelCommandGroup(
 				this.cargo_sys.visionShoot(
-					()->Attack3.Digital.TB.getValueOf(this.stick_right),
+					Attack3.Digital.TB.getSupplier(this.stick_right),
 					Constants.feed_speed,
 					(double inches)-> inches / 200.0 * 12.0			// 200 inches @ max power, 12v max voltage (obviously needs to be tuned)
 				),

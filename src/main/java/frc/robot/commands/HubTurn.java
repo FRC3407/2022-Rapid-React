@@ -63,7 +63,10 @@ public class HubTurn extends DriveBase.DriveCommandBase {
 		@Override public void execute() {
 			super.position = RapidReactVision.getHubPosition();
 			if(super.position != null) {
-				super.autoTurn((super.position.lr / Constants.target_angle_range_lr) * Constants.auto_max_turn_speed * this.turnvec.get());
+				super.autoTurn(
+					(super.position.lr / Constants.target_angle_range_lr) * 
+						Constants.teleop_assist_turn_speed * this.turnvec.get()
+				);
 			} else {
 				super.fromLast(Constants.uncertainty_continuation_percentage);
 			}

@@ -52,7 +52,7 @@ public class HubFind extends DriveBase.DriveCommandBase {
 		}
 
 		@Override public void execute() {
-			super.autoTurn(Constants.auto_max_turn_speed * this.turnvec.get());
+			super.autoTurn(Constants.teleop_assist_turn_speed * this.turnvec.get());
 		}
 
 
