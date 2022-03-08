@@ -1,3 +1,5 @@
+[![Build Robot Code](https://github.com/FRC3407/2022-Rapid-React/actions/workflows/main.yml/badge.svg?branch=dev-samr)](https://github.com/FRC3407/2022-Rapid-React/actions/workflows/main.yml)
+
 # 2022-Rapid-React
 Team 3407's robot code for the FRC 2022 game: Rapid React
 
