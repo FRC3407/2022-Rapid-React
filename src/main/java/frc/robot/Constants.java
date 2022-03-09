@@ -79,14 +79,15 @@ public final class Constants {
 	public static final ClosedLoopDifferentialDrive.CLDriveParams cl_params = new ClosedLoopDifferentialDrive.CLDriveParams(
 		Units.inchesToMeters(drivetrack_width_inches),		// drivebase track width in meters
 		Units.inchesToMeters(drivewheel_diameter_inches),	// drivebase wheel diameter in meters
-		0.0,	// "kS"(volts) -> base voltage required to overcome static friction -> from SysID characterization
-		0.0,	// "kV"(volts * seconds / meters) -> voltage required for each additional meter/second of velocity -> from SysID characterization
-		0.0,	// "kA"(volts * seconds^2 / meters) -> voltage required for each additional meter/second^2 of acceleration -> from SysID characterization
-		0.0,	// "kP"(volts * seconds / meters) -> voltage added to correct for error
+		1.1185,	// "kS"(volts) -> base voltage required to overcome static friction -> from SysID characterization
+		2.1132,	// "kV"(volts * seconds / meters) -> voltage required for each additional meter/second of velocity -> from SysID characterization
+		1.0668,	// "kA"(volts * seconds^2 / meters) -> voltage required for each additional meter/second^2 of acceleration -> from SysID characterization
+		3.5176,	// "kP"(volts * seconds / meters) -> voltage added to correct for error
 		10.0,	// (volts) maximum voltage that can be supplied
 		1.5,	// (meters per second) maximum velocity in meters per second
 		2.0		// (meters per second^2) maximum acceleration in meters per second squared
 	);
+	public static final Inversions cl_encoder_inversions = Inversions.BOTH;	// invert both encoders
 
 
 

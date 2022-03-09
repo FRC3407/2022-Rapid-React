@@ -98,16 +98,20 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 	private final WPI_TalonSRX left, right;		// front left and front right respectively for 4-motor systems
 
 	public final CLDriveParams params;
+	public final Inversions encoder_invrt;
 
 	private final DifferentialDriveOdometry odometry;
 	private final DifferentialDriveKinematics kinematics;
 	private final DifferentialDriveVoltageConstraint voltage_constraint;
 	private final SimpleMotorFeedforward feedforward;
 
-	public ClosedLoopDifferentialDrive(DriveMap_2<WPI_TalonSRX> map, Gyro gy, CLDriveParams params) {
+	public ClosedLoopDifferentialDrive(DriveMap_2<WPI_TalonSRX> map, Gyro gy, CLDriveParams params) { this(map, gy, params, Inversions.NEITHER); }
+	public ClosedLoopDifferentialDrive(DriveMap_4<WPI_TalonSRX> map, Gyro gy, CLDriveParams params) { this(map, gy, params, Inversions.NEITHER); }
+	public ClosedLoopDifferentialDrive(DriveMap_2<WPI_TalonSRX> map, Gyro gy, CLDriveParams params, Inversions ei) {
 		super(map);
 		this.gyro = gy;
 		this.params = params;
+		this.encoder_invrt = ei;
 
 		this.left = map.left;
 		this.right = map.right;
@@ -122,10 +126,11 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 		this.left.configSelectedFeedbackSensor(FeedbackDevice.CTRE_MagEncoder_Relative);
 		this.right.configSelectedFeedbackSensor(FeedbackDevice.CTRE_MagEncoder_Relative);
 	}
-	public ClosedLoopDifferentialDrive(DriveMap_4<WPI_TalonSRX> map, Gyro gy, CLDriveParams params) {
+	public ClosedLoopDifferentialDrive(DriveMap_4<WPI_TalonSRX> map, Gyro gy, CLDriveParams params, Inversions ei) {
 		super(map);
 		this.gyro = gy;
 		this.params = params;
+		this.encoder_invrt = ei;
 
 		this.left = map.front_left;
 		this.right = map.front_right;
@@ -139,6 +144,8 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 		configDefault(this.left, this.right, map.back_left, map.back_right);
 		this.left.configSelectedFeedbackSensor(FeedbackDevice.CTRE_MagEncoder_Relative);
 		this.right.configSelectedFeedbackSensor(FeedbackDevice.CTRE_MagEncoder_Relative);
+		this.left.configSelectedFeedbackCoefficient(-1.0);
+		this.right.configSelectedFeedbackCoefficient(-1.0);
 		map.back_left.follow(this.left);
 		map.back_right.follow(this.right);
 		map.back_left.setInverted(InvertType.FollowMaster);
@@ -159,6 +166,12 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 	}
 	public FollowTrajectory followTrajectory(Path json_path) {
 		return new FollowTrajectory(this, json_path);
+	}
+	public FollowTrajectory followSingleTrajectory(Trajectory t) {	// stops when complete
+		return new FollowTrajectory(this, t, true);
+	}
+	public FollowTrajectory followSingleTrajectory(Path json_path) {	// stops when complete
+		return new FollowTrajectory(this, json_path, true);
 	}
 
 	// "Setters" -> require command key
@@ -201,16 +214,16 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 	}
 
 	public double getLeftPositionMeters() {
-		return this.getRawLeftPosition() / Constants.srx_mag_units_per_revolution * this.params.wheel_diameter_meters;
+		return this.getRawLeftPosition() / Constants.srx_mag_units_per_revolution * this.params.wheel_diameter_meters * this.encoder_invrt.leftSign();
 	}
 	public double getRightPositionMeters() {
-		return this.getRawRightPosition() / Constants.srx_mag_units_per_revolution * this.params.wheel_diameter_meters;
+		return this.getRawRightPosition() / Constants.srx_mag_units_per_revolution * this.params.wheel_diameter_meters * this.encoder_invrt.rightSign();
 	}
 	public double getLeftVelocity() {	// in meters per second
-		return this.getRawLeftVelocity() * 10 / Constants.srx_mag_units_per_revolution * this.params.wheel_diameter_meters;
+		return this.getRawLeftVelocity() * 10 / Constants.srx_mag_units_per_revolution * this.params.wheel_diameter_meters * this.encoder_invrt.leftSign();
 	}
 	public double getRightVelocity() {	// in meters per second
-		return this.getRawRightVelocity() * 10 / Constants.srx_mag_units_per_revolution * this.params.wheel_diameter_meters;
+		return this.getRawRightVelocity() * 10 / Constants.srx_mag_units_per_revolution * this.params.wheel_diameter_meters * this.encoder_invrt.rightSign();
 	}
 
 	public double getContinuousAngle() {	// in degrees
@@ -266,10 +279,14 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 
 		private final Trajectory trajectory;
 		private final RamseteCommand controller;
+		private final boolean stop;
 
-		public FollowTrajectory(ClosedLoopDifferentialDrive db, Trajectory t) {
+		public FollowTrajectory(ClosedLoopDifferentialDrive db, Trajectory t) { this(db, t, false); }
+		public FollowTrajectory(ClosedLoopDifferentialDrive db, Path json_path) { this(db, json_path, false); }
+		public FollowTrajectory(ClosedLoopDifferentialDrive db, Trajectory t, boolean s) {
 			super(db);
 			this.trajectory = t;
+			this.stop = s;
 			this.controller = new RamseteCommand(
 				this.trajectory,
 				super.drivebase_cl::getPose,
@@ -282,7 +299,7 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 				super::setDriveVoltage
 			);
 		}
-		public FollowTrajectory(ClosedLoopDifferentialDrive db, Path json_path) {	// accepts a path to a pathweaver json (deployed with robot program)
+		public FollowTrajectory(ClosedLoopDifferentialDrive db, Path json_path, boolean s) {	// accepts a path to a pathweaver json (deployed with robot program)
 			super(db);
 			Trajectory temp;
 			try {
@@ -292,6 +309,7 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 				temp = null;
 			}
 			this.trajectory = temp;
+			this.stop = s;
 			this.controller = new RamseteCommand(
 				this.trajectory,
 				super.drivebase_cl::getPose,
@@ -315,6 +333,9 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 		}
 		@Override public void end(boolean i) {
 			this.controller.end(i);
+			if(this.stop) {
+				super.setDriveVoltage(0, 0);
+			}
 			System.out.println("FollowTrajectory: " + (i ? "Terminated." : "Completed."));
 		}
 		@Override public boolean isFinished() {
