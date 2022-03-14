@@ -9,6 +9,7 @@ import frc.robot.modules.vision.java.VisionServer;
 
 import com.ctre.phoenix.motorcontrol.*;
 import com.ctre.phoenix.motorcontrol.can.*;
+import com.ctre.phoenix.sensors.SensorInitializationStrategy;
 
 import edu.wpi.first.wpilibj.DigitalInput;
 import edu.wpi.first.wpilibj.motorcontrol.*;
@@ -176,6 +177,7 @@ public final class CargoSystem {
 			if(this.main != null) {
 				this.main.configFactoryDefault();
 				this.main.configSelectedFeedbackSensor(TalonFXFeedbackDevice.IntegratedSensor, 0, 0);
+				this.main.configIntegratedSensorInitializationStrategy(SensorInitializationStrategy.BootToZero);
 				if(this.secondary != null) {
 					this.secondary.configFactoryDefault();
 					this.secondary.follow(this.main);
