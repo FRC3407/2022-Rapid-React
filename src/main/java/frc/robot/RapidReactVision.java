@@ -1,17 +1,38 @@
 package frc.robot;
 
+import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.math.filter.SlewRateLimiter;
 import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.DriverStation.Alliance;
+import edu.wpi.first.wpilibj2.command.CommandScheduler;
+import frc.robot.modules.common.Input.AnalogSupplier;
+import frc.robot.modules.common.drive.DriveBase;
 import frc.robot.modules.vision.java.VisionServer;
 
+
+/**
+ * Rapid-React specific vision methods and commands. For a general vision interface, see {@link VisionServer}
+ */
 public class RapidReactVision {
 
-	private static VisionServer.VsPipeline 
-		upperhub = VisionServer.getPipeline("Upper-Hub Pipeline"), 
-		cargo = VisionServer.getPipeline("Cargo Pipeline");
 
-	public static boolean hasHubPipeline() { return VisionServer.getPipeline("Upper-Hub Pipeline") != null; }
+	public static final String
+		hub_pipeline_name = "Upper-Hub Pipeline",
+		cargo_pipeline_name = "Cargo Pipeline",
+		hub_camera_name = Constants.hub_cam_name,
+		cargo_camera_name = Constants.cargo_cam_name
+	;
+
+
+
+	private static VisionServer.VsPipeline 
+		upperhub = VisionServer.getPipeline(hub_pipeline_name),
+		cargo = VisionServer.getPipeline(cargo_pipeline_name)
+	;
+
+	public static boolean hasHubPipeline() { return VisionServer.getPipeline(hub_pipeline_name) != null; }
 	public static boolean isHubPipelineValid() { return upperhub != null; }
-	public static boolean hasCargoPipeline() { return VisionServer.getPipeline("Cargo Pipeline") != null; }
+	public static boolean hasCargoPipeline() { return VisionServer.getPipeline(cargo_pipeline_name) != null; }
 	public static boolean isCargoPipelineValid() { return cargo != null; }
 	public static boolean hasPipelines() { return hasHubPipeline() && hasCargoPipeline(); }
 	public static boolean arePipelinesValid() { return isHubPipelineValid() && isCargoPipelineValid(); }
@@ -19,7 +40,7 @@ public class RapidReactVision {
 	public static boolean verifyHubPipeline() {
 		if(!isHubPipelineValid()) {
 			//System.out.println("VerifyHubPipeline: pipeline not valid, updating...");
-			upperhub = VisionServer.getPipeline("Upper-Hub Pipeline");
+			upperhub = VisionServer.getPipeline(hub_pipeline_name);
 			return isHubPipelineValid();
 		}
 		//System.out.println("VerifyHubPipeline: pipeline already valid");
@@ -27,7 +48,7 @@ public class RapidReactVision {
 	}
 	public static boolean verifyCargoPipeline() {
 		if(!isCargoPipelineValid()) {
-			cargo = VisionServer.getPipeline("Cargo Pipeline");
+			cargo = VisionServer.getPipeline(cargo_pipeline_name);
 			return isCargoPipelineValid();
 		}
 		return true;
@@ -52,8 +73,6 @@ public class RapidReactVision {
 	// 		}, false
 	// 	);
 	// }
-
-// ADD NULLPTR SAFETY TO ALL OF THESE? ->>
 
 	public static boolean setHubPipelineScaling(int downscale) {	// returns false on failure
 		if(verifyHubPipeline()) {
@@ -262,6 +281,367 @@ public class RapidReactVision {
 
 	public static double getHubBaseDistance(VisionServer.TargetData d, double height) {		// output in inches
 		return Math.sqrt(Math.pow(d.distance, 2) - Math.pow(height, 2));	// pythagorean solved for A (sqrt(C^2 - B^2) = A)
+	}
+
+
+
+	public static final double
+		cargo_max_range = Constants.cargo_distance_range,
+		hub_max_range = 200,
+		max_heading_offset = Constants.max_heading_offset,
+		heading_thresh = Constants.heading_offset_thresh,
+
+		continuation_percent = Constants.uncertainty_continuation_percentage,
+
+		static_voltage = Constants.cl_params.static_voltage,
+		default_max_forward_voltage = 4.0,
+		default_max_turning_voltage = 2.0
+	;
+
+
+	public static class CargoFind extends DriveBase.DriveCommandBase {
+	
+		private final Alliance team;
+		private final SlewRateLimiter limit;
+		private final double turning_voltage;
+		private double last_voltage = 0.0;
+		private boolean failed = false;
+
+		public CargoFind(DriveBase db) { this(db, DriverStation.getAlliance(), default_max_turning_voltage, Double.MAX_VALUE); }
+		public CargoFind(DriveBase db, Alliance a) { this(db, a, default_max_turning_voltage, Double.MAX_VALUE); }
+		public CargoFind(DriveBase db, Alliance a, double tv) { this(db, a, tv, Double.MAX_VALUE); }
+		public CargoFind(DriveBase db, Alliance a, double tvolts, double mvr) {
+			super(db);
+			this.team = a;
+			this.limit = new SlewRateLimiter(mvr);
+			this.turning_voltage = tvolts;
+		}
+	
+		@Override public void initialize() {
+			setCargoPipelineScaling(4);
+			VisionServer.applyCameraPreset(Constants.cam_cargo_pipeline);
+			VisionServer.setCamera(cargo_camera_name);
+			if(!verifyCargoPipelineActive()) {
+				System.out.println("CargoFind: Failed to set Cargo pipeline");
+				this.failed = true;
+				return;
+			}
+			System.out.println("CargoFind: Running...");
+		}
+		@Override public void execute() {
+			this.last_voltage = this.limit.calculate(getClosestAllianceCargo(this.team) != null ? 0.0 : this.turning_voltage);
+			super.autoTurnVoltage(this.last_voltage);
+		}
+		@Override public void end(boolean i) {
+			super.autoTurnVoltage(0);
+			System.out.println(this.failed || i ? "CargoFind: Terminated." : "CargoFind: Completed.");
+		}
+		@Override public boolean isFinished() {
+			return this.failed || (getClosestAllianceCargo(this.team) != null && this.last_voltage < static_voltage);
+		}
+	
+	
+	}
+	public static class CargoTurn extends DriveBase.DriveCommandBase {
+
+		private final Alliance team;
+		//private final SlewRateLimiter limit;
+		private final double max_turn_voltage;
+		private VisionServer.TargetData position = null;
+		//private double last_voltage = 0.0;
+		private boolean failed = false;
+
+		public CargoTurn(DriveBase db, Alliance a, double mtvolts) {
+			super(db);
+			this.team = a;
+			//this.limit = new SlewRateLimiter(mvr);
+			this.max_turn_voltage = mtvolts;
+		}
+	
+		@Override public void initialize() {
+			setCargoPipelineScaling(4);
+			VisionServer.applyCameraPreset(Constants.cam_cargo_pipeline);
+			VisionServer.setCamera(cargo_camera_name);
+			if(!verifyCargoPipelineActive()) {
+				System.out.println("CargoTurn: Failed to set Cargo pipeline");
+				this.failed = true;
+				return;
+			}
+			System.out.println("CargoTurn: Running...");
+		}
+		@Override public void execute() {
+			this.position = getClosestAllianceCargo(this.team);
+			if(this.position != null) {
+				double v = MathUtil.clamp(this.position.lr / max_heading_offset, -1.0, 1.0) * (this.max_turn_voltage - static_voltage);
+				super.autoTurn((Math.signum(v) * static_voltage) + v);
+			} else {
+				super.fromLast(continuation_percent);	// % of what was last set (decelerating)
+			}
+		}
+		@Override public void end(boolean i) {
+			super.autoDriveVoltage(0, 0);
+			System.out.println(this.failed ? "CargoTurn: Terminated." : "CargoTurn: Completed.");
+		}
+		@Override public boolean isFinished() {	// change threshold angle when testing >>
+			if(this.position != null) {
+				return Math.abs(this.position.lr) < heading_thresh;
+			}
+			return this.failed;
+		}
+	
+	
+	
+		/** Extension of CargoTurn class that runs indefinately */
+		public static class Demo extends CargoTurn {
+	
+			//public Demo(DriveBase db, Alliance a) { super(db, a, ); }
+			public Demo(DriveBase db, Alliance a, double mtvolts) { super(db, a, mtvolts); }
+	
+			@Override public boolean isFinished() { return super.failed; }
+	
+		}
+	
+	
+	}
+	public static class CargoFollow extends DriveBase.DriveCommandBase {	
+	
+		private final Alliance team;
+		private final SlewRateLimiter f_limit;
+		private final double target, max_forward_voltage, max_turning_voltage;
+		private VisionServer.TargetData position;
+		private boolean failed = false;
+
+		public CargoFollow(DriveBase db) { this(db, DriverStation.getAlliance(), 20, default_max_forward_voltage, default_max_turning_voltage, Double.MAX_VALUE); }
+		public CargoFollow(DriveBase db, Alliance a) { this(db, a, 20, default_max_forward_voltage, default_max_turning_voltage, Double.MAX_VALUE); }
+		public CargoFollow(DriveBase db, Alliance a, double target_inches, double mfa) { this(db, a, target_inches, default_max_forward_voltage, default_max_turning_voltage, mfa); }
+		// 					drivebase,	alliance,	max forward voltage, max turn voltage, max forard voltage acceleration
+		public CargoFollow(DriveBase db, Alliance a, double target_inches, double mfvolts, double mtvolts, double mfa) {
+			super(db);
+			this.team = a;
+			this.f_limit = new SlewRateLimiter(mfa);
+			this.target = target_inches;
+			this.max_forward_voltage = mfvolts;
+			this.max_turning_voltage = mtvolts;
+		}
+	
+		@Override public void initialize() {
+			setCargoPipelineScaling(4);
+			VisionServer.applyCameraPreset(Constants.cam_cargo_pipeline);
+			VisionServer.setCamera(cargo_camera_name);
+			if(!verifyCargoPipelineActive()) {
+				System.out.println("CargoFollow: Failed to set Cargo pipeline");
+				this.failed = true;
+				return;
+			}
+			System.out.println("CargoFollow: Running...");
+		}
+		@Override public void execute() {
+			this.position = getClosestAllianceCargo(this.team);
+			if(this.position != null) {
+				double f = MathUtil.clamp(
+					(this.position.distance - this.target) / cargo_max_range, -1.0, 1.0		// the forward error, clamped to [-1, 1]
+				) * (this.max_forward_voltage - static_voltage);							// multiply by forward voltage range
+				double f_l = this.f_limit.calculate(f);				// calculate rate-limited voltage
+				double t = MathUtil.clamp(
+					this.position.lr / max_heading_offset, -1.0, 1.0	// the turning error, clamped to [-1, 1]
+				) * (this.max_turning_voltage - static_voltage);		// multiply by turning voltage range
+				t *= (f_l / f);		// normalize turning so that it is proportional to the rate-limited forward speed
+				super.autoDriveVoltage(
+					static_voltage * Math.signum(f_l+t) + f_l + t,	// static voltage (in correct direction) + limited forward voltage + normalized turning voltage
+					static_voltage * Math.signum(f_l-t) + f_l - t	// static voltage (in correct direction) + limited forward voltage - normalized turning voltage
+				);
+			} else {
+				super.fromLast(continuation_percent);	// handle jitters in vision detection -> worst case cenario this causes a gradual deceleration
+			}
+		}
+		@Override public void end(boolean i) {
+			super.autoDriveVoltage(0, 0);
+			System.out.println(this.failed || i ? "CargoFollow: Terminated." : "CargoFollow: Completed.");
+		}
+		@Override public boolean isFinished() {
+			if(this.position != null) {
+				return Math.abs(this.position.lr) <= heading_thresh && Math.abs(this.position.distance) <= this.target;
+			}
+			return this.failed;
+		}
+	
+	
+	
+		/** Extension of CargoFollow that runs indefinately */
+		public static class Demo extends CargoFollow {
+	
+			public Demo(DriveBase db) { super(db); }
+			public Demo(DriveBase db, Alliance a) { super(db, a); }
+			public Demo(DriveBase db, Alliance a, double target_inches, double mfa) { super(db, a, target_inches, mfa); }
+			public Demo(DriveBase db, Alliance a, double target_inches, double mfvolts, double mtvolts, double mfa) { super(db, a, target_inches, mfvolts, mtvolts, mfa); }
+	
+			@Override public boolean isFinished() { return super.failed; }
+	
+		}
+	
+	
+	}
+	public static class HubFind extends DriveBase.DriveCommandBase {
+
+		private final SlewRateLimiter limit;
+		private final double turning_voltage;
+		private double last_voltage = 0.0;
+		private boolean failed = false;
+
+		public HubFind(DriveBase db, double tvolts, double mvr) {
+			super(db);
+			this.limit = new SlewRateLimiter(mvr);
+			this.turning_voltage = tvolts;
+		}
+	
+		@Override public void initialize() {
+			VisionServer.applyCameraPreset(Constants.cam_hub_pipeline);
+			VisionServer.setCamera(hub_camera_name);
+			if(!verifyHubPipelineActive()) {
+				System.out.println(getClass().getSimpleName() + ": Failed to set UpperHub pipeline.");
+				this.failed = true;
+				return;
+			}
+			System.out.println(getClass().getSimpleName() + ": Running...");
+		}
+		@Override public void execute() {
+			this.last_voltage = this.limit.calculate(isHubDetected() ? 0.0 : this.turning_voltage);
+			super.autoTurnVoltage(this.last_voltage);
+		}
+		@Override public void end(boolean i) {
+			super.autoTurnVoltage(0);
+			System.out.println(getClass().getSimpleName() + (this.failed || i ? ": Terminated." : ": Completed."));
+		}
+		@Override public boolean isFinished() {
+			return this.failed || (isHubDetected() && this.last_voltage < static_voltage);
+		}
+	
+	
+	
+		// public static class TeleopAssist extends HubFind {
+	
+		// 	private final AnalogSupplier turnvec;
+	
+		// 	public TeleopAssist(DriveBase db, AnalogSupplier tv) {
+		// 		super(db, Constants.hub_cam_name);
+		// 		this.turnvec = tv;
+		// 	}
+	
+		// 	@Override public void execute() {
+		// 		super.autoTurn(Constants.teleop_assist_turn_speed * this.turnvec.get());
+		// 	}
+	
+	
+		// }
+	
+	
+	}
+	public static class HubTurn extends DriveBase.DriveCommandBase {
+
+		private final double max_turn_voltage;
+		private VisionServer.TargetData position = null;
+		private boolean failed = false;
+
+		public HubTurn(DriveBase db, double mtvolts) {
+			super(db);
+			this.max_turn_voltage = mtvolts;
+		}
+	
+		@Override public void initialize() {
+			VisionServer.applyCameraPreset(Constants.cam_hub_pipeline);
+			VisionServer.setCamera(hub_camera_name);
+			if(!verifyHubPipelineActive()) {
+				System.out.println(getClass().getSimpleName() + ": Failed to set UpperHub pipeline");
+				this.failed = true;
+				return;
+			}
+			System.out.println(getClass().getSimpleName() + ": Running...");
+		}
+		@Override public void execute() {
+			this.position = getHubPosition();
+			if(this.position != null) {
+				double v = MathUtil.clamp(this.position.lr / max_heading_offset, -1.0, 1.0) * (this.max_turn_voltage - static_voltage);
+				super.autoTurnVoltage((Math.signum(v) * static_voltage) + v);
+			} else {
+				super.fromLast(continuation_percent);
+			}
+		}
+		@Override public void end(boolean i) {
+			super.autoTurnVoltage(0);
+			System.out.println(getClass().getSimpleName() + (this.failed || i ? ": Terminated." : ": Completed."));
+		}
+		@Override public boolean isFinished() {
+			if(this.position != null) {
+				return Math.abs(this.position.lr) <= heading_thresh;
+			}
+			return this.failed;
+		}
+	
+	
+	
+		// public static class TeleopAssist extends HubTurn {
+	
+		// 	private final AnalogSupplier turnvec;
+	
+		// 	public TeleopAssist(DriveBase db, AnalogSupplier tv) {
+		// 		super(db, Constants.hub_cam_name);
+		// 		this.turnvec = tv;
+		// 	}
+	
+		// 	@Override public void execute() {
+		// 		super.position = RapidReactVision.getHubPosition();
+		// 		if(super.position != null) {
+		// 			super.autoTurnVoltage(
+		// 				Math.signum(super.position.lr / Constants.target_angle_range_lr) +
+		// 				MathUtil.clamp(
+		// 					super.position.lr / Constants.target_angle_range_lr * 9 * Constants.teleop_assist_turn_speed * 0.6,
+		// 					Constants.teleop_assist_turn_speed * 9 * -0.5,
+		// 					Constants.teleop_assist_turn_speed * 9 * 0.5
+		// 				) * this.turnvec.get()
+		// 			);
+		// 		} else {
+		// 			super.fromLast(Constants.uncertainty_continuation_percentage);
+		// 		}
+		// 	}
+		// 	@Override public boolean isFinished() { return false; }
+	
+		// }
+	
+	
+	}
+	public static class HubAssistRoutine extends HubTurn {
+
+		public static final int discontinuity_timeout_cycles = 25;
+
+		private final AnalogSupplier control;
+		private final SlewRateLimiter olimit;
+		private double last_voltage = 0.0;
+		private int misses = 0;
+
+		public HubAssistRoutine(DriveBase db, AnalogSupplier op_input, double mtvolts, double mvr) {
+			super(db, mtvolts);
+			this.control = op_input;
+			this.olimit = new SlewRateLimiter(mvr);
+		}
+		@Override public void execute() {
+			super.position = getHubPosition();
+			if(super.position != null) {
+				this.misses = 0;
+				double p = MathUtil.clamp(super.position.lr / max_heading_offset, -1.0, 1.0) * (super.max_turn_voltage - static_voltage) * Math.abs(this.control.get());
+				this.last_voltage = (Math.signum(p) * static_voltage) + p;
+				this.olimit.calculate(this.last_voltage);
+			} else if(this.misses >= discontinuity_timeout_cycles) {	// if hub goes undetected for more than half of a second
+				this.last_voltage = this.olimit.calculate(this.control.get() * super.max_turn_voltage);
+			} else {
+				this.misses++;
+				this.last_voltage *= continuation_percent;
+				this.olimit.calculate(this.last_voltage);
+			}
+			super.autoTurnVoltage(this.last_voltage);
+		}
+		@Override public boolean isFinished() { return false; }
+
+
 	}
 
 

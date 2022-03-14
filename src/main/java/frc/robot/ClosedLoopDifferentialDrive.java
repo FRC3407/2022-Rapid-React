@@ -8,10 +8,12 @@ import frc.robot.modules.common.drive.Types.*;
 import edu.wpi.first.math.kinematics.*;
 import edu.wpi.first.math.trajectory.*;
 import edu.wpi.first.math.trajectory.constraint.*;
+import edu.wpi.first.util.sendable.SendableBuilder;
 import edu.wpi.first.wpilibj.interfaces.Gyro;
 import edu.wpi.first.wpilibj2.command.*;
 import edu.wpi.first.math.controller.*;
 import edu.wpi.first.math.geometry.*;
+import edu.wpi.first.wpilibj.smartdashboard.*;
 
 import com.ctre.phoenix.motorcontrol.can.*;
 import com.ctre.phoenix.motorcontrol.*;
@@ -98,12 +100,12 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 	private final WPI_TalonSRX left, right;		// front left and front right respectively for 4-motor systems
 
 	public final CLDriveParams params;
-	public final Inversions encoder_invrt;
 
 	private final DifferentialDriveOdometry odometry;
 	private final DifferentialDriveKinematics kinematics;
-	private final DifferentialDriveVoltageConstraint voltage_constraint;
 	private final SimpleMotorFeedforward feedforward;
+
+	private final Field2d map = new Field2d();
 
 	public ClosedLoopDifferentialDrive(DriveMap_2<WPI_TalonSRX> map, Gyro gy, CLDriveParams params) { this(map, gy, params, Inversions.NEITHER); }
 	public ClosedLoopDifferentialDrive(DriveMap_4<WPI_TalonSRX> map, Gyro gy, CLDriveParams params) { this(map, gy, params, Inversions.NEITHER); }
@@ -111,7 +113,6 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 		super(map);
 		this.gyro = gy;
 		this.params = params;
-		this.encoder_invrt = ei;
 
 		this.left = map.left;
 		this.right = map.right;
@@ -119,18 +120,22 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 		this.odometry = new DifferentialDriveOdometry(this.gyro.getRotation2d());
 		this.kinematics = new DifferentialDriveKinematics(this.params.track_width_meters);
 		this.feedforward = params.getFeedforward();
-		this.voltage_constraint = new DifferentialDriveVoltageConstraint(this.feedforward, this.kinematics, this.params.max_voltage);
 
 		// apply configs...
 		configDefault(this.left, this.right);
 		this.left.configSelectedFeedbackSensor(FeedbackDevice.CTRE_MagEncoder_Relative);
 		this.right.configSelectedFeedbackSensor(FeedbackDevice.CTRE_MagEncoder_Relative);
+		this.left.setSelectedSensorPosition(0.0);
+		this.right.setSelectedSensorPosition(0.0);
+		this.left.setSensorPhase(ei.left);
+		this.right.setSensorPhase(ei.right);
+
+		SmartDashboard.putData("Robot Location", this.map);
 	}
 	public ClosedLoopDifferentialDrive(DriveMap_4<WPI_TalonSRX> map, Gyro gy, CLDriveParams params, Inversions ei) {
 		super(map);
 		this.gyro = gy;
 		this.params = params;
-		this.encoder_invrt = ei;
 
 		this.left = map.front_left;
 		this.right = map.front_right;
@@ -138,18 +143,22 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 		this.odometry = new DifferentialDriveOdometry(this.gyro.getRotation2d());
 		this.kinematics = new DifferentialDriveKinematics(this.params.track_width_meters);
 		this.feedforward = params.getFeedforward();
-		this.voltage_constraint = new DifferentialDriveVoltageConstraint(this.feedforward, this.kinematics, this.params.max_voltage);
 
 		// apply configs...
 		configDefault(this.left, this.right, map.back_left, map.back_right);
 		this.left.configSelectedFeedbackSensor(FeedbackDevice.CTRE_MagEncoder_Relative);
 		this.right.configSelectedFeedbackSensor(FeedbackDevice.CTRE_MagEncoder_Relative);
-		this.left.configSelectedFeedbackCoefficient(-1.0);
-		this.right.configSelectedFeedbackCoefficient(-1.0);
+		this.left.setSelectedSensorPosition(0.0);
+		this.right.setSelectedSensorPosition(0.0);
+		this.left.setSensorPhase(ei.left);
+		this.right.setSensorPhase(ei.right);
+
 		map.back_left.follow(this.left);
 		map.back_right.follow(this.right);
 		map.back_left.setInverted(InvertType.FollowMaster);
 		map.back_right.setInverted(InvertType.FollowMaster);
+
+		SmartDashboard.putData("Robot Location", this.map);
 	}
 
 	@Override public void periodic() {
@@ -159,6 +168,16 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 			this.getRightPositionMeters()
 		);
 		// update robot field pose if we use that on the dashboard
+		this.map.setRobotPose(this.getPose());
+	}
+
+	@Override public void initSendable(SendableBuilder b) {
+		super.initSendable(b);
+		b.addDoubleProperty("Left Distance", ()->this.getLeftPositionMeters(), null);
+		b.addDoubleProperty("Right Distance", ()->this.getRightPositionMeters(), null);
+		b.addDoubleProperty("Left Velocity", ()->this.getLeftVelocity(), null);
+		b.addDoubleProperty("Right Velocity", ()->this.getRightVelocity(), null);
+		b.addDoubleProperty("Rotation (Continuous)", ()->this.getContinuousAngle(), null);
 	}
 
 	public FollowTrajectory followTrajectory(Trajectory t) {
@@ -214,16 +233,30 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 	}
 
 	public double getLeftPositionMeters() {
-		return this.getRawLeftPosition() / Constants.srx_mag_units_per_revolution * this.params.wheel_diameter_meters * this.encoder_invrt.leftSign();
+		return this.getRawLeftPosition()				// output is in encoder units...
+			/ Constants.srx_mag_units_per_revolution		// to get total rotations
+			* this.params.wheel_diameter_meters * Math.PI;	// to get total distance
+			//* this.encoder_invrt.leftSign();				// to get total distance in the correct direction
 	}
 	public double getRightPositionMeters() {
-		return this.getRawRightPosition() / Constants.srx_mag_units_per_revolution * this.params.wheel_diameter_meters * this.encoder_invrt.rightSign();
+		return this.getRawRightPosition()				// ^^^
+			/ Constants.srx_mag_units_per_revolution
+			* this.params.wheel_diameter_meters * Math.PI;
+			//* this.encoder_invrt.rightSign();
 	}
 	public double getLeftVelocity() {	// in meters per second
-		return this.getRawLeftVelocity() * 10 / Constants.srx_mag_units_per_revolution * this.params.wheel_diameter_meters * this.encoder_invrt.leftSign();
+		return this.getRawLeftVelocity()				// output is in encoder units per 100 ms
+			* 10											// to get encoder units per second
+			/ Constants.srx_mag_units_per_revolution		// to get rotations per second
+			* this.params.wheel_diameter_meters * Math.PI;	// to get meters per second
+			//* this.encoder_invrt.leftSign();				// to get meters per second in the correct direction
 	}
 	public double getRightVelocity() {	// in meters per second
-		return this.getRawRightVelocity() * 10 / Constants.srx_mag_units_per_revolution * this.params.wheel_diameter_meters * this.encoder_invrt.rightSign();
+		return this.getRawRightVelocity()				// ^^^
+			* 10
+			/ Constants.srx_mag_units_per_revolution
+			* this.params.wheel_diameter_meters * Math.PI;
+			//* this.encoder_invrt.rightSign();
 	}
 
 	public double getContinuousAngle() {	// in degrees
@@ -239,11 +272,20 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 		return this.gyro.getRotation2d();
 	}
 
+	public DifferentialDriveVoltageConstraint getVoltageConstraint() {
+		return new DifferentialDriveVoltageConstraint(
+			this.feedforward, this.kinematics, this.params.max_voltage
+		);
+	}
 	public TrajectoryConfig getTrajectoryConfig() {
 		return new TrajectoryConfig(
 			this.params.max_velocity_meters_per_sec,
 			this.params.max_acceleration_meters_per_sec_sqrd
-		).setKinematics(this.kinematics).addConstraint(this.voltage_constraint);
+		).setKinematics(
+			this.kinematics
+		).addConstraint(
+			this.getVoltageConstraint()
+		);
 	}
 
 

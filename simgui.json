@@ -89,7 +89,15 @@
       "/LiveWindow/W0_Transfer": "Subsystem",
       "/LiveWindow/WeekZero": "Subsystem",
       "/SmartDashboard/Auto Command": "String Chooser",
-      "/SmartDashboard/Auto Mode": "String Chooser"
+      "/SmartDashboard/Auto Mode": "String Chooser",
+      "/SmartDashboard/Robot Location": "Field2d"
+    },
+    "windows": {
+      "/SmartDashboard/Auto Command": {
+        "window": {
+          "visible": true
+        }
+      }
     }
   },
   "NetworkTables": {
@@ -130,6 +138,9 @@
     },
     "SmartDashboard": {
       "Auto Mode": {
+        "open": true
+      },
+      "Robot Location": {
         "open": true
       },
       "open": true

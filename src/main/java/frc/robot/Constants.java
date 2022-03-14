@@ -37,8 +37,8 @@ public final class Constants {
 
 	public static final double 
 // Vision
-		turn_thresh = 1.0,				// threshold for targeting angle
-		target_angle_range_lr = 20.0,	// maximum angle range that a target could be offset (used as divisor for P-loop)
+		heading_offset_thresh = 0.5,	// threshold for targeting angle
+		max_heading_offset = 22.0,		// maximum angle range that a target could be offset (used as divisor for P-loop)
 		cargo_thresh = 20.0,			// threshold distance for a cargo to be considered close enough to influenced by intake
 		cargo_distance_range = 100.0,	// maximum range that a cargo could be (and detected - used as divisor for P-loop)
 
@@ -46,14 +46,14 @@ public final class Constants {
 		uncertainty_continuation_percentage = 0.95,	// if break in target detection, keep powering motors at this percent of the last values used
 		motors_thresh_tozero = 0.1,		// the point where it is safe to go straight to zero (deceleration)
 
-		auto_max_turn_speed = 0.2,		// maximum speed when turning in place during auto
-		auto_max_forward_speed = 0.4,	// maximum speed when driving forward during auto
-		auto_max_acceleration = 2.5,	// maximum acceleration in percent output/sec^2
+		auto_max_turn_voltage = 2.0,	// maximum voltage for turning in place during auto
+		auto_max_forward_voltage = 4.0,	// maximum voltage for driving forward during auto
+		auto_max_voltage_ramp = 20.0,	// maximum voltage ramp (acceleration) in voltage/sec^2
 
-		teleop_assist_turn_speed = 0.4,
-		teleop_drivebase_scaling = -0.5,
-		teleop_drivebase_deadband = 0.05,
-		teleop_max_acceleration = 2.0,		// maximum acceleration in percent output/sec^2
+		teleop_assist_turn_voltage = 3.5,	// in volts
+		teleop_drivebase_scaling = -0.5,	// cap the voltage @50% -> negative because joysticks default to being inverted
+		teleop_drivebase_deadband = 0.05,	// the input range that is discarded
+		teleop_max_input_ramp = 2.0,		// maximum input acceleration in percent/sec^2
 
 		intake_speed = 0.65,
 		transfer_speed = 0.6,
@@ -75,19 +75,21 @@ public final class Constants {
 		srx_mag_units_per_revolution = 4096,	// self explainatory (12 bit precision)
 		falcon_units_per_revolution = 2048;		// self explainatory (11 bit precision)
 
-	// K-VALUES NEED TO BE FOUND IN CHARACTERIZATION >>>
-	public static final ClosedLoopDifferentialDrive.CLDriveParams cl_params = new ClosedLoopDifferentialDrive.CLDriveParams(
-		Units.inchesToMeters(drivetrack_width_inches),		// drivebase track width in meters
-		Units.inchesToMeters(drivewheel_diameter_inches),	// drivebase wheel diameter in meters
-		1.1185,	// "kS"(volts) -> base voltage required to overcome static friction -> from SysID characterization
-		2.1132,	// "kV"(volts * seconds / meters) -> voltage required for each additional meter/second of velocity -> from SysID characterization
-		1.0668,	// "kA"(volts * seconds^2 / meters) -> voltage required for each additional meter/second^2 of acceleration -> from SysID characterization
-		3.5176,	// "kP"(volts * seconds / meters) -> voltage added to correct for error
-		10.0,	// (volts) maximum voltage that can be supplied
-		1.5,	// (meters per second) maximum velocity in meters per second
-		2.0		// (meters per second^2) maximum acceleration in meters per second squared
-	);
-	public static final Inversions cl_encoder_inversions = Inversions.BOTH;	// invert both encoders
+
+	public static final Inversions
+		cl_encoder_inversions = Inversions.LEFT;
+	public static final ClosedLoopDifferentialDrive.CLDriveParams
+		cl_params = new ClosedLoopDifferentialDrive.CLDriveParams(
+			Units.inchesToMeters(drivetrack_width_inches),		// drivebase track width in meters
+			Units.inchesToMeters(drivewheel_diameter_inches),	// drivebase wheel diameter in meters
+			1.1185,	// "kS"(volts) -> base voltage required to overcome static friction -> from SysID characterization
+			2.1132,	// "kV"(volts * seconds / meters) -> voltage required for each additional meter/second of velocity -> from SysID characterization
+			1.0668,	// "kA"(volts * seconds^2 / meters) -> voltage required for each additional meter/second^2 of acceleration -> from SysID characterization
+			3.5176,	// "kP"(volts * seconds / meters) -> voltage added to correct for error
+			10.0,	// (volts) maximum voltage that can be supplied
+			1.5,	// (meters per second) maximum velocity in meters per second
+			2.0		// (meters per second^2) maximum acceleration in meters per second squared
+		);
 
 
 
@@ -111,7 +113,11 @@ public final class Constants {
 
 
 // PathWeaver filesystem locations / Generated paths
-	public static final Path test_fromjson = Filesystem.getDeployDirectory().toPath().resolve("./pathweaver/json/Test.wpilib.json");
-
+	public static final Path
+		test_straight1m = Filesystem.getDeployDirectory().toPath().resolve("./pathweaver/json/Straight-1m.wpilib.json")/*,
+		test_arc90R = Filesystem.getDeployDirectory().toPath().resolve("./pathweaver/json/Arc-90dd(r)-0.5m.wpilib.json"),
+		test_arc180L = Filesystem.getDeployDirectory().toPath().resolve("./pathweaver/json/Arc-180d(l)-0.5m.wpilib.json"),
+		test_arc360R = Filesystem.getDeployDirectory().toPath().resolve("./pathweaver/json/Arc-360d(R)-1.wpilib.json"),
+		test_diag45R = Filesystem.getDeployDirectory().toPath().resolve("./pathweaver/json/Diag-45d(R)-0.5m.wpilib.json")*/;
 
 }

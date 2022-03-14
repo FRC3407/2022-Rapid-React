@@ -18,7 +18,7 @@ public class Auto {
 
 		public Basic(DriveBase db) {
 			super.addCommands(
-				new BasicDriveControl(db, 0.25, 0.25, Constants.auto_max_acceleration).withTimeout(3.0)
+				new BasicDriveControl(db, 0.25, 0.25).withTimeout(3.0)
 			);
 		}
 
