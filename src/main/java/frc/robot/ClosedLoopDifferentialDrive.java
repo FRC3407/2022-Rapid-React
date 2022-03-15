@@ -1,6 +1,7 @@
 package frc.robot;
 
 import java.nio.file.Path;
+import java.util.List;
 
 import frc.robot.modules.common.drive.DriveBase;
 import frc.robot.modules.common.drive.Types.*;
@@ -133,7 +134,7 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 		SmartDashboard.putData("Robot Location", this.map);
 	}
 	public ClosedLoopDifferentialDrive(DriveMap_4<WPI_TalonSRX> map, Gyro gy, CLDriveParams params, Inversions ei) {
-		super(map);
+		super(map.differentialDowncast());	// motorcontroller groups mess everything up, so only let the super control the front motors, the back can be set via the phoenix api
 		this.gyro = gy;
 		this.params = params;
 
@@ -153,7 +154,7 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 		this.left.setSensorPhase(ei.left);
 		this.right.setSensorPhase(ei.right);
 
-		map.back_left.follow(this.left);
+		map.back_left.follow(this.left);	// since we didn't pass these motors to the super, we can just set them to follow the front ones and nothing else will touch them
 		map.back_right.follow(this.right);
 		map.back_left.setInverted(InvertType.FollowMaster);
 		map.back_right.setInverted(InvertType.FollowMaster);
@@ -319,6 +320,15 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 	 */
 	public static class FollowTrajectory extends CLDriveCommand {
 
+		public static final Trajectory getDefault(TrajectoryConfig c) {	// this trajectory is meant to do nothing because the values are very small
+			return TrajectoryGenerator.generateTrajectory(
+				new Pose2d(0, 0, new Rotation2d(0)),
+				List.of(new Translation2d(0.0000000001, 0)),
+				new Pose2d(0.0000000002, 0, new Rotation2d(0)),
+				c
+			);
+		}
+
 		private final Trajectory trajectory;
 		private final RamseteCommand controller;
 		private final boolean stop;
@@ -343,15 +353,15 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 		}
 		public FollowTrajectory(ClosedLoopDifferentialDrive db, Path json_path, boolean s) {	// accepts a path to a pathweaver json (deployed with robot program)
 			super(db);
+			this.stop = s;
 			Trajectory temp;
 			try {
 				temp = TrajectoryUtil.fromPathweaverJson(json_path);
 			} catch(Exception e) {
-				System.err.println(e.getMessage());
-				temp = null;
+				System.err.println("FAILED TO READ TRAJECTORY: " + json_path.toString() + " -> " + e.getMessage());
+				temp = getDefault(db.getTrajectoryConfig());	// do-nothing trajectory as placeholder
 			}
 			this.trajectory = temp;
-			this.stop = s;
 			this.controller = new RamseteCommand(
 				this.trajectory,
 				super.drivebase_cl::getPose,

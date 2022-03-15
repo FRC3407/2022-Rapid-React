@@ -13,6 +13,7 @@ import edu.wpi.first.wpilibj.smartdashboard.*;
 import edu.wpi.first.wpilibj2.command.*;
 import edu.wpi.first.wpilibj2.command.button.*;
 
+import java.nio.file.Path;
 import java.util.List;
 
 import edu.wpi.first.math.geometry.*;
@@ -47,6 +48,7 @@ import edu.wpi.first.networktables.*;
 
 public class Runtime extends TimedRobot {
 
+	/* The input devices should always be setup with these port-id's on the driverstation so we can distinguish between input types */
 	private final InputDevice
 		input = new InputDevice(0),			// xbox controller
 
@@ -55,15 +57,15 @@ public class Runtime extends TimedRobot {
 
 	private final ADIS16470
 		spi_imu = new ADIS16470();
-	private final DriveBase
-		drivebase = new DriveBase(Constants.drivebase_map_testbot);
-	// private final ClosedLoopDifferentialDrive
-	// 	drivebase = new ClosedLoopDifferentialDrive(
-	// 		Constants.drivebase_map_2022,
-	// 		this.spi_imu,
-	// 		Constants.cl_params,
-	// 		Constants.cl_encoder_inversions
-	// 	);
+	// private final DriveBase
+	// 	drivebase = new DriveBase(Constants.drivebase_map_testbot);
+	private final ClosedLoopDifferentialDrive
+		drivebase = new ClosedLoopDifferentialDrive(
+			Constants.drivebase_map_2022,
+			this.spi_imu,
+			Constants.cl_params,
+			Constants.cl_encoder_inversions
+		);
 	private final CargoSystem
 		cargo_sys = new CargoSystem(
 			new CargoSystem.IntakeSubsystem(Constants.intake_port),
@@ -84,21 +86,22 @@ public class Runtime extends TimedRobot {
 
 		this.cargo_sys.startAutomaticTransfer(Constants.transfer_speed);
 
-		// Trajectory test = TrajectoryGenerator.generateTrajectory(
-		// 	new Pose2d(0, 0, new Rotation2d(0)),
-		// 	//List.of(new Translation2d(1, 1), new Translation2d(2, -1)),
-		// 	List.of(new Translation2d(1, 0)),
-		// 	new Pose2d(2, 0, new Rotation2d(0)),
-		// 	this.drivebase.getTrajectoryConfig()
-		// );
+		Trajectory test = TrajectoryGenerator.generateTrajectory(
+			new Pose2d(0, 0, new Rotation2d(0)),
+			//List.of(new Translation2d(1, 1), new Translation2d(2, -1)),
+			List.of(new Translation2d(1, 0)),
+			new Pose2d(2, 0, new Rotation2d(0)),
+			this.drivebase.getTrajectoryConfig()
+		);
 
 		this.auto_command.setDefaultOption("Basic-Taxi", new Auto.Basic(this.drivebase));
 		this.auto_command.addOption("Gyro-Taxi", new Auto.GyroCL(this.drivebase, this.spi_imu));
-		//this.auto_command.addOption("Test Trajectory", this.drivebase.followSingleTrajectory(test));
-		// this.auto_command.addOption("Arc-90(R) Trajectory", this.drivebase.followSingleTrajectory(Constants.test_arc90R));
-		// this.auto_command.addOption("Arc-180(L) Trajectory", this.drivebase.followSingleTrajectory(Constants.test_arc180L));
-		// this.auto_command.addOption("Arc-360(R) Trajectory", this.drivebase.followSingleTrajectory(Constants.test_arc360R));
-		// this.auto_command.addOption("Diag-45(R) Trajectory", this.drivebase.followSingleTrajectory(Constants.test_diag45R));
+		this.auto_command.addOption("Test Trajectory", this.drivebase.followSingleTrajectory(test));
+		this.auto_command.addOption("Straight Trajectory", this.drivebase.followSingleTrajectory(Constants.test_straight1m));
+		this.auto_command.addOption("Arc-90(R) Trajectory", this.drivebase.followSingleTrajectory(Constants.test_arc90R));
+		this.auto_command.addOption("Arc-180(L) Trajectory", this.drivebase.followSingleTrajectory(Constants.test_arc180L));
+		this.auto_command.addOption("Arc-360(R) Trajectory", this.drivebase.followSingleTrajectory(Constants.test_arc360R));
+		this.auto_command.addOption("Diag-45(R) Trajectory", this.drivebase.followSingleTrajectory(Constants.test_diag45R));
 		this.auto_command.addOption("Demo-Follow", new RapidReactVision.CargoFollow.Demo(this.drivebase));
 		SmartDashboard.putData("Auto Command", this.auto_command);
 	}
@@ -110,10 +113,15 @@ public class Runtime extends TimedRobot {
 		AutonomousTrigger.Get().whenActive(()->this.auto_command.getSelected().schedule());
 		//AutonomousTrigger.Get().whenActive( new CargoFollow.Demo(this.drivebase, DriverStation.getAlliance(), Constants.cargo_cam_name) );
 
-		new Trigger(()->VisionServer.isConnected()).whenActive(new LambdaCommand(()->System.out.println("VisionServer Connected")));
+		new Trigger(()->VisionServer.isConnected()).whenActive(
+			new LambdaCommand(()->System.out.println("Coprocessor Connected!"))
+		).whenInactive(
+			new LambdaCommand(()->System.out.println("Coprocessor Disconnected."))
+		);
 
 		if(this.input.isConnected()) {
 			this.xboxControls();
+			System.out.println("Xbox Bindings Scheduled.");
 		} else {
 			this.input.connectionTrigger().whenActive(
 				new LambdaCommand.Singular(()->{
@@ -219,8 +227,8 @@ public class Runtime extends TimedRobot {
 		);
 
 		Xbox.Digital.RB.getToggleFrom(this.input).and(
-			Xbox.Digital.Y.getCallbackFrom(this.input).negate()
-		).and( TeleopTrigger.Get() ).whenActive(
+			TeleopTrigger.Get()
+		).whenActive(
 			new SequentialCommandGroup(
 				new LambdaCommand(()->System.out.println("VISION ASSIST RUNNING...")),
 				new LambdaCommand(()->this.drivebase.modeDrive().cancel()),		// disable driving
@@ -233,34 +241,27 @@ public class Runtime extends TimedRobot {
 					Constants.feed_speed,
 					(double inches)-> inches / 200.0 * 12.0			// 200 inches @ max power, 12v max voltage (obviously needs to be tuned)
 				),
-				new RapidReactVision.HubAssistRoutine(this.drivebase, ()->Xbox.Analog.RT.getValueOf(this.input) - Xbox.Analog.LT.getValueOf(this.input), 3.0, 10.0)
-				// new SequentialCommandGroup(							// LT and RT control turning speed of aim assist
-				// 	// maybe disable driving here so it is garenteed to be canceled before the following commands start
-				// 	// new HubFind.TeleopAssist(this.drivebase, ()->Xbox.Analog.RT.getValueOf(this.input) - Xbox.Analog.LT.getValueOf(this.input)),
-				// 	// new HubTurn.TeleopAssist(this.drivebase, ()->Xbox.Analog.RT.getValueOf(this.input)/* - Xbox.Analog.LT.getValueOf(this.input)*/)
-				// )
+				new RapidReactVision.HubAssistRoutine(
+					this.drivebase,
+					()->Xbox.Analog.RT.getValueOf(this.input) - Xbox.Analog.LT.getValueOf(this.input),
+					3.0, 10.0	// max turning voltage and max voltage ramp
+				)
 			)
 		).whenInactive(
 			new SequentialCommandGroup(
-				new LambdaCommand(()->System.out.println("VISION ASSIST TERMINATED.")),
+				new LambdaCommand(()->System.out.println("VISION ASSIST TERMINATED.")), 
 				new LambdaCommand(()->this.drivebase.modeDrive().schedule()),		// re-enable driving
 				new LambdaCommand(Constants.vision_driving)
 			)
 		);
-		// new ToggleTrigger(
-		// 	Xbox.Digital.RB.getToggleFrom(this.input).and(
-		// 		Xbox.Digital.LB.getCallbackFrom(this.input).negate()
-		// 	).and(
-		// 		Xbox.Digital.B.getCallbackFrom(this.input)
-		// 	).and(
-		// 		TeleopTrigger.Get()
-		// 	)
-		Xbox.Digital.Y.getToggleFrom(this.input).and(
-			Xbox.Digital.RB.getToggleFrom(this.input).negate()
-		).and(
-			Xbox.Digital.LB.getCallbackFrom(this.input).negate()
-		).and(
-			TeleopTrigger.Get()
+		new ToggleTrigger(
+			Xbox.Digital.RB.getToggleFrom(this.input).negate().and(
+				Xbox.Digital.LB.getCallbackFrom(this.input).negate()
+			).and(
+				Xbox.Digital.Y.getCallbackFrom(this.input)
+			).and(
+				TeleopTrigger.Get()
+			)
 		).whenActive(
 			new SequentialCommandGroup(
 				new LambdaCommand(()->System.out.println("VISION ASSIST RUNNING...")),
@@ -268,97 +269,14 @@ public class Runtime extends TimedRobot {
 				new LambdaCommand(Constants.vision_cargo)
 			)
 		).whileActiveOnce(
-			new RapidReactVision.CargoAssistRoutine(this.drivebase, this.drivebase.modeDrive(), DriverStation.getAlliance(), 20, 4, 2, 10)
-		).whenInactive(
-			new SequentialCommandGroup(
-				new LambdaCommand(()->System.out.println("VISION ASSIST TERMINATED.")),
-				new LambdaCommand(()->this.drivebase.modeDrive().schedule()),		// re-enable driving
-				new LambdaCommand(Constants.vision_driving)
-			)
-		);
-
-	}
-	private void arcadeControls() {	// bindings for arcade board
-
-		TeleopTrigger.Get().whenActive(
-			new SequentialCommandGroup(
-				new LambdaCommand(Constants.vision_driving),
-				this.drivebase.modeDrive(
-					Attack3.Analog.X.getLimitedSupplier(this.stick_left, Constants.teleop_max_input_ramp),
-					Attack3.Analog.Y.getLimitedSupplier(this.stick_left, Constants.teleop_max_input_ramp),
-					Attack3.Analog.X.getLimitedSupplier(this.stick_right, Constants.teleop_max_input_ramp),
-					Attack3.Analog.Y.getLimitedSupplier(this.stick_right, Constants.teleop_max_input_ramp),
-					Attack3.Digital.TR.getPressedSupplier(this.stick_left),
-					Attack3.Digital.TL.getPressedSupplier(this.stick_left)
-				)
-			)
-		);	// schedule mode drive when in teleop mode
-
-		//Attack3.Digital.TT.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.IncrementPipeline.Get());
-		//Attack3.Digital.TB.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.DecrementPipeline.Get());
-		Attack3.Digital.TT.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.IncrementCamera.Get());
-		Attack3.Digital.TB.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.DecrementCamera.Get());
-		//Attack3.Digital.TB.getCallbackFrom(this.stick_right).whenPressed(VisionSubsystem.ToggleProcessing.Get());
-		//Attack3.Digital.TB.getCallbackFrom(this.stick_right).whenPressed(VisionSubsystem.ToggleStatistics.Get());
-
-		Attack3.Digital.TL.getCallbackFrom(this.stick_right).and(
-			Attack3.Digital.TRI.getCallbackFrom(this.stick_left).negate()
-		).and( TeleopTrigger.Get() ).whileActiveOnce(
-			this.cargo_sys.managedIntake(Constants.intake_speed)
-		);
-		Attack3.Digital.TL.getCallbackFrom(this.stick_right).and(
-			Attack3.Digital.TRI.getCallbackFrom(this.stick_left)
-		).and( TeleopTrigger.Get() ).whileActiveOnce(
-			this.cargo_sys.basicIntake(Constants.intake_speed)
-		);
-
-		Attack3.Digital.TT.getCallbackFrom(this.stick_right).and(
-			Attack3.Digital.TRI.getCallbackFrom(this.stick_left)
-		).and( TeleopTrigger.Get() ).whileActiveOnce(
-			this.cargo_sys.basicTransfer(Constants.transfer_speed)
-		);
-		Attack3.Digital.TR.getCallbackFrom(this.stick_right).and(
-			Attack3.Digital.TRI.getCallbackFrom(this.stick_left).negate()
-		).and(
-			Attack3.Digital.TRI.getToggleFrom(this.stick_right).negate()
-		).and( TeleopTrigger.Get() ).toggleWhenActive(
-			this.cargo_sys.managedShoot(
-				Attack3.Digital.TB.getSupplier(this.stick_right),
-				Constants.feed_speed,
-				Constants.shooter_default_speed
-			)
-		);
-		Attack3.Digital.TR.getCallbackFrom(this.stick_right).and(
-			Attack3.Digital.TRI.getCallbackFrom(this.stick_left)
-		).and(
-			Attack3.Digital.TRI.getToggleFrom(this.stick_right).negate()
-		).and( TeleopTrigger.Get() ).toggleWhenActive(
-			this.cargo_sys.basicShoot(
-				Attack3.Digital.TB.getSupplier(this.stick_right),
-				Constants.feed_speed,
-				Constants.shooter_default_speed
-			)
-		);
-
-		Attack3.Digital.TRI.getToggleFrom(this.stick_right).and(
-			TeleopTrigger.Get()
-		).whenActive(
-			new SequentialCommandGroup(
-				new LambdaCommand(()->System.out.println("VISION ASSIST RUNNING...")),
-				new LambdaCommand(()->this.drivebase.modeDrive().cancel()),
-				new LambdaCommand(Constants.vision_hub)
-			)
-		).whileActiveOnce(
-			new ParallelCommandGroup(
-				this.cargo_sys.visionShoot(
-					Attack3.Digital.TB.getSupplier(this.stick_right),
-					Constants.feed_speed,
-					(double inches)-> inches / 200.0 * 12.0			// 200 inches @ max power, 12v max voltage (obviously needs to be tuned)
-				),
-				new SequentialCommandGroup(
-					// new HubFind.TeleopAssist(this.drivebase, Attack3.Analog.X.getSupplier(this.stick_left)),
-					// new HubTurn.TeleopAssist(this.drivebase, Attack3.Analog.X.getSupplier(this.stick_left))
-				)
+			new RapidReactVision.CargoAssistRoutine(
+				this.drivebase,
+				this.drivebase.modeDrive(),
+				DriverStation.getAlliance(),
+				Constants.cargo_follow_target_inches,
+				Constants.auto_max_forward_voltage,
+				Constants.auto_max_turn_voltage,
+				Constants.auto_max_voltage_ramp
 			)
 		).whenInactive(
 			new SequentialCommandGroup(
@@ -369,6 +287,98 @@ public class Runtime extends TimedRobot {
 		);
 
 	}
+// needs to be updated >>
+	// private void arcadeControls() {	// bindings for arcade board
+
+	// 	TeleopTrigger.Get().whenActive(
+	// 		new SequentialCommandGroup(
+	// 			new LambdaCommand(Constants.vision_driving),
+	// 			this.drivebase.modeDrive(
+	// 				Attack3.Analog.X.getLimitedSupplier(this.stick_left, Constants.teleop_max_input_ramp),
+	// 				Attack3.Analog.Y.getLimitedSupplier(this.stick_left, Constants.teleop_max_input_ramp),
+	// 				Attack3.Analog.X.getLimitedSupplier(this.stick_right, Constants.teleop_max_input_ramp),
+	// 				Attack3.Analog.Y.getLimitedSupplier(this.stick_right, Constants.teleop_max_input_ramp),
+	// 				Attack3.Digital.TR.getPressedSupplier(this.stick_left),
+	// 				Attack3.Digital.TL.getPressedSupplier(this.stick_left)
+	// 			)
+	// 		)
+	// 	);	// schedule mode drive when in teleop mode
+
+	// 	//Attack3.Digital.TT.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.IncrementPipeline.Get());
+	// 	//Attack3.Digital.TB.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.DecrementPipeline.Get());
+	// 	Attack3.Digital.TT.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.IncrementCamera.Get());
+	// 	Attack3.Digital.TB.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.DecrementCamera.Get());
+	// 	//Attack3.Digital.TB.getCallbackFrom(this.stick_right).whenPressed(VisionSubsystem.ToggleProcessing.Get());
+	// 	//Attack3.Digital.TB.getCallbackFrom(this.stick_right).whenPressed(VisionSubsystem.ToggleStatistics.Get());
+
+	// 	Attack3.Digital.TL.getCallbackFrom(this.stick_right).and(
+	// 		Attack3.Digital.TRI.getCallbackFrom(this.stick_left).negate()
+	// 	).and( TeleopTrigger.Get() ).whileActiveOnce(
+	// 		this.cargo_sys.managedIntake(Constants.intake_speed)
+	// 	);
+	// 	Attack3.Digital.TL.getCallbackFrom(this.stick_right).and(
+	// 		Attack3.Digital.TRI.getCallbackFrom(this.stick_left)
+	// 	).and( TeleopTrigger.Get() ).whileActiveOnce(
+	// 		this.cargo_sys.basicIntake(Constants.intake_speed)
+	// 	);
+
+	// 	Attack3.Digital.TT.getCallbackFrom(this.stick_right).and(
+	// 		Attack3.Digital.TRI.getCallbackFrom(this.stick_left)
+	// 	).and( TeleopTrigger.Get() ).whileActiveOnce(
+	// 		this.cargo_sys.basicTransfer(Constants.transfer_speed)
+	// 	);
+	// 	Attack3.Digital.TR.getCallbackFrom(this.stick_right).and(
+	// 		Attack3.Digital.TRI.getCallbackFrom(this.stick_left).negate()
+	// 	).and(
+	// 		Attack3.Digital.TRI.getToggleFrom(this.stick_right).negate()
+	// 	).and( TeleopTrigger.Get() ).toggleWhenActive(
+	// 		this.cargo_sys.managedShoot(
+	// 			Attack3.Digital.TB.getSupplier(this.stick_right),
+	// 			Constants.feed_speed,
+	// 			Constants.shooter_default_speed
+	// 		)
+	// 	);
+	// 	Attack3.Digital.TR.getCallbackFrom(this.stick_right).and(
+	// 		Attack3.Digital.TRI.getCallbackFrom(this.stick_left)
+	// 	).and(
+	// 		Attack3.Digital.TRI.getToggleFrom(this.stick_right).negate()
+	// 	).and( TeleopTrigger.Get() ).toggleWhenActive(
+	// 		this.cargo_sys.basicShoot(
+	// 			Attack3.Digital.TB.getSupplier(this.stick_right),
+	// 			Constants.feed_speed,
+	// 			Constants.shooter_default_speed
+	// 		)
+	// 	);
+
+	// 	Attack3.Digital.TRI.getToggleFrom(this.stick_right).and(
+	// 		TeleopTrigger.Get()
+	// 	).whenActive(
+	// 		new SequentialCommandGroup(
+	// 			new LambdaCommand(()->System.out.println("VISION ASSIST RUNNING...")),
+	// 			new LambdaCommand(()->this.drivebase.modeDrive().cancel()),
+	// 			new LambdaCommand(Constants.vision_hub)
+	// 		)
+	// 	).whileActiveOnce(
+	// 		new ParallelCommandGroup(
+	// 			this.cargo_sys.visionShoot(
+	// 				Attack3.Digital.TB.getSupplier(this.stick_right),
+	// 				Constants.feed_speed,
+	// 				(double inches)-> inches / 200.0 * 12.0			// 200 inches @ max power, 12v max voltage (obviously needs to be tuned)
+	// 			),
+	// 			new SequentialCommandGroup(
+	// 				// new HubFind.TeleopAssist(this.drivebase, Attack3.Analog.X.getSupplier(this.stick_left)),
+	// 				// new HubTurn.TeleopAssist(this.drivebase, Attack3.Analog.X.getSupplier(this.stick_left))
+	// 			)
+	// 		)
+	// 	).whenInactive(
+	// 		new SequentialCommandGroup(
+	// 			new LambdaCommand(()->System.out.println("VISION ASSIST TERMINATED.")),
+	// 			new LambdaCommand(()->this.drivebase.modeDrive().schedule()),		// re-enable driving
+	// 			new LambdaCommand(Constants.vision_driving)
+	// 		)
+	// 	);
+
+	// }
 
 
 }
