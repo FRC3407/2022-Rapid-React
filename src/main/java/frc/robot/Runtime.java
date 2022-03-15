@@ -55,15 +55,15 @@ public class Runtime extends TimedRobot {
 
 	private final ADIS16470
 		spi_imu = new ADIS16470();
-	// private final DriveBase
-	// 	drivebase = new DriveBase(Constants.drivebase_map_testbot);
-	private final ClosedLoopDifferentialDrive
-		drivebase = new ClosedLoopDifferentialDrive(
-			Constants.drivebase_map_2022,
-			this.spi_imu,
-			Constants.cl_params,
-			Constants.cl_encoder_inversions
-		);
+	private final DriveBase
+		drivebase = new DriveBase(Constants.drivebase_map_testbot);
+	// private final ClosedLoopDifferentialDrive
+	// 	drivebase = new ClosedLoopDifferentialDrive(
+	// 		Constants.drivebase_map_2022,
+	// 		this.spi_imu,
+	// 		Constants.cl_params,
+	// 		Constants.cl_encoder_inversions
+	// 	);
 	private final CargoSystem
 		cargo_sys = new CargoSystem(
 			new CargoSystem.IntakeSubsystem(Constants.intake_port),
@@ -72,7 +72,7 @@ public class Runtime extends TimedRobot {
 		);
 
 	private final SendableChooser<Command>
-		auto_command = new SendableChooser<>();
+		auto_command = new SendableChooser<Command>();
 
 
 	public Runtime() {
@@ -156,11 +156,7 @@ public class Runtime extends TimedRobot {
 	private void xboxControls() {	// bindings for xbox controller
 
 		TeleopTrigger.Get().whenActive(
-			new SequentialCommandGroup(
-				new LambdaCommand(()->VisionServer.setStatistics(false)),
-				new LambdaCommand(()->VisionServer.setProcessingEnabled(false)),
-				new LambdaCommand(()->VisionServer.applyCameraPreset(Constants.cam_driving))
-			)
+			new LambdaCommand(Constants.vision_driving)
 		).whenActive(
 			this.drivebase.modeDrive(
 				Xbox.Analog.LX.getLimitedSupplier(input, Constants.teleop_max_input_ramp),
@@ -228,9 +224,7 @@ public class Runtime extends TimedRobot {
 			new SequentialCommandGroup(
 				new LambdaCommand(()->System.out.println("VISION ASSIST RUNNING...")),
 				new LambdaCommand(()->this.drivebase.modeDrive().cancel()),		// disable driving
-				new LambdaCommand(()->VisionServer.setStatistics(true)),
-				new LambdaCommand(()->VisionServer.setProcessingEnabled(true)),
-				new LambdaCommand(()->VisionServer.applyCameraPreset(Constants.cam_hub_pipeline))
+				new LambdaCommand(Constants.vision_hub)
 			)
 		).whileActiveOnce(
 			new ParallelCommandGroup(
@@ -239,58 +233,65 @@ public class Runtime extends TimedRobot {
 					Constants.feed_speed,
 					(double inches)-> inches / 200.0 * 12.0			// 200 inches @ max power, 12v max voltage (obviously needs to be tuned)
 				),
-				new SequentialCommandGroup(							// LT and RT control turning speed of aim assist
-					// maybe disable driving here so it is garenteed to be canceled before the following commands start
-					// new HubFind.TeleopAssist(this.drivebase, ()->Xbox.Analog.RT.getValueOf(this.input) - Xbox.Analog.LT.getValueOf(this.input)),
-					// new HubTurn.TeleopAssist(this.drivebase, ()->Xbox.Analog.RT.getValueOf(this.input)/* - Xbox.Analog.LT.getValueOf(this.input)*/)
-					new RapidReactVision.HubAssistRoutine(this.drivebase, ()->Xbox.Analog.RT.getValueOf(this.input) - Xbox.Analog.LT.getValueOf(this.input), 4.0, 10.0)
-				)
+				new RapidReactVision.HubAssistRoutine(this.drivebase, ()->Xbox.Analog.RT.getValueOf(this.input) - Xbox.Analog.LT.getValueOf(this.input), 3.0, 10.0)
+				// new SequentialCommandGroup(							// LT and RT control turning speed of aim assist
+				// 	// maybe disable driving here so it is garenteed to be canceled before the following commands start
+				// 	// new HubFind.TeleopAssist(this.drivebase, ()->Xbox.Analog.RT.getValueOf(this.input) - Xbox.Analog.LT.getValueOf(this.input)),
+				// 	// new HubTurn.TeleopAssist(this.drivebase, ()->Xbox.Analog.RT.getValueOf(this.input)/* - Xbox.Analog.LT.getValueOf(this.input)*/)
+				// )
 			)
 		).whenInactive(
 			new SequentialCommandGroup(
 				new LambdaCommand(()->System.out.println("VISION ASSIST TERMINATED.")),
 				new LambdaCommand(()->this.drivebase.modeDrive().schedule()),		// re-enable driving
-				new LambdaCommand(()->VisionServer.setStatistics(false)),
-				new LambdaCommand(()->VisionServer.setProcessingEnabled(false)),
-				new LambdaCommand(()->VisionServer.applyCameraPreset(Constants.cam_driving))
+				new LambdaCommand(Constants.vision_driving)
 			)
 		);
 		// new ToggleTrigger(
-		// 	Xbox.Digital.Y.getCallbackFrom(this.input).and(
-		// 		Xbox.Digital.RB.getCallbackFrom(this.input)
-		// 	).and(
+		// 	Xbox.Digital.RB.getToggleFrom(this.input).and(
 		// 		Xbox.Digital.LB.getCallbackFrom(this.input).negate()
+		// 	).and(
+		// 		Xbox.Digital.B.getCallbackFrom(this.input)
+		// 	).and(
+		// 		TeleopTrigger.Get()
 		// 	)
-		// ).whenActive(
-		// 	new SequentialCommandGroup(
-		// 		new LambdaCommand(()->System.out.println("VISION ASSIST RUNNING...")),
-		// 		new LambdaCommand(()->this.drivebase.modeDrive().cancel()),		// disable driving
-		// 		new LambdaCommand(()->VisionServer.setStatistics(true)),
-		// 		new LambdaCommand(()->VisionServer.setProcessingEnabled(true)),
-		// 		new LambdaCommand(()->VisionServer.applyCameraPreset(Constants.cam_cargo_pipeline))
-		// 	)
-		// ).whileActiveOnce(
-
-		// );
+		Xbox.Digital.Y.getToggleFrom(this.input).and(
+			Xbox.Digital.RB.getToggleFrom(this.input).negate()
+		).and(
+			Xbox.Digital.LB.getCallbackFrom(this.input).negate()
+		).and(
+			TeleopTrigger.Get()
+		).whenActive(
+			new SequentialCommandGroup(
+				new LambdaCommand(()->System.out.println("VISION ASSIST RUNNING...")),
+				new LambdaCommand(()->this.drivebase.modeDrive().cancel()),		// disable driving
+				new LambdaCommand(Constants.vision_cargo)
+			)
+		).whileActiveOnce(
+			new RapidReactVision.CargoAssistRoutine(this.drivebase, this.drivebase.modeDrive(), DriverStation.getAlliance(), 20, 4, 2, 10)
+		).whenInactive(
+			new SequentialCommandGroup(
+				new LambdaCommand(()->System.out.println("VISION ASSIST TERMINATED.")),
+				new LambdaCommand(()->this.drivebase.modeDrive().schedule()),		// re-enable driving
+				new LambdaCommand(Constants.vision_driving)
+			)
+		);
 
 	}
 	private void arcadeControls() {	// bindings for arcade board
 
 		TeleopTrigger.Get().whenActive(
 			new SequentialCommandGroup(
-				new LambdaCommand(()->VisionServer.setStatistics(false)),
-				new LambdaCommand(()->VisionServer.setProcessingEnabled(false)),
-				new LambdaCommand(()->VisionServer.applyCameraPreset(Constants.cam_driving))
+				new LambdaCommand(Constants.vision_driving),
+				this.drivebase.modeDrive(
+					Attack3.Analog.X.getLimitedSupplier(this.stick_left, Constants.teleop_max_input_ramp),
+					Attack3.Analog.Y.getLimitedSupplier(this.stick_left, Constants.teleop_max_input_ramp),
+					Attack3.Analog.X.getLimitedSupplier(this.stick_right, Constants.teleop_max_input_ramp),
+					Attack3.Analog.Y.getLimitedSupplier(this.stick_right, Constants.teleop_max_input_ramp),
+					Attack3.Digital.TR.getPressedSupplier(this.stick_left),
+					Attack3.Digital.TL.getPressedSupplier(this.stick_left)
+				)
 			)
-		).whenActive(
-			this.drivebase.modeDrive(
-				Attack3.Analog.X.getLimitedSupplier(this.stick_left, Constants.teleop_max_input_ramp),
-				Attack3.Analog.Y.getLimitedSupplier(this.stick_left, Constants.teleop_max_input_ramp),
-				Attack3.Analog.X.getLimitedSupplier(this.stick_right, Constants.teleop_max_input_ramp),
-				Attack3.Analog.Y.getLimitedSupplier(this.stick_right, Constants.teleop_max_input_ramp),
-				Attack3.Digital.TR.getPressedSupplier(this.stick_left),
-				Attack3.Digital.TL.getPressedSupplier(this.stick_left)
-			), false
 		);	// schedule mode drive when in teleop mode
 
 		//Attack3.Digital.TT.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.IncrementPipeline.Get());
@@ -345,9 +346,7 @@ public class Runtime extends TimedRobot {
 			new SequentialCommandGroup(
 				new LambdaCommand(()->System.out.println("VISION ASSIST RUNNING...")),
 				new LambdaCommand(()->this.drivebase.modeDrive().cancel()),
-				new LambdaCommand(()->VisionServer.setStatistics(true)),
-				new LambdaCommand(()->VisionServer.setProcessingEnabled(true)),
-				new LambdaCommand(()->VisionServer.applyCameraPreset(Constants.cam_hub_pipeline))
+				new LambdaCommand(Constants.vision_hub)
 			)
 		).whileActiveOnce(
 			new ParallelCommandGroup(
@@ -365,9 +364,7 @@ public class Runtime extends TimedRobot {
 			new SequentialCommandGroup(
 				new LambdaCommand(()->System.out.println("VISION ASSIST TERMINATED.")),
 				new LambdaCommand(()->this.drivebase.modeDrive().schedule()),		// re-enable driving
-				new LambdaCommand(()->VisionServer.setStatistics(false)),
-				new LambdaCommand(()->VisionServer.setProcessingEnabled(false)),
-				new LambdaCommand(()->VisionServer.applyCameraPreset(Constants.cam_driving))
+				new LambdaCommand(Constants.vision_driving)
 			)
 		);
 

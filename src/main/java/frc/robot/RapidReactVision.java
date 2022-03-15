@@ -1,46 +1,85 @@
 package frc.robot;
 
+import frc.robot.modules.common.Input.AnalogSupplier;
+import frc.robot.modules.common.drive.DriveBase;
+import frc.robot.modules.common.drive.DriveBase.DriveCommandBase;
+import frc.robot.modules.vision.java.VisionServer;
+
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.filter.SlewRateLimiter;
+import edu.wpi.first.networktables.*;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
-import frc.robot.modules.common.Input.AnalogSupplier;
-import frc.robot.modules.common.drive.DriveBase;
-import frc.robot.modules.vision.java.VisionServer;
+import edu.wpi.first.wpilibj2.command.button.Trigger;
 
 
 /**
  * Rapid-React specific vision methods and commands. For a general vision interface, see {@link VisionServer}
  */
-public class RapidReactVision {
+public final class RapidReactVision {
+
+	public static enum Cameras {
+		HUB		("Hub"),		// the camera tilted upwards for viewing the hub
+		CARGO	("Cargo");		// the camera pointed to view the ground
+
+		public final String key;
+		private Cameras(String k) {
+			this.key = k;
+		}
+
+		public int getIndex() { return VisionServer.findCameraIdx(this.key); }
+		public VisionServer.VsCamera getObject() { return VisionServer.getCamera(this.key); }
+		public NetworkTable getTable() { return VisionServer.getCamerasTable().getSubTable(this.key); }
+		public boolean setActive() { return VisionServer.setCamera(this.key); }
+	}
+	public static enum Pipelines {
+		HUB_TRACKER		("Upper-Hub Pipeline"),		// hub position tracking
+		CARGO_TRACKER	("Cargo Pipeline");			// cargo position tracking
+
+		public final String key;
+		private Pipelines(String k) {
+			this.key = k;
+		}
+
+		public int getIndex() { return VisionServer.findCameraIdx(this.key); }
+		public VisionServer.VsPipeline getObject() { return VisionServer.getPipeline(this.key); }
+		public NetworkTable getTable() { return VisionServer.getPipelinesTable().getSubTable(this.key); }
+		public boolean setActive() { return VisionServer.setPipeline(this.key); }
+	}
 
 
-	public static final String
-		hub_pipeline_name = "Upper-Hub Pipeline",
-		cargo_pipeline_name = "Cargo Pipeline",
-		hub_camera_name = Constants.hub_cam_name,
-		cargo_camera_name = Constants.cargo_cam_name
-	;
+
+	private VisionServer.VsPipeline
+		upperhub = null, cargo = null;
+
+	private RapidReactVision() {
+		if(!VisionServer.isConnected()) {
+			new Trigger(()->VisionServer.isConnected()).whenActive(
+				()->{
+					this.upperhub = Pipelines.HUB_TRACKER.getObject();
+					this.cargo = Pipelines.CARGO_TRACKER.getObject();
+				}
+			);
+		} else {
+			this.upperhub = Pipelines.HUB_TRACKER.getObject();
+			this.cargo = Pipelines.CARGO_TRACKER.getObject();
+		}
+	}
+	private static RapidReactVision inst = new RapidReactVision();
 
 
-
-	private static VisionServer.VsPipeline 
-		upperhub = VisionServer.getPipeline(hub_pipeline_name),
-		cargo = VisionServer.getPipeline(cargo_pipeline_name)
-	;
-
-	public static boolean hasHubPipeline() { return VisionServer.getPipeline(hub_pipeline_name) != null; }
-	public static boolean isHubPipelineValid() { return upperhub != null; }
-	public static boolean hasCargoPipeline() { return VisionServer.getPipeline(cargo_pipeline_name) != null; }
-	public static boolean isCargoPipelineValid() { return cargo != null; }
+	public static boolean hasHubPipeline() { return Pipelines.HUB_TRACKER.getObject() != null; }
+	public static boolean isHubPipelineValid() { return inst.upperhub != null; }
+	public static boolean hasCargoPipeline() { return Pipelines.CARGO_TRACKER.getObject() != null; }
+	public static boolean isCargoPipelineValid() { return inst.cargo != null; }
 	public static boolean hasPipelines() { return hasHubPipeline() && hasCargoPipeline(); }
 	public static boolean arePipelinesValid() { return isHubPipelineValid() && isCargoPipelineValid(); }
 
 	public static boolean verifyHubPipeline() {
 		if(!isHubPipelineValid()) {
 			//System.out.println("VerifyHubPipeline: pipeline not valid, updating...");
-			upperhub = VisionServer.getPipeline(hub_pipeline_name);
+			inst.upperhub = Pipelines.HUB_TRACKER.getObject();
 			return isHubPipelineValid();
 		}
 		//System.out.println("VerifyHubPipeline: pipeline already valid");
@@ -48,7 +87,7 @@ public class RapidReactVision {
 	}
 	public static boolean verifyCargoPipeline() {
 		if(!isCargoPipelineValid()) {
-			cargo = VisionServer.getPipeline(cargo_pipeline_name);
+			inst.cargo = Pipelines.CARGO_TRACKER.getObject();
 			return isCargoPipelineValid();
 		}
 		return true;
@@ -76,51 +115,51 @@ public class RapidReactVision {
 
 	public static boolean setHubPipelineScaling(int downscale) {	// returns false on failure
 		if(verifyHubPipeline()) {
-			return upperhub.get().getEntry("Scaling").setDouble((double)downscale);
+			return inst.upperhub.get().getEntry("Scaling").setDouble((double)downscale);
 		}
 		return false;
 	}
 	public static boolean showHubPipelineThreshold(boolean show) {	// returns false on failure
 		if(verifyHubPipeline()) {
-			return upperhub.get().getEntry("Show Thresholed").setBoolean(show);
+			return inst.upperhub.get().getEntry("Show Thresholed").setBoolean(show);
 		}
 		return false;
 	}
 	public static boolean setCargoPipelineScaling(int downscale) {	// returns false on failure
 		if(verifyCargoPipeline()) {
-			return cargo.get().getEntry("Scaling").setDouble((double)downscale);
+			return inst.cargo.get().getEntry("Scaling").setDouble((double)downscale);
 		}
 		return false;
 	}
 	public static boolean showCargoPipelineThreshold(boolean show) {	// returns false on failure
 		if(verifyCargoPipeline()) {
-			return cargo.get().getEntry("Show Threshold").setBoolean(show);
+			return inst.cargo.get().getEntry("Show Threshold").setBoolean(show);
 		}
 		return false;
 	}
 	public static boolean showCargoPipelineContours(boolean show) {		// returns false on failure
 		if(verifyCargoPipeline()) {
-			return cargo.get().getEntry("Show Contours").setBoolean(show);
+			return inst.cargo.get().getEntry("Show Contours").setBoolean(show);
 		}
 		return false;
 	}
 
 	public static boolean isHubPipelineActive() {
 		if(verifyHubPipeline()) {
-			return upperhub == VisionServer.getCurrentPipeline();
+			return inst.upperhub == VisionServer.getCurrentPipeline();
 		}
 		return false;
 	}
 	public static boolean isCargoPipelineActive() {
 		if(verifyCargoPipeline()) {
-			return cargo == VisionServer.getCurrentPipeline();
+			return inst.cargo == VisionServer.getCurrentPipeline();
 		}
 		return false;
 	}
 	public static boolean setHubPipelineActive() {
 		if(verifyHubPipeline()) {
 			//System.out.println("SetHubPipelineActive: pipeline exists, attempting to set");
-			return VisionServer.setPipeline(upperhub.getIdx());
+			return VisionServer.setPipeline(inst.upperhub.getIdx());
 		}
 		//System.out.println("SetHubPipelineActive: pipeline nonexistant");
 		return false;
@@ -128,7 +167,7 @@ public class RapidReactVision {
 	public static boolean setCargoPipelineActive() {
 		if(verifyCargoPipeline()) {
 			//System.out.println("SetCargoPipelineActive: pipeline exists, attempting to set");
-			return VisionServer.setPipeline(cargo.getIdx());
+			return VisionServer.setPipeline(inst.cargo.getIdx());
 		}
 		//System.out.println("SetCargoPipelineActive: pipeline nonexistant");
 		return false;
@@ -152,20 +191,20 @@ public class RapidReactVision {
 
 	private static boolean isRedCargoEnabled() {
 		if(verifyCargoPipeline()) {
-			return cargo.get().getEntry("Process Red").getBoolean(true);
+			return inst.cargo.get().getEntry("Process Red").getBoolean(true);
 		}
 		return false;
 	}
 	private static boolean setRedCargoEnabled(boolean enable) {		// returns false on failure
 		if(verifyCargoPipeline()) {
-			return cargo.get().getEntry("Process Red").setBoolean(enable);
+			return inst.cargo.get().getEntry("Process Red").setBoolean(enable);
 		}
 		return false;
 	}
 	private static boolean verifyRedCargo(boolean status) {
 		if(verifyCargoPipeline()) {
-			if(cargo.get().getEntry("Process Red").getBoolean(status) != status) {
-				return cargo.get().getEntry("Process Red").setBoolean(status);
+			if(inst.cargo.get().getEntry("Process Red").getBoolean(status) != status) {
+				return inst.cargo.get().getEntry("Process Red").setBoolean(status);
 			}
 			return true;
 		}
@@ -173,20 +212,20 @@ public class RapidReactVision {
 	}
 	private static boolean isBlueCargoEnabled() {
 		if(verifyCargoPipeline()) {
-			return cargo.get().getEntry("Process Blue").getBoolean(true);
+			return inst.cargo.get().getEntry("Process Blue").getBoolean(true);
 		}
 		return false;
 	}
 	private static boolean setBlueCargoEnabled(boolean enable) {		// returns false on failure
 		if(verifyCargoPipeline()) {
-			return cargo.get().getEntry("Process Blue").setBoolean(enable);
+			return inst.cargo.get().getEntry("Process Blue").setBoolean(enable);
 		}
 		return false;
 	}
 	private static boolean verifyBlueCargo(boolean status) {
 		if(verifyCargoPipeline()) {
-			if(cargo.get().getEntry("Process Blue").getBoolean(status) != status) {
-				return cargo.get().getEntry("Process Blue").setBoolean(status);
+			if(inst.cargo.get().getEntry("Process Blue").getBoolean(status) != status) {
+				return inst.cargo.get().getEntry("Process Blue").setBoolean(status);
 			}
 			return true;
 		}
@@ -285,6 +324,13 @@ public class RapidReactVision {
 
 
 
+
+
+
+
+
+
+
 	public static final double
 		cargo_max_range = Constants.cargo_distance_range,
 		hub_max_range = 200,
@@ -297,6 +343,9 @@ public class RapidReactVision {
 		default_max_forward_voltage = 4.0,
 		default_max_turning_voltage = 2.0
 	;
+
+
+
 
 
 	public static class CargoFind extends DriveBase.DriveCommandBase {
@@ -318,9 +367,7 @@ public class RapidReactVision {
 		}
 	
 		@Override public void initialize() {
-			setCargoPipelineScaling(4);
-			VisionServer.applyCameraPreset(Constants.cam_cargo_pipeline);
-			VisionServer.setCamera(cargo_camera_name);
+			Constants.vision_cargo.run();
 			if(!verifyCargoPipelineActive()) {
 				System.out.println("CargoFind: Failed to set Cargo pipeline");
 				this.failed = true;
@@ -359,9 +406,7 @@ public class RapidReactVision {
 		}
 	
 		@Override public void initialize() {
-			setCargoPipelineScaling(4);
-			VisionServer.applyCameraPreset(Constants.cam_cargo_pipeline);
-			VisionServer.setCamera(cargo_camera_name);
+			Constants.vision_cargo.run();
 			if(!verifyCargoPipelineActive()) {
 				System.out.println("CargoTurn: Failed to set Cargo pipeline");
 				this.failed = true;
@@ -425,9 +470,7 @@ public class RapidReactVision {
 		}
 	
 		@Override public void initialize() {
-			setCargoPipelineScaling(4);
-			VisionServer.applyCameraPreset(Constants.cam_cargo_pipeline);
-			VisionServer.setCamera(cargo_camera_name);
+			Constants.vision_cargo.run();
 			if(!verifyCargoPipelineActive()) {
 				System.out.println("CargoFollow: Failed to set Cargo pipeline");
 				this.failed = true;
@@ -481,6 +524,39 @@ public class RapidReactVision {
 	
 	
 	}
+	/**
+	 * Merges CargoFollow and ModeDrive together 
+	 */
+	public static class CargoAssistRoutine extends CargoFollow {
+
+		private final DriveCommandBase drive;
+
+		public CargoAssistRoutine(DriveBase db, DriveCommandBase d, Alliance a, double target_inches, double mfvolts, double mtvolts, double mfa) {
+			super(db, a, target_inches, mfvolts, mtvolts, mfa);
+			this.drive = d;
+		}
+
+		@Override public void initialize() {
+			super.initialize();
+			if(this.drive.isScheduled()) {
+				this.drive.cancel();
+			}
+			this.drive.initialize();
+		}
+		@Override public void execute() {
+			super.position = getClosestAllianceCargo(super.team);
+			if(super.position != null) {
+				super.execute();
+			} else {
+				this.drive.execute();
+			}
+		}
+		@Override public boolean isFinished() {
+			return false;
+		}
+
+
+	}
 	public static class HubFind extends DriveBase.DriveCommandBase {
 
 		private final SlewRateLimiter limit;
@@ -495,8 +571,7 @@ public class RapidReactVision {
 		}
 	
 		@Override public void initialize() {
-			VisionServer.applyCameraPreset(Constants.cam_hub_pipeline);
-			VisionServer.setCamera(hub_camera_name);
+			Constants.vision_hub.run();
 			if(!verifyHubPipelineActive()) {
 				System.out.println(getClass().getSimpleName() + ": Failed to set UpperHub pipeline.");
 				this.failed = true;
@@ -548,8 +623,7 @@ public class RapidReactVision {
 		}
 	
 		@Override public void initialize() {
-			VisionServer.applyCameraPreset(Constants.cam_hub_pipeline);
-			VisionServer.setCamera(hub_camera_name);
+			Constants.vision_hub.run();
 			if(!verifyHubPipelineActive()) {
 				System.out.println(getClass().getSimpleName() + ": Failed to set UpperHub pipeline");
 				this.failed = true;
@@ -611,7 +685,7 @@ public class RapidReactVision {
 	}
 	public static class HubAssistRoutine extends HubTurn {
 
-		public static final int discontinuity_timeout_cycles = 25;
+		public static final int discontinuity_timeout_cycles = 50;
 
 		private final AnalogSupplier control;
 		private final SlewRateLimiter olimit;
@@ -630,7 +704,7 @@ public class RapidReactVision {
 				double p = MathUtil.clamp(super.position.lr / max_heading_offset, -1.0, 1.0) * (super.max_turn_voltage - static_voltage) * Math.abs(this.control.get());
 				this.last_voltage = (Math.signum(p) * static_voltage) + p;
 				this.olimit.calculate(this.last_voltage);
-			} else if(this.misses >= discontinuity_timeout_cycles) {	// if hub goes undetected for more than half of a second
+			} else if(this.misses >= discontinuity_timeout_cycles) {	// if hub goes undetected for more than a second
 				this.last_voltage = this.olimit.calculate(this.control.get() * super.max_turn_voltage);
 			} else {
 				this.misses++;

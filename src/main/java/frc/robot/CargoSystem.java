@@ -689,8 +689,7 @@ public final class CargoSystem {
 		}
 
 		@Override public void initialize() {
-			VisionServer.applyCameraPreset(Constants.cam_hub_pipeline);
-			VisionServer.setCamera(Constants.hub_cam_name);
+			Constants.vision_hub.run();
 			if(!RapidReactVision.verifyHubPipelineActive()) {
 				System.out.println(getClass().getSimpleName() + ": Failed to set UpperHub pipeline.");
 				this.failed = true;
@@ -738,8 +737,7 @@ public final class CargoSystem {
 		}
 
 		@Override public void initialize() {
-			VisionServer.applyCameraPreset(Constants.cam_hub_pipeline);
-			VisionServer.setCamera(Constants.hub_cam_name);
+			Constants.vision_hub.run();
 			if(!RapidReactVision.verifyHubPipelineActive()) {
 				System.out.println(getClass().getSimpleName() + ": Failed to set UpperHub pipeline.");
 				this.failed = true;
