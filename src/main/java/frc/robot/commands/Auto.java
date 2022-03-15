@@ -1,8 +1,6 @@
 package frc.robot.commands;
 
-import frc.robot.CargoSystem;
-import frc.robot.Constants;
-import frc.robot.RapidReactVision;
+import frc.robot.*;
 import frc.robot.modules.common.LambdaCommand;
 import frc.robot.modules.common.drive.DriveBase;
 import frc.robot.modules.vision.java.VisionServer;
@@ -12,6 +10,7 @@ import edu.wpi.first.wpilibj.interfaces.Gyro;
 import edu.wpi.first.wpilibj2.command.*;
 
 
+/** This class contains various composed commands that are either tests or for actual competition autonomous */
 public class Auto {
 
 	public static class Basic extends SequentialCommandGroup {
@@ -30,6 +29,24 @@ public class Auto {
 				new GyroDrive.Straight(db, gy, 0.25).withTimeout(3),
 				new GyroDrive.TurnInPlace(db, gy, 90)
 			);
+		}
+
+	}
+	public static class TaxiIntakeShoot extends SequentialCommandGroup {
+
+		/** Basic Driving, Vision CL when possible */
+		public TaxiIntakeShoot(DriveBase db, CargoSystem cs) {
+			/**
+			 * 1. 
+			 */
+		}
+		/** Open-loop driving with closed loop turning and Vision when possible */
+		public TaxiIntakeShoot(DriveBase db, CargoSystem cs, Gyro gy) {
+
+		}
+		/** Closed-loop driving (trajectories) with Vision CL when available */
+		public TaxiIntakeShoot(ClosedLoopDifferentialDrive db, CargoSystem cs) {
+			
 		}
 
 	}

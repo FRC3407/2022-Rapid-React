@@ -1,11 +1,6 @@
 {
   "HALProvider": {
     "Other Devices": {
-      "ADIS16470[0]": {
-        "header": {
-          "open": true
-        }
-      },
       "BuiltInAccel": {
         "header": {
           "open": true

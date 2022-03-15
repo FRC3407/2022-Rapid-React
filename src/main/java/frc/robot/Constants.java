@@ -4,6 +4,7 @@ import java.nio.file.Path;
 
 import frc.robot.modules.common.drive.Types.*;
 import frc.robot.modules.common.drive.*;
+import frc.robot.modules.vision.java.VisionServer;
 import frc.robot.modules.vision.java.VisionServer.*;
 
 import com.ctre.phoenix.motorcontrol.can.WPI_TalonSRX;
@@ -94,21 +95,35 @@ public final class Constants {
 
 
 
-// Vision presets
-	public static final String
-		cargo_cam_name = "Cargo",
-		hub_cam_name = "Hub";
+// Vision stuff
+	public static final int
+		cargo_pipeline_scaling = 4
+	;
 	public static final CameraPreset
-		cam_driving = new CameraPreset(50, -1, -1),
-		cam_hub_pipeline = new CameraPreset(50, 10, 3500),
-		cam_cargo_pipeline = new CameraPreset(50, 25, 3500);
-	public static final EntryPreset[]
-		cargo_pipeline_options = new EntryPreset[]{
-			new NumberOption("Scaling", 4.0)
+		driving_camera_preset = new CameraPreset(50, -1, -1),
+		hub_camera_preset = new CameraPreset(50, 10, 3500),
+		cargo_camera_preset = new CameraPreset(50, 25, 3500)
+	;
+	public static final Runnable
+		vision_driving = ()->{
+			VisionServer.setProcessingEnabled(false);
+			VisionServer.setStatistics(false);
+			VisionServer.applyCameraPreset(driving_camera_preset);
 		},
-		hub_pipeline_options = new EntryPreset[]{
-
-		};
+		vision_cargo = ()->{
+			VisionServer.setProcessingEnabled(true);
+			VisionServer.setStatistics(true);
+			VisionServer.applyCameraPreset(cargo_camera_preset);
+			RapidReactVision.setCargoPipelineScaling(cargo_pipeline_scaling);
+			RapidReactVision.Cameras.CARGO.setActive();
+		},
+		vision_hub = ()->{
+			VisionServer.setProcessingEnabled(true);
+			VisionServer.setStatistics(true);
+			VisionServer.applyCameraPreset(hub_camera_preset);
+			RapidReactVision.Cameras.HUB.setActive();
+		}
+	;
 
 
 

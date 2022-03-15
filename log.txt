@@ -1,3 +1,2 @@
-1. some vision commands not switching cameras in 'init'
-2. some vision commands not enabling processing in 'init'
-(pi) 3. not outputing target when two colors in frame (but one "disabled")
+(pi) 1. not outputing target when alliance changes (works again after restart) -> "active target" just always says 'none'
+2. 
