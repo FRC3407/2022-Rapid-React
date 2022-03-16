@@ -67,6 +67,7 @@ public final class RapidReactVision {
 		}
 	}
 	private static RapidReactVision inst = new RapidReactVision();
+	public static boolean safeInit() { return inst != null; }
 
 
 	public static boolean hasHubPipeline() { return Pipelines.HUB_TRACKER.getObject() != null; }
@@ -328,20 +329,23 @@ public final class RapidReactVision {
 
 
 
-
-
-
+/*
+	This is to make it more obvious what constants are used in the commands below and where they come from
+*/
 	public static final double
-		cargo_max_range = Constants.cargo_distance_range,
-		hub_max_range = 200,
+		cargo_max_range = Constants.max_cargo_range_inches,
+		hub_max_range = Constants.max_hub_range_inches,
 		max_heading_offset = Constants.max_heading_offset,
 		heading_thresh = Constants.heading_offset_thresh,
+
+		default_cargo_target = Constants.cargo_follow_target_inches,
 
 		continuation_percent = Constants.uncertainty_continuation_percentage,
 
 		static_voltage = Constants.cl_params.static_voltage,
-		default_max_forward_voltage = 4.0,
-		default_max_turning_voltage = 2.0
+		default_max_forward_voltage = Constants.auto_max_forward_voltage,
+		default_max_turning_voltage = Constants.auto_max_turn_voltage,
+		default_max_voltage_ramp = Constants.auto_max_voltage_ramp
 	;
 
 
@@ -356,9 +360,9 @@ public final class RapidReactVision {
 		private double last_voltage = 0.0;
 		private boolean failed = false;
 
-		public CargoFind(DriveBase db) { this(db, DriverStation.getAlliance(), default_max_turning_voltage, Double.MAX_VALUE); }
-		public CargoFind(DriveBase db, Alliance a) { this(db, a, default_max_turning_voltage, Double.MAX_VALUE); }
-		public CargoFind(DriveBase db, Alliance a, double tv) { this(db, a, tv, Double.MAX_VALUE); }
+		public CargoFind(DriveBase db) { this(db, DriverStation.getAlliance()); }
+		public CargoFind(DriveBase db, Alliance a) { this(db, a, default_max_turning_voltage); }
+		public CargoFind(DriveBase db, Alliance a, double tvolts) { this(db, a, tvolts, default_max_voltage_ramp); }
 		public CargoFind(DriveBase db, Alliance a, double tvolts, double mvr) {
 			super(db);
 			this.team = a;
@@ -392,16 +396,15 @@ public final class RapidReactVision {
 	public static class CargoTurn extends DriveBase.DriveCommandBase {
 
 		private final Alliance team;
-		//private final SlewRateLimiter limit;
 		private final double max_turn_voltage;
 		private VisionServer.TargetData position = null;
-		//private double last_voltage = 0.0;
 		private boolean failed = false;
 
+		public CargoTurn(DriveBase db) { this(db, DriverStation.getAlliance()); }
+		public CargoTurn(DriveBase db, Alliance a) { this(db, a, default_max_turning_voltage); }
 		public CargoTurn(DriveBase db, Alliance a, double mtvolts) {
 			super(db);
 			this.team = a;
-			//this.limit = new SlewRateLimiter(mvr);
 			this.max_turn_voltage = mtvolts;
 		}
 	
@@ -433,13 +436,13 @@ public final class RapidReactVision {
 			}
 			return this.failed;
 		}
-	
-	
-	
+
+
 		/** Extension of CargoTurn class that runs indefinately */
 		public static class Demo extends CargoTurn {
 	
-			//public Demo(DriveBase db, Alliance a) { super(db, a, ); }
+			public Demo(DriveBase db) { super(db); }
+			public Demo(DriveBase db, Alliance a) { super(db, a); }
 			public Demo(DriveBase db, Alliance a, double mtvolts) { super(db, a, mtvolts); }
 	
 			@Override public boolean isFinished() { return super.failed; }
@@ -448,22 +451,26 @@ public final class RapidReactVision {
 	
 	
 	}
-	public static class CargoFollow extends DriveBase.DriveCommandBase {	
-	
+	public static class CargoFollow extends DriveBase.DriveCommandBase {
+
 		private final Alliance team;
 		private final SlewRateLimiter f_limit;
 		private final double target, max_forward_voltage, max_turning_voltage;
 		private VisionServer.TargetData position;
 		private boolean failed = false;
 
-		public CargoFollow(DriveBase db) { this(db, DriverStation.getAlliance(), 20, default_max_forward_voltage, default_max_turning_voltage, Double.MAX_VALUE); }
-		public CargoFollow(DriveBase db, Alliance a) { this(db, a, 20, default_max_forward_voltage, default_max_turning_voltage, Double.MAX_VALUE); }
+		public CargoFollow(DriveBase db) { this(db, DriverStation.getAlliance()); }
+		public CargoFollow(DriveBase db, double target_inches) { this(db, target_inches, default_max_voltage_ramp); }
+		public CargoFollow(DriveBase db, double target_inches, double mfvr) { this(db, target_inches, default_max_forward_voltage, default_max_turning_voltage, mfvr); }
+		public CargoFollow(DriveBase db, double target_inches, double mfvolts, double mtvolts, double mfvr) { this(db, DriverStation.getAlliance(), target_inches, mfvolts, mtvolts, mfvr); }
+		public CargoFollow(DriveBase db, Alliance a) { this(db, a, default_cargo_target); }
+		public CargoFollow(DriveBase db, Alliance a, double target_inches) { this(db, a, target_inches, default_max_voltage_ramp); }
 		public CargoFollow(DriveBase db, Alliance a, double target_inches, double mfa) { this(db, a, target_inches, default_max_forward_voltage, default_max_turning_voltage, mfa); }
-		// 					drivebase,	alliance,	max forward voltage, max turn voltage, max forard voltage acceleration
-		public CargoFollow(DriveBase db, Alliance a, double target_inches, double mfvolts, double mtvolts, double mfa) {
+		// 					drivebase, alliance, distance target, max forward voltage, max turn voltage, max forard voltage acceleration
+		public CargoFollow(DriveBase db, Alliance a, double target_inches, double mfvolts, double mtvolts, double mfvr) {
 			super(db);
 			this.team = a;
-			this.f_limit = new SlewRateLimiter(mfa);
+			this.f_limit = new SlewRateLimiter(mfvr);
 			this.target = target_inches;
 			this.max_forward_voltage = mfvolts;
 			this.max_turning_voltage = mtvolts;
@@ -507,14 +514,17 @@ public final class RapidReactVision {
 			}
 			return this.failed;
 		}
-	
-	
-	
+
+
 		/** Extension of CargoFollow that runs indefinately */
 		public static class Demo extends CargoFollow {
 	
 			public Demo(DriveBase db) { super(db); }
+			public Demo(DriveBase db, double target_inches) { super(db, target_inches); }
+			public Demo(DriveBase db, double target_inches, double mfvr) { super(db, target_inches, mfvr); }
+			public Demo(DriveBase db, double target_inches, double mfvolts, double mtvolts, double mfvr) { super(db, target_inches, mfvolts, mtvolts, mfvr); }
 			public Demo(DriveBase db, Alliance a) { super(db, a); }
+			public Demo(DriveBase db, Alliance a, double target_inches) { super(db, a, target_inches); }
 			public Demo(DriveBase db, Alliance a, double target_inches, double mfa) { super(db, a, target_inches, mfa); }
 			public Demo(DriveBase db, Alliance a, double target_inches, double mfvolts, double mtvolts, double mfa) { super(db, a, target_inches, mfvolts, mtvolts, mfa); }
 	
@@ -530,10 +540,26 @@ public final class RapidReactVision {
 	public static class CargoAssistRoutine extends CargoFollow {
 
 		private final DriveCommandBase drive;
+		private final CargoSystem.IntakeSubsystem.IntakeCommand intake;
 
-		public CargoAssistRoutine(DriveBase db, DriveCommandBase d, Alliance a, double target_inches, double mfvolts, double mtvolts, double mfa) {
-			super(db, a, target_inches, mfvolts, mtvolts, mfa);
+		public CargoAssistRoutine(DriveBase db, DriveCommandBase d, CargoSystem.IntakeSubsystem.IntakeCommand i) {
+			super(db);
 			this.drive = d;
+			this.intake = i;
+
+			super.addRequirements(this.intake.getRequirements().toArray(new CargoSystem.IntakeSubsystem[]{}));
+		}
+		public CargoAssistRoutine(
+			DriveBase db, DriveCommandBase d, 
+			CargoSystem.IntakeSubsystem.IntakeCommand i, 
+			Alliance a, 
+			double target_inches, double mfvolts, double mtvolts, double mfva
+		) {
+			super(db, a, target_inches, mfvolts, mtvolts, mfva);
+			this.drive = d;
+			this.intake = i;
+
+			super.addRequirements(this.intake.getRequirements().toArray(new CargoSystem.IntakeSubsystem[]{}));
 		}
 
 		@Override public void initialize() {
@@ -541,15 +567,26 @@ public final class RapidReactVision {
 			if(this.drive.isScheduled()) {
 				this.drive.cancel();
 			}
+			if(this.intake.isScheduled()) {
+				this.intake.cancel();
+			}
 			this.drive.initialize();
+			this.intake.initialize();
 		}
 		@Override public void execute() {
 			super.position = getClosestAllianceCargo(super.team);
 			if(super.position != null) {
 				super.execute();
+				if(super.position.distance <= super.target + 15) {
+					this.intake.execute();
+				}
 			} else {
 				this.drive.execute();
 			}
+		}
+		@Override public void end(boolean i) {
+			super.end(i);
+			this.intake.end(i);
 		}
 		@Override public boolean isFinished() {
 			return false;
@@ -564,6 +601,7 @@ public final class RapidReactVision {
 		private double last_voltage = 0.0;
 		private boolean failed = false;
 
+		public HubFind(DriveBase db) { this(db, default_max_turning_voltage, default_max_voltage_ramp); }
 		public HubFind(DriveBase db, double tvolts, double mvr) {
 			super(db);
 			this.limit = new SlewRateLimiter(mvr);
@@ -590,26 +628,8 @@ public final class RapidReactVision {
 		@Override public boolean isFinished() {
 			return this.failed || (isHubDetected() && this.last_voltage < static_voltage);
 		}
-	
-	
-	
-		// public static class TeleopAssist extends HubFind {
-	
-		// 	private final AnalogSupplier turnvec;
-	
-		// 	public TeleopAssist(DriveBase db, AnalogSupplier tv) {
-		// 		super(db, Constants.hub_cam_name);
-		// 		this.turnvec = tv;
-		// 	}
-	
-		// 	@Override public void execute() {
-		// 		super.autoTurn(Constants.teleop_assist_turn_speed * this.turnvec.get());
-		// 	}
-	
-	
-		// }
-	
-	
+
+
 	}
 	public static class HubTurn extends DriveBase.DriveCommandBase {
 
@@ -617,6 +637,7 @@ public final class RapidReactVision {
 		private VisionServer.TargetData position = null;
 		private boolean failed = false;
 
+		public HubTurn(DriveBase db) { this(db, default_max_turning_voltage); }
 		public HubTurn(DriveBase db, double mtvolts) {
 			super(db);
 			this.max_turn_voltage = mtvolts;
@@ -650,38 +671,8 @@ public final class RapidReactVision {
 			}
 			return this.failed;
 		}
-	
-	
-	
-		// public static class TeleopAssist extends HubTurn {
-	
-		// 	private final AnalogSupplier turnvec;
-	
-		// 	public TeleopAssist(DriveBase db, AnalogSupplier tv) {
-		// 		super(db, Constants.hub_cam_name);
-		// 		this.turnvec = tv;
-		// 	}
-	
-		// 	@Override public void execute() {
-		// 		super.position = RapidReactVision.getHubPosition();
-		// 		if(super.position != null) {
-		// 			super.autoTurnVoltage(
-		// 				Math.signum(super.position.lr / Constants.target_angle_range_lr) +
-		// 				MathUtil.clamp(
-		// 					super.position.lr / Constants.target_angle_range_lr * 9 * Constants.teleop_assist_turn_speed * 0.6,
-		// 					Constants.teleop_assist_turn_speed * 9 * -0.5,
-		// 					Constants.teleop_assist_turn_speed * 9 * 0.5
-		// 				) * this.turnvec.get()
-		// 			);
-		// 		} else {
-		// 			super.fromLast(Constants.uncertainty_continuation_percentage);
-		// 		}
-		// 	}
-		// 	@Override public boolean isFinished() { return false; }
-	
-		// }
-	
-	
+
+
 	}
 	public static class HubAssistRoutine extends HubTurn {
 
@@ -692,6 +683,8 @@ public final class RapidReactVision {
 		private double last_voltage = 0.0;
 		private int misses = 0;
 
+		public HubAssistRoutine(DriveBase db, AnalogSupplier op_input) { this(db, op_input, default_max_turning_voltage); }
+		public HubAssistRoutine(DriveBase db, AnalogSupplier op_input, double mtvolts) { this(db, op_input, mtvolts, default_max_voltage_ramp); }
 		public HubAssistRoutine(DriveBase db, AnalogSupplier op_input, double mtvolts, double mvr) {
 			super(db, mtvolts);
 			this.control = op_input;
