@@ -4,21 +4,18 @@ import frc.robot.commands.*;
 import frc.robot.modules.common.*;
 import frc.robot.modules.common.drive.*;
 import frc.robot.modules.common.Input.*;
-import frc.robot.modules.common.drive.DriveBase;
-import frc.robot.modules.common.drive.*;
 import frc.robot.modules.common.EventTriggers.*;
 import frc.robot.modules.vision.java.*;
+
+import java.util.List;
+
 import edu.wpi.first.wpilibj.*;
 import edu.wpi.first.wpilibj.smartdashboard.*;
 import edu.wpi.first.wpilibj2.command.*;
 import edu.wpi.first.wpilibj2.command.button.*;
-
-import java.nio.file.Path;
-import java.util.List;
-
 import edu.wpi.first.math.geometry.*;
 import edu.wpi.first.math.trajectory.*;
-import edu.wpi.first.networktables.*;
+//import edu.wpi.first.networktables.*;
 
 
 /* TODO:
@@ -26,8 +23,8 @@ import edu.wpi.first.networktables.*;
  x Verify/imporve singleton for each ^^^
  x Create "helper" container for methods at the start of DriveBase
  x Make better names for "DB#..." and split into port map and motorcontroller object containers (this would be an extension)
- - Commands for CLDifferential -> Ramsete controller (characterization first)
- - Update C++ VisionServer-Robot API (actually already safe because of the use of LANGUAGE SUPPORT FOR UNSIGNED ~> smh java :| )
+ x Commands for CLDifferential -> Ramsete controller (characterization first)
+ - Update C++ VisionServer-Robot API
  - Methods/impelemtation to search DriverStation for a certain input (common.Input.InputDevice) and return object/port
  x max output/scaling method for drivebase
  - make a spreadsheet for camera presets (each pipeline) under different lighting conditions
@@ -38,12 +35,12 @@ import edu.wpi.first.networktables.*;
  x make AnalogSupplier and DigitalSupplier extend BooleanSupplier and DigitalSupplier respectively
  x? Path planning and drivebase cl (all of it...)
 
- - Tune hubturn p-loop
+ x? Tune hubturn p-loop
  - Change camera params / configure switching when camera positions are finalized
 
- - Polish "Vision Assist" -> re-schedule operator-turning after overcorrection or "dead zone"
+ x Polish "Vision Assist" -> re-schedule operator-turning after overcorrection or "dead zone"
  - Auto -> "Hierarchy" of closed-loop
- - Add cargo-following routine to vision assist
+ x Add cargo-following routine to vision assist
 */
 
 public class Runtime extends TimedRobot {
@@ -77,6 +74,9 @@ public class Runtime extends TimedRobot {
 		auto_command = new SendableChooser<Command>();
 
 
+
+
+
 	public Runtime() {
 		System.out.println("RUNTIME INITIALIZATION");
 
@@ -85,6 +85,8 @@ public class Runtime extends TimedRobot {
 		this.drivebase.setSpeedSquaring(Constants.teleop_drivebase_speed_squaring);
 
 		this.cargo_sys.startAutomaticTransfer(Constants.transfer_speed);
+
+		RapidReactVision.safeInit();
 
 		Trajectory test = TrajectoryGenerator.generateTrajectory(
 			new Pose2d(0, 0, new Rotation2d(0)),
@@ -101,46 +103,44 @@ public class Runtime extends TimedRobot {
 		this.auto_command.addOption("Arc-90(R) Trajectory", this.drivebase.followSingleTrajectory(Constants.test_arc90R));
 		this.auto_command.addOption("Arc-180(L) Trajectory", this.drivebase.followSingleTrajectory(Constants.test_arc180L));
 		this.auto_command.addOption("Arc-360(R) Trajectory", this.drivebase.followSingleTrajectory(Constants.test_arc360R));
-		this.auto_command.addOption("Diag-45(R) Trajectory", this.drivebase.followSingleTrajectory(Constants.test_diag45R));
+		this.auto_command.addOption("ZigZag Trajectory", this.drivebase.followSingleTrajectory(Constants.test_zigzag));
 		this.auto_command.addOption("Demo-Follow", new RapidReactVision.CargoFollow.Demo(this.drivebase));
 		SmartDashboard.putData("Auto Command", this.auto_command);
 	}
 
-	@Override public void robotPeriodic() {
-		CommandScheduler.getInstance().run();
-	}
 	@Override public void robotInit() {
-		AutonomousTrigger.Get().whenActive(()->this.auto_command.getSelected().schedule());
-		//AutonomousTrigger.Get().whenActive( new CargoFollow.Demo(this.drivebase, DriverStation.getAlliance(), Constants.cargo_cam_name) );
 
 		new Trigger(()->VisionServer.isConnected()).whenActive(
 			new LambdaCommand(()->System.out.println("Coprocessor Connected!"))
-		).whenInactive(
-			new LambdaCommand(()->System.out.println("Coprocessor Disconnected."))
 		);
+		AutonomousTrigger.Get().whenActive(()->this.auto_command.getSelected().schedule());	// schedule the auto command when autonomous starts
 
 		if(this.input.isConnected()) {
 			this.xboxControls();
-			System.out.println("Xbox Bindings Scheduled.");
+			System.out.println("Xbox Bindings Initialized.");
 		} else {
 			this.input.connectionTrigger().whenActive(
-				new LambdaCommand.Singular(()->{
+				new LambdaCommand.Singular(()->{		// bindings should only be bound once
 					this.xboxControls();
-					System.out.println("Xbox Bindings Scheduled.");
+					System.out.println("Xbox Bindings Initialized.");
 				}, true)
 			);
 		}
 		// if(this.stick_left.isConnected() && this.stick_right.isConnected()) {
 		// 	this.arcadeControls();
+		// 	System.out.println("Arcade Bindings Initialized.");
 		// } else {
 		// 	this.stick_left.connectionTrigger().and(this.stick_right.connectionTrigger()).whenActive(
 		// 		new LambdaCommand.Singular(()->{
 		// 			this.arcadeControls();
-		// 			System.out.println("Arcade Bindings Scheduled.");
+		// 			System.out.println("Arcade Bindings Initialized.");
 		// 		}, true)
 		// 	);
 		// }
 
+	}
+	@Override public void robotPeriodic() {
+		CommandScheduler.getInstance().run();
 	}
 
 	@Override public void disabledInit() {}
@@ -158,6 +158,11 @@ public class Runtime extends TimedRobot {
 	@Override public void testInit() {}
 	@Override public void testPeriodic() {}
 	@Override public void testExit() {}
+
+
+
+
+
 
 
 
@@ -230,7 +235,7 @@ public class Runtime extends TimedRobot {
 			TeleopTrigger.Get()
 		).whenActive(
 			new SequentialCommandGroup(
-				new LambdaCommand(()->System.out.println("VISION ASSIST RUNNING...")),
+				new LambdaCommand(()->System.out.println("HUB ASSIST RUNNING...")),
 				new LambdaCommand(()->this.drivebase.modeDrive().cancel()),		// disable driving
 				new LambdaCommand(Constants.vision_hub)
 			)
@@ -249,7 +254,7 @@ public class Runtime extends TimedRobot {
 			)
 		).whenInactive(
 			new SequentialCommandGroup(
-				new LambdaCommand(()->System.out.println("VISION ASSIST TERMINATED.")), 
+				new LambdaCommand(()->System.out.println("HUB ASSIST TERMINATED.")), 
 				new LambdaCommand(()->this.drivebase.modeDrive().schedule()),		// re-enable driving
 				new LambdaCommand(Constants.vision_driving)
 			)
@@ -264,7 +269,7 @@ public class Runtime extends TimedRobot {
 			)
 		).whenActive(
 			new SequentialCommandGroup(
-				new LambdaCommand(()->System.out.println("VISION ASSIST RUNNING...")),
+				new LambdaCommand(()->System.out.println("CARGO ASSIST RUNNING...")),
 				new LambdaCommand(()->this.drivebase.modeDrive().cancel()),		// disable driving
 				new LambdaCommand(Constants.vision_cargo)
 			)
@@ -272,6 +277,7 @@ public class Runtime extends TimedRobot {
 			new RapidReactVision.CargoAssistRoutine(
 				this.drivebase,
 				this.drivebase.modeDrive(),
+				this.cargo_sys.managedIntake(Constants.intake_speed),
 				DriverStation.getAlliance(),
 				Constants.cargo_follow_target_inches,
 				Constants.auto_max_forward_voltage,
@@ -280,7 +286,7 @@ public class Runtime extends TimedRobot {
 			)
 		).whenInactive(
 			new SequentialCommandGroup(
-				new LambdaCommand(()->System.out.println("VISION ASSIST TERMINATED.")),
+				new LambdaCommand(()->System.out.println("CARGO ASSIST TERMINATED.")),
 				new LambdaCommand(()->this.drivebase.modeDrive().schedule()),		// re-enable driving
 				new LambdaCommand(Constants.vision_driving)
 			)

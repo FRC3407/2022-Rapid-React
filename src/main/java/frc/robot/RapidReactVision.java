@@ -67,6 +67,7 @@ public final class RapidReactVision {
 		}
 	}
 	private static RapidReactVision inst = new RapidReactVision();
+	public static boolean safeInit() { return inst != null; }
 
 
 	public static boolean hasHubPipeline() { return Pipelines.HUB_TRACKER.getObject() != null; }
@@ -539,14 +540,26 @@ public final class RapidReactVision {
 	public static class CargoAssistRoutine extends CargoFollow {
 
 		private final DriveCommandBase drive;
+		private final CargoSystem.IntakeSubsystem.IntakeCommand intake;
 
-		public CargoAssistRoutine(DriveBase db, DriveCommandBase d) {
+		public CargoAssistRoutine(DriveBase db, DriveCommandBase d, CargoSystem.IntakeSubsystem.IntakeCommand i) {
 			super(db);
 			this.drive = d;
+			this.intake = i;
+
+			super.addRequirements(this.intake.getRequirements().toArray(new CargoSystem.IntakeSubsystem[]{}));
 		}
-		public CargoAssistRoutine(DriveBase db, DriveCommandBase d, Alliance a, double target_inches, double mfvolts, double mtvolts, double mfva) {
+		public CargoAssistRoutine(
+			DriveBase db, DriveCommandBase d, 
+			CargoSystem.IntakeSubsystem.IntakeCommand i, 
+			Alliance a, 
+			double target_inches, double mfvolts, double mtvolts, double mfva
+		) {
 			super(db, a, target_inches, mfvolts, mtvolts, mfva);
 			this.drive = d;
+			this.intake = i;
+
+			super.addRequirements(this.intake.getRequirements().toArray(new CargoSystem.IntakeSubsystem[]{}));
 		}
 
 		@Override public void initialize() {
@@ -554,15 +567,26 @@ public final class RapidReactVision {
 			if(this.drive.isScheduled()) {
 				this.drive.cancel();
 			}
+			if(this.intake.isScheduled()) {
+				this.intake.cancel();
+			}
 			this.drive.initialize();
+			this.intake.initialize();
 		}
 		@Override public void execute() {
 			super.position = getClosestAllianceCargo(super.team);
 			if(super.position != null) {
 				super.execute();
+				if(super.position.distance <= super.target + 15) {
+					this.intake.execute();
+				}
 			} else {
 				this.drive.execute();
 			}
+		}
+		@Override public void end(boolean i) {
+			super.end(i);
+			this.intake.end(i);
 		}
 		@Override public boolean isFinished() {
 			return false;

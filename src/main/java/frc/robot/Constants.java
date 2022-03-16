@@ -50,7 +50,7 @@ public final class Constants {
 		cargo_thresh = 20.0,			// threshold distance for a cargo to be considered close enough to influenced by intake
 		max_cargo_range_inches = 100.0,		// maximum range that a cargo could be (and detected - used as divisor for P-loop)
 		max_hub_range_inches = 200.0,		// maximum range that the hub can be detected from (used as divisor for P-loop)
-		cargo_follow_target_inches = 20,	// the distance away from a cargo that cargo-following commands will target
+		cargo_follow_target_inches = 5.0,	// the distance away from a cargo that cargo-following commands will target
 
 // "percent output" (1.0 as 100%)
 		uncertainty_continuation_percentage = 0.95,	// if break in target detection, keep powering motors at this percent of the last values used
@@ -88,7 +88,7 @@ public final class Constants {
 	;
 
 	public static final Inversions
-		cl_encoder_inversions = Inversions.LEFT;	// which encoders should be inverted (or phase-changed for phoenix api)
+		cl_encoder_inversions = Inversions.BOTH;	// which encoders should be inverted (aka "phase-changed" in the phoenix api)
 	public static final ClosedLoopDifferentialDrive.CLDriveParams
 		cl_params = new ClosedLoopDifferentialDrive.CLDriveParams(
 			Units.inchesToMeters(drivetrack_width_inches),		// drivebase track width in meters
@@ -98,8 +98,8 @@ public final class Constants {
 			1.0668,	// "kA"(volts * seconds^2 / meters) -> voltage required for each additional meter/second^2 of acceleration -> from SysID characterization
 			3.5176,	// "kP"(volts * seconds / meters) -> voltage added to correct for error
 			universal_max_voltage,	// (volts) maximum voltage that can be supplied
-			1.0,	// (meters per second) maximum velocity in meters per second
-			2.0		// (meters per second^2) maximum acceleration in meters per second squared
+			1.5,	// (meters per second) maximum velocity in meters per second
+			1.5		// (meters per second^2) maximum acceleration in meters per second squared
 		);
 
 
@@ -141,7 +141,7 @@ public final class Constants {
 		test_arc90R = Filesystem.getDeployDirectory().toPath().resolve("pathweaver/json/Arc-90d(r)-0.5m.wpilib.json"),
 		test_arc180L = Filesystem.getDeployDirectory().toPath().resolve("pathweaver/json/Arc-180d(l)-0.5m.wpilib.json"),
 		test_arc360R = Filesystem.getDeployDirectory().toPath().resolve("pathweaver/json/Arc-360d(R)-1m.wpilib.json"),
-		test_diag45R = Filesystem.getDeployDirectory().toPath().resolve("pathweaver/json/Diag-45d(R)-0.5m.wpilib.json");
+		test_zigzag = Filesystem.getDeployDirectory().toPath().resolve("pathweaver/json/ZigZag-4m.wpilib.json");
 
 
 }
