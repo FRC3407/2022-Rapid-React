@@ -298,14 +298,17 @@ public final class RapidReactVision {
 				if(verifyRedCargo(true) && verifyBlueCargo(false)) {
 					return VisionServer.getTargetDataIfMatching("Cargo-1r");
 				}
+				break;
 			case Blue:
 				if(verifyRedCargo(false) && verifyBlueCargo(true)) {
 					return VisionServer.getTargetDataIfMatching("Cargo-1b");
 				}
+				break;
 			case Invalid:
 			default:
 				return VisionServer.getTargetData();
 		}
+		return null;
 	}
 	public static VisionServer.TargetData getClosestRedPosition() {		// returns null on incorrect target
 		return getClosestAllianceCargo(DriverStation.Alliance.Red);
@@ -456,7 +459,7 @@ public final class RapidReactVision {
 		private final Alliance team;
 		private final SlewRateLimiter f_limit;
 		private final double target, max_forward_voltage, max_turning_voltage;
-		private VisionServer.TargetData position;
+		private VisionServer.TargetData position = null;
 		private boolean failed = false;
 
 		public CargoFollow(DriveBase db) { this(db, DriverStation.getAlliance()); }
@@ -548,6 +551,7 @@ public final class RapidReactVision {
 			this.intake = i;
 
 			super.addRequirements(this.intake.getRequirements().toArray(new CargoSystem.IntakeSubsystem[]{}));
+			super.addRequirements(this.drive.getRequirements().toArray(new DriveBase[]{}));
 		}
 		public CargoAssistRoutine(
 			DriveBase db, DriveCommandBase d, 
@@ -560,6 +564,7 @@ public final class RapidReactVision {
 			this.intake = i;
 
 			super.addRequirements(this.intake.getRequirements().toArray(new CargoSystem.IntakeSubsystem[]{}));
+			super.addRequirements(this.drive.getRequirements().toArray(new DriveBase[]{}));
 		}
 
 		@Override public void initialize() {
