@@ -20,6 +20,13 @@ import com.ctre.phoenix.motorcontrol.can.*;
 import com.ctre.phoenix.motorcontrol.*;
 
 
+/**
+ * Extends {@link DriveBase} and represents a differential drivebase with srx-mag encoders. Constructors require a motor map of the type 
+ * {@link WPI_TalonSRX} in order to interface with the encoders. All 'super' functionality should still be possible, and a drivebase can be 
+ * created with either 2 or 4 motors. Note that it is expected that the encoders are plugged into the front motorcontrollers for each side. 
+ * This class allows for trajectory-following functionality provided that the supplied constants ("clparams") are accurate. Additionally,
+ * the position of the robot can be viewed in the dashboard from the "Robot Position" table under this subsystem's sendable table. 
+ */
 public class ClosedLoopDifferentialDrive extends DriveBase {
 
 	/**
