@@ -13,7 +13,7 @@ import edu.wpi.first.wpilibj2.command.*;
 import edu.wpi.first.wpilibj2.command.button.*;
 // import edu.wpi.first.math.geometry.*;
 // import edu.wpi.first.math.trajectory.*;
-//import edu.wpi.first.networktables.*;
+// import edu.wpi.first.networktables.*;
 
 
 /* TODO:
@@ -82,7 +82,7 @@ public class Runtime extends TimedRobot {
 		this.drivebase.setSpeedDeadband(Constants.teleop_drivebase_deadband);
 		this.drivebase.setSpeedSquaring(Constants.teleop_drivebase_speed_squaring);
 
-		this.cargo_sys.startAutomaticTransfer(Constants.transfer_speed);
+		this.cargo_sys.startAutomaticTransfer(Constants.transfer_voltage);
 
 		RapidReactVision.safeInit();
 
@@ -222,26 +222,26 @@ public class Runtime extends TimedRobot {
 		teleop_trigger.and(shoot_trigger).and(override_trigger.negate()).and(routines_trigger.negate()).whileActiveOnce(
 			this.cargo_sys.managedShoot(
 				actuate.getSupplier(this.input),
-				Constants.feed_speed,
-				Constants.shooter_default_speed
+				Constants.feed_voltage,
+				Constants.shooter_default_voltage
 			)
 		);
 		// and the shooter is toggled off
 		teleop_trigger.and(shoot_trigger.negate()).and(override_trigger.negate()).and(actuate_trigger).and(routines_trigger.negate()).whileActiveOnce(
-			this.cargo_sys.managedIntake(Constants.intake_speed)
+			this.cargo_sys.managedIntake(Constants.intake_voltage)
 		);
 	// when the override button is pressed...
 		// and the shooter is toggled on
 		teleop_trigger.and(shoot_trigger).and(override_trigger).and(routines_trigger.negate()).whileActiveOnce(
 			this.cargo_sys.basicShoot(
 				actuate.getSupplier(this.input),
-				Constants.feed_speed,
-				Constants.shooter_default_speed
+				Constants.feed_voltage,
+				Constants.shooter_default_voltage
 			)
 		);
 		// and the shooter is toggled off
 		teleop_trigger.and(shoot_trigger.negate()).and(override_trigger).and(actuate_trigger).and(routines_trigger.negate()).whileActiveOnce(
-			this.cargo_sys.basicIntake(Constants.intake_speed)
+			this.cargo_sys.basicIntake(Constants.intake_voltage)
 		);
 
 		// transfer override?
@@ -265,8 +265,8 @@ public class Runtime extends TimedRobot {
 			new ParallelCommandGroup(
 				this.cargo_sys.visionShoot(							// control the shooter with velocity determined by vision
 					actuate.getSupplier(this.input),				// press 'A' to feed
-					Constants.feed_speed,
-					(double inches)-> inches / Constants.max_hub_range_inches * 12.0	// 200 inches @ max power, 12v max voltage (obviously needs to be tuned)
+					Constants.feed_voltage,
+					(double inches)-> Constants.shooter_static_voltage + (inches / Constants.max_hub_range_inches * (12 - Constants.shooter_static_voltage))
 				),
 				new RapidReactVision.HubAssistRoutine(
 					this.drivebase,
@@ -293,7 +293,7 @@ public class Runtime extends TimedRobot {
 			new RapidReactVision.CargoAssistRoutine(
 				this.drivebase,
 				this.drivebase.modeDrive(),
-				this.cargo_sys.managedIntake(Constants.intake_speed),
+				this.cargo_sys.managedIntake(Constants.intake_voltage),
 				DriverStation.getAlliance(),
 				Constants.cargo_follow_target_inches,
 				Constants.auto_max_forward_voltage,
@@ -368,26 +368,26 @@ public class Runtime extends TimedRobot {
 		teleop_trigger.and(shoot_trigger).and(override_trigger.negate()).and(routines_trigger.negate()).whileActiveOnce(
 			this.cargo_sys.managedShoot(
 				actuate.getSupplier(this.stick_right),
-				Constants.feed_speed,
-				Constants.shooter_default_speed
+				Constants.feed_voltage,
+				Constants.shooter_default_voltage
 			)
 		);
 		// and the shooter is toggled off
 		teleop_trigger.and(shoot_trigger.negate()).and(override_trigger.negate()).and(actuate_trigger).and(routines_trigger.negate()).whileActiveOnce(
-			this.cargo_sys.managedIntake(Constants.intake_speed)
+			this.cargo_sys.managedIntake(Constants.intake_voltage)
 		);
 	// when the override button is pressed...
 		// and the shooter is toggled on
 		teleop_trigger.and(shoot_trigger).and(override_trigger).and(routines_trigger.negate()).whileActiveOnce(
 			this.cargo_sys.basicShoot(
 				actuate.getSupplier(this.stick_right),
-				Constants.feed_speed,
-				Constants.shooter_default_speed
+				Constants.feed_voltage,
+				Constants.shooter_default_voltage
 			)
 		);
 		// and the shooter is toggled off
 		teleop_trigger.and(shoot_trigger.negate()).and(override_trigger).and(actuate_trigger).and(routines_trigger.negate()).whileActiveOnce(
-			this.cargo_sys.basicIntake(Constants.intake_speed)
+			this.cargo_sys.basicIntake(Constants.intake_voltage)
 		);
 
 		// transfer override?
@@ -409,8 +409,8 @@ public class Runtime extends TimedRobot {
 			new ParallelCommandGroup(
 				this.cargo_sys.visionShoot(							// control the shooter with velocity determined by vision
 					actuate.getSupplier(this.stick_right),				// press 'A' to feed
-					Constants.feed_speed,
-					(double inches)-> inches / Constants.max_hub_range_inches * 12.0	// 200 inches @ max power, 12v max voltage (obviously needs to be tuned)
+					Constants.feed_voltage,
+					(double inches)-> Constants.shooter_static_voltage + (inches / Constants.max_hub_range_inches * (12 - Constants.shooter_static_voltage))
 				),
 				new RapidReactVision.HubAssistRoutine(
 					this.drivebase,
@@ -437,7 +437,7 @@ public class Runtime extends TimedRobot {
 			new RapidReactVision.CargoAssistRoutine(
 				this.drivebase,
 				this.drivebase.modeDrive(),
-				this.cargo_sys.managedIntake(Constants.intake_speed),
+				this.cargo_sys.managedIntake(Constants.intake_voltage),
 				DriverStation.getAlliance(),
 				Constants.cargo_follow_target_inches,
 				Constants.auto_max_forward_voltage,

@@ -60,19 +60,20 @@ public final class Constants {
 		teleop_drivebase_deadband = 0.05,	// the input range that is discarded
 		teleop_max_input_ramp = 2.0,		// maximum input acceleration in percent/sec^2 -> no more than 200% per second per second
 
-		intake_speed = 0.65,
-		transfer_speed = 0.6,
-		feed_speed = 0.4,
-		shooter_default_speed = 0.85,
-
 // voltage
 		universal_max_voltage = 10.0,
+		shooter_static_voltage = 0.8,	// CURRENTLY JUST AN ESTIMATE
 
 		auto_max_turn_voltage = 2.0,	// maximum voltage for turning in place during auto
 		auto_max_forward_voltage = 4.0,	// maximum voltage for driving forward during auto
 		auto_max_voltage_ramp = 20.0,	// maximum voltage ramp (acceleration) in voltage/sec^2
 
 		teleop_assist_turn_voltage = 3.0,	// maximum turn voltage for finding the hub
+
+		intake_voltage = 7,
+		transfer_voltage = 5,
+		feed_voltage = 4.5,
+		shooter_default_voltage = 9,
 
 // Physical properties
 		drivetrack_width_inches = 21.819,		// track width of drivebase
