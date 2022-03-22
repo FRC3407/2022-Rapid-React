@@ -1,6 +1,7 @@
 package frc.robot;
 
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 
 import frc.robot.modules.common.drive.DriveBase;
@@ -113,6 +114,7 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 	private final DifferentialDriveKinematics kinematics;
 	private final SimpleMotorFeedforward feedforward;
 
+	private Transform2d position_offset = new Transform2d();
 	private final Field2d map = new Field2d();
 
 	public ClosedLoopDifferentialDrive(DriveMap_2<WPI_TalonSRX> map, Gyro gy, CLDriveParams params) { this(map, gy, params, Inversions.NEITHER); }
@@ -175,8 +177,7 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 			this.getLeftPositionMeters(),
 			this.getRightPositionMeters()
 		);
-		// update robot field pose if we use that on the dashboard
-		this.map.setRobotPose(this.getPose());
+		this.map.setRobotPose(this.getTotalPose());
 	}
 
 	@Override public void initSendable(SendableBuilder b) {
@@ -200,10 +201,15 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 	public FollowTrajectory followSingleTrajectory(Path json_path) {	// stops when complete
 		return new FollowTrajectory(this, json_path, true);
 	}
+	public GoTo autoPosition(Pose2d p) {
+		return new GoTo(this, p);
+	}
 
 	// "Setters" -> require command key
 	public void resetOdometry(Pose2d p, CLDriveCommand c) {
 		this.resetEncoders(c);
+		Pose2d total = this.getTotalPose();
+		this.position_offset = new Transform2d(total.getTranslation(), total.getRotation());
 		this.odometry.resetPosition(p, this.getRotation());
 	}
 	public void setDriveVoltage(double lv, double rv, CLDriveCommand c) {
@@ -219,9 +225,18 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 		this.gyro.reset();
 	}
 
+	public void setInitial(Pose2d init) {	// set the initial position based on where the robot is located on the field - used primarily for accurate dashboard view
+		if(this.position_offset.equals(new Transform2d())) {
+			this.position_offset = new Transform2d(init.getTranslation(), init.getRotation());
+		}
+	}
 
-	public Pose2d getPose() {	// in meters
+
+	public Pose2d getCurrentPose() {	// in meters
 		return this.odometry.getPoseMeters();
+	}
+	public Pose2d getTotalPose() {	// in meters
+		return this.odometry.getPoseMeters().plus(this.position_offset);
 	}
 	public DifferentialDriveWheelSpeeds getWheelSpeeds() {
 		return new DifferentialDriveWheelSpeeds(this.getLeftVelocity(), this.getRightVelocity());
@@ -327,15 +342,6 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 	 */
 	public static class FollowTrajectory extends CLDriveCommand {
 
-		public static final Trajectory getDefault(TrajectoryConfig c) {	// this trajectory is meant to do nothing because the values are very small
-			return TrajectoryGenerator.generateTrajectory(
-				new Pose2d(0, 0, new Rotation2d(0)),
-				List.of(new Translation2d(0.0000000001, 0)),
-				new Pose2d(0.0000000002, 0, new Rotation2d(0)),
-				c
-			);
-		}
-
 		private final Trajectory trajectory;
 		private final RamseteCommand controller;
 		private final boolean stop;
@@ -348,7 +354,7 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 			this.stop = s;
 			this.controller = new RamseteCommand(
 				this.trajectory,
-				super.drivebase_cl::getPose,
+				super.drivebase_cl::getCurrentPose,
 				new RamseteController(Constants.ramsete_B, Constants.ramsete_Zeta),
 				super.drivebase_cl.feedforward,
 				super.drivebase_cl.kinematics,
@@ -366,12 +372,12 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 				temp = TrajectoryUtil.fromPathweaverJson(json_path);
 			} catch(Exception e) {
 				System.err.println("FAILED TO READ TRAJECTORY: " + json_path.toString() + " -> " + e.getMessage());
-				temp = getDefault(db.getTrajectoryConfig());	// do-nothing trajectory as placeholder
+				temp = new Trajectory(Arrays.asList(new Trajectory.State()));	// do-nothing trajectory as placeholder
 			}
 			this.trajectory = temp;
 			this.controller = new RamseteCommand(
 				this.trajectory,
-				super.drivebase_cl::getPose,
+				super.drivebase_cl::getCurrentPose,
 				new RamseteController(Constants.ramsete_B, Constants.ramsete_Zeta),
 				super.drivebase_cl.feedforward,
 				super.drivebase_cl.kinematics,
@@ -399,6 +405,92 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 		}
 		@Override public boolean isFinished() {
 			return this.controller.isFinished();
+		}
+
+		public ParallelCommandGroup alongWithFromPercentage(Command c, double p) {	// starts the given command when the trajectory is the given percentage finished
+			return new ParallelCommandGroup(
+				this,
+				new SequentialCommandGroup(
+					new WaitCommand(this.trajectory.getTotalTimeSeconds() * p),
+					c
+				)
+			);
+		}
+		public ParallelDeadlineGroup alongWithFromPercentageDeadline(Command c, double p) {	// ^^^ but the given command is cancelled when the trajectory ends
+			return new ParallelDeadlineGroup(
+				this,
+				new SequentialCommandGroup(
+					new WaitCommand(this.trajectory.getTotalTimeSeconds() * p),
+					c
+				)
+			);
+		}
+		public ParallelCommandGroup alongWithUntilPercentage(Command c, double p) {	// starts the given command immediately and ends it when the given percentage is reached
+			return new ParallelCommandGroup(
+				this,
+				new ParallelRaceGroup(
+					c,
+					new WaitCommand(this.trajectory.getTotalTimeSeconds() * p)
+				)
+			);
+		}
+
+
+	}
+
+	public static class GoTo extends CLDriveCommand {
+
+		private final Pose2d destination;
+		private Trajectory generated = null;
+		private RamseteCommand controller = null;
+		private Thread builder = null;
+
+		public GoTo(ClosedLoopDifferentialDrive db, Pose2d gt) {
+			super(db);
+			this.destination = gt;
+		}
+
+		@Override public void initialize() {
+			this.generated = null;
+			this.controller = null;
+			this.builder = new Thread(()->{
+				System.out.println("GoTo (Pose): Generating Trajectory...");
+				this.generated = TrajectoryGenerator.generateTrajectory(
+					List.of(super.drivebase_cl.getTotalPose(), this.destination),
+					super.drivebase_cl.getTrajectoryConfig()
+				);
+				this.controller = new RamseteCommand(
+					this.generated,
+					super.drivebase_cl::getCurrentPose,
+					new RamseteController(Constants.ramsete_B, Constants.ramsete_Zeta),
+					super.drivebase_cl.feedforward,
+					super.drivebase_cl.kinematics,
+					super.drivebase_cl::getWheelSpeeds,
+					new PIDController(super.drivebase_cl.params.kP(), 0, 0),
+					new PIDController(super.drivebase_cl.params.kP(), 0, 0),
+					super::setDriveVoltage
+				);
+				this.controller.initialize();
+				System.out.println("GoTo (Pose): Trajectory Built. Running...");
+			});
+			this.builder.start();
+		}
+		@Override public void execute() {
+			if(this.controller != null) {
+				this.controller.execute();
+			} else {
+				super.setDriveVoltage(0, 0);
+			}
+		}
+		@Override public void end(boolean i) {
+			if(this.controller != null) {
+				this.controller.end(i);
+			}
+			// super.setDriveVoltage(0, 0);
+			System.out.println("GoTo (Pose): " + (i ? "Terminated." : "Completed."));
+		}
+		@Override public boolean isFinished() {
+			return this.controller != null && this.controller.isFinished();
 		}
 
 

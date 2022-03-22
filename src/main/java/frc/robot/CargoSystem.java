@@ -796,6 +796,7 @@ public final class CargoSystem {
 				return;
 			}
 			System.out.println(getClass().getSimpleName() + ": Running...");
+			this.failed = false;
 		}
 		@Override public void execute() {
 			if(!super.transfer_sys.hasFeedback() || super.transfer_sys.getCargoCount() > 0) {	// if sensors not detected or cargo in transfer system
@@ -846,6 +847,7 @@ public final class CargoSystem {
 			}
 			super.transfer_command.initialize();
 			System.out.println(getClass().getSimpleName() + ": Running...");
+			this.failed = false;
 		}
 		@Override public void execute() {
 			super.transfer_command.execute();
