@@ -2,14 +2,17 @@ package frc.robot;
 
 import java.nio.file.Path;
 
-import frc.robot.modules.common.drive.Types.*;
 import frc.robot.modules.common.drive.*;
+import frc.robot.modules.common.drive.Types.*;
 import frc.robot.modules.vision.java.VisionServer;
 import frc.robot.modules.vision.java.VisionServer.*;
 
-import edu.wpi.first.wpilibj.motorcontrol.PWMVictorSPX;
+import edu.wpi.first.math.geometry.*;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.Filesystem;
+import edu.wpi.first.wpilibj.DriverStation.Alliance;
+import edu.wpi.first.wpilibj.motorcontrol.PWMVictorSPX;
+import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 
 import com.ctre.phoenix.motorcontrol.can.WPI_TalonSRX;
 
@@ -143,6 +146,47 @@ public final class Constants {
 		test_arc180L = Filesystem.getDeployDirectory().toPath().resolve("pathweaver/json/Arc-180d(l)-0.5m.wpilib.json"),
 		test_arc360R = Filesystem.getDeployDirectory().toPath().resolve("pathweaver/json/Arc-360d(R)-1m.wpilib.json"),
 		test_zigzag = Filesystem.getDeployDirectory().toPath().resolve("pathweaver/json/ZigZag-4m.wpilib.json");
+
+
+	public static enum StartingPose {	// values sourced from pathweaver and "eyeballing" -> definately are not super accureate
+		B1	(new Pose2d(6.7, 5.5, new Rotation2d(-1.293, 0.851))),
+		B2	(new Pose2d(6.2, 4.1, new Rotation2d(-1.595, 0.334))),
+		B3	(new Pose2d(6.8, 2.5, new Rotation2d(-0.701, -0.959))),
+		B4	(new Pose2d(8.4, 2, new Rotation2d(-0.313, -1.239))),
+		R1	(new Pose2d(9.9, 2.8, new Rotation2d(0.884, -0.992))),
+		R2	(new Pose2d(10.2, 4, new Rotation2d(1.433, 0.097))),
+		R3	(new Pose2d(9.5, 5.5, new Rotation2d(1.164, 0.808))),
+		R4	(new Pose2d(8.5, 6, new Rotation2d(0.279, 1.388))),
+		ORG	(new Pose2d());	// field origin, for testing purposes
+
+		public final Pose2d pose;
+		private StartingPose(Pose2d p) {
+			this.pose = p;
+		}
+
+		public static void addOptions(SendableChooser<StartingPose> s, Alliance a) {
+			if(a == Alliance.Red || a == Alliance.Invalid) {
+				s.addOption("Red 1", R1);
+				s.addOption("Red 2", R2);
+				s.addOption("Red 3", R3);
+				s.addOption("Red 4", R4);
+			}
+			if(a == Alliance.Blue || a == Alliance.Invalid) {
+				s.addOption("Blue 1", B1);
+				s.addOption("Blue 2", B2);
+				s.addOption("Blue 3", B3);
+				s.addOption("Blue 4", B4);
+			}
+			if(a == Alliance.Invalid) {
+				s.addOption("Origin", ORG);
+			}
+		}
+		public static SendableChooser<StartingPose> getSelectable(Alliance a) {
+			SendableChooser<StartingPose> s = new SendableChooser<StartingPose>();
+			addOptions(s, a);
+			return s;
+		}
+	}
 
 
 }

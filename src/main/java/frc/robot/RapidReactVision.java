@@ -53,20 +53,24 @@ public final class RapidReactVision {
 		upperhub = null, cargo = null;
 
 	private RapidReactVision() {
-		if(!VisionServer.isConnected()) {
-			new Trigger(()->VisionServer.isConnected()).whenActive(
-				()->{
-					this.upperhub = Pipelines.HUB_TRACKER.getObject();
-					this.cargo = Pipelines.CARGO_TRACKER.getObject();
-				}
-			);
-		} else {
+		if(VisionServer.isConnected()) {
 			this.upperhub = Pipelines.HUB_TRACKER.getObject();
 			this.cargo = Pipelines.CARGO_TRACKER.getObject();
 		}
+		// if(!VisionServer.isConnected()) {
+		// 	new Trigger(()->VisionServer.isConnected()).whenActive(
+		// 		()->{
+		// 			this.upperhub = Pipelines.HUB_TRACKER.getObject();
+		// 			this.cargo = Pipelines.CARGO_TRACKER.getObject();
+		// 		}
+		// 	);
+		// } else {
+		// 	this.upperhub = Pipelines.HUB_TRACKER.getObject();
+		// 	this.cargo = Pipelines.CARGO_TRACKER.getObject();
+		// }
 	}
 	private static RapidReactVision inst = new RapidReactVision();
-	public static boolean safeInit() { return inst != null; }
+	//public static boolean safeInit() { return inst != null; }
 
 
 	public static boolean hasHubPipeline() { return Pipelines.HUB_TRACKER.getObject() != null; }
@@ -380,6 +384,7 @@ public final class RapidReactVision {
 				return;
 			}
 			System.out.println("CargoFind: Running...");
+			this.failed = false;	// in case the command is run again after a failure
 		}
 		@Override public void execute() {
 			this.last_voltage = this.limit.calculate(getClosestAllianceCargo(this.team) != null ? 0.0 : this.turning_voltage);
@@ -418,6 +423,7 @@ public final class RapidReactVision {
 				return;
 			}
 			System.out.println("CargoTurn: Running...");
+			this.failed = false;
 		}
 		@Override public void execute() {
 			this.position = getClosestAllianceCargo(this.team);
@@ -486,6 +492,7 @@ public final class RapidReactVision {
 				return;
 			}
 			System.out.println("CargoFollow: Running...");
+			this.failed = false;
 		}
 		@Override public void execute() {
 			this.position = getClosestAllianceCargo(this.team);
@@ -499,8 +506,8 @@ public final class RapidReactVision {
 				) * (this.max_turning_voltage - static_voltage);		// multiply by turning voltage range
 				t *= (f_l / f);		// normalize turning so that it is proportional to the rate-limited forward speed
 				super.autoDriveVoltage(
-					static_voltage * Math.signum(f_l+t) + f_l + t,	// static voltage (in correct direction) + limited forward voltage + normalized turning voltage
-					static_voltage * Math.signum(f_l-t) + f_l - t	// static voltage (in correct direction) + limited forward voltage - normalized turning voltage
+					static_voltage * Math.signum(f_l + t) + f_l + t,	// static voltage (in correct direction) + limited forward voltage + normalized turning voltage
+					static_voltage * Math.signum(f_l - t) + f_l - t	// static voltage (in correct direction) + limited forward voltage - normalized turning voltage
 				);
 			} else {
 				super.fromLast(continuation_percent);	// handle jitters in vision detection -> worst case cenario this causes a gradual deceleration
@@ -515,6 +522,10 @@ public final class RapidReactVision {
 				return Math.abs(this.position.lr) <= heading_thresh && Math.abs(this.position.distance) <= this.target;
 			}
 			return this.failed;
+		}
+
+		public boolean inRange(double dist_inches) {
+			return this.position != null && this.position.distance <= dist_inches;
 		}
 
 
@@ -540,6 +551,8 @@ public final class RapidReactVision {
 	 * Merges CargoFollow and ModeDrive together 
 	 */
 	public static class CargoAssistRoutine extends CargoFollow {
+
+		public static final double intake_enable_distance = 20;	// when the cargo gets this close (inches), the intake will be started
 
 		private final DriveCommandBase drive;
 		private final CargoSystem.IntakeSubsystem.IntakeCommand intake;
@@ -581,7 +594,7 @@ public final class RapidReactVision {
 			super.position = getClosestAllianceCargo(super.team);
 			if(super.position != null) {
 				super.execute();
-				if(super.position.distance <= super.target + 15) {
+				if(super.position.distance <= intake_enable_distance) {
 					this.intake.execute();
 				}
 			} else {
@@ -620,6 +633,7 @@ public final class RapidReactVision {
 				return;
 			}
 			System.out.println(getClass().getSimpleName() + ": Running...");
+			this.failed = false;
 		}
 		@Override public void execute() {
 			this.last_voltage = this.limit.calculate(isHubDetected() ? 0.0 : this.turning_voltage);
@@ -655,6 +669,7 @@ public final class RapidReactVision {
 				return;
 			}
 			System.out.println(getClass().getSimpleName() + ": Running...");
+			this.failed = false;
 		}
 		@Override public void execute() {
 			this.position = getHubPosition();

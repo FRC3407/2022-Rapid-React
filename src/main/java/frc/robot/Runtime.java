@@ -11,7 +11,6 @@ import edu.wpi.first.wpilibj.*;
 import edu.wpi.first.wpilibj.smartdashboard.*;
 import edu.wpi.first.wpilibj2.command.*;
 import edu.wpi.first.wpilibj2.command.button.*;
-// import edu.wpi.first.math.geometry.*;
 // import edu.wpi.first.math.trajectory.*;
 // import edu.wpi.first.networktables.*;
 
@@ -68,6 +67,8 @@ public class Runtime extends TimedRobot {
 			new CargoSystem.ShooterSubsystem(Motors.pwm_victorspx, Constants.w0_shooter_port, Motors.pwm_victorspx, Constants.feed_port)
 		);
 
+	private final SendableChooser<Constants.StartingPose>
+		starting_pose;
 	private final SendableChooser<Command>
 		auto_command = new SendableChooser<Command>();
 
@@ -84,8 +85,6 @@ public class Runtime extends TimedRobot {
 
 		this.cargo_sys.startAutomaticTransfer(Constants.transfer_voltage);
 
-		RapidReactVision.safeInit();
-
 		// Trajectory test = TrajectoryGenerator.generateTrajectory(
 		// 	new Pose2d(0, 0, new Rotation2d(0)),
 		// 	//List.of(new Translation2d(1, 1), new Translation2d(2, -1)),
@@ -93,6 +92,9 @@ public class Runtime extends TimedRobot {
 		// 	new Pose2d(2, 0, new Rotation2d(0)),
 		// 	this.drivebase.getTrajectoryConfig()
 		// );
+
+		this.starting_pose = Constants.StartingPose.getSelectable(DriverStation.getAlliance());
+		SmartDashboard.putData("Starting Position", this.starting_pose);
 
 		this.auto_command.setDefaultOption("Basic-Taxi", new Auto.Basic(this.drivebase));
 		this.auto_command.addOption("Gyro-Taxi", new Auto.GyroCL(this.drivebase, this.spi_imu));
@@ -103,6 +105,8 @@ public class Runtime extends TimedRobot {
 		this.auto_command.addOption("Arc-360(R) Trajectory", this.drivebase.followSingleTrajectory(Constants.test_arc360R));
 		this.auto_command.addOption("ZigZag Trajectory", this.drivebase.followSingleTrajectory(Constants.test_zigzag));
 		this.auto_command.addOption("Demo-Follow", new RapidReactVision.CargoFollow.Demo(this.drivebase));
+		this.auto_command.addOption("Test", this.drivebase.followTrajectory(Constants.test_zigzag).alongWithFromPercentageDeadline(this.cargo_sys.managedIntake(Constants.intake_voltage), 0.8));
+		this.auto_command.addOption("Auto-Home", this.drivebase.autoPosition(Constants.StartingPose.ORG.pose));
 		SmartDashboard.putData("Auto Command", this.auto_command);
 	}
 
@@ -111,7 +115,8 @@ public class Runtime extends TimedRobot {
 		new Trigger(()->VisionServer.isConnected()).whenActive(
 			new LambdaCommand(()->System.out.println("Coprocessor Connected!"))
 		);
-		AutonomousTrigger.Get().whenActive(()->this.auto_command.getSelected().schedule());	// schedule the auto command when autonomous starts
+		AutonomousTrigger.Get().whenActive(()->this.auto_command.getSelected().schedule());
+		EnabledTrigger.Get().whenActive(new LambdaCommand.Singular(()->this.drivebase.setInitial(this.starting_pose.getSelected().pose)));
 
 		if(this.input.isConnected()) {
 			this.xboxControls();
