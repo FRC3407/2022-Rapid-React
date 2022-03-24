@@ -507,14 +507,14 @@ public final class RapidReactVision {
 				t *= (f_l / f);		// normalize turning so that it is proportional to the rate-limited forward speed
 				super.autoDriveVoltage(
 					static_voltage * Math.signum(f_l + t) + f_l + t,	// static voltage (in correct direction) + limited forward voltage + normalized turning voltage
-					static_voltage * Math.signum(f_l - t) + f_l - t	// static voltage (in correct direction) + limited forward voltage - normalized turning voltage
+					static_voltage * Math.signum(f_l - t) + f_l - t		// static voltage (in correct direction) + limited forward voltage - normalized turning voltage
 				);
 			} else {
 				super.fromLast(continuation_percent);	// handle jitters in vision detection -> worst case cenario this causes a gradual deceleration
 			}
 		}
 		@Override public void end(boolean i) {
-			super.autoDriveVoltage(0, 0);
+			super.autoDriveVoltage(0.0, 0.0);
 			System.out.println(this.failed || i ? "CargoFollow: Terminated." : "CargoFollow: Completed.");
 		}
 		@Override public boolean isFinished() {
@@ -552,10 +552,12 @@ public final class RapidReactVision {
 	 */
 	public static class CargoAssistRoutine extends CargoFollow {
 
-		public static final double intake_enable_distance = 20;	// when the cargo gets this close (inches), the intake will be started
+		public static final double intake_enable_distance = 20;		// when the cargo gets this close (inches), the intake will be started
+		public static final int intake_continuation_cycles = 75;	// 1.5 seconds
 
 		private final DriveCommandBase drive;
 		private final CargoSystem.IntakeSubsystem.IntakeCommand intake;
+		private int intake_count = 0;
 
 		public CargoAssistRoutine(DriveBase db, DriveCommandBase d, CargoSystem.IntakeSubsystem.IntakeCommand i) {
 			super(db);
@@ -596,8 +598,15 @@ public final class RapidReactVision {
 				super.execute();
 				if(super.position.distance <= intake_enable_distance) {
 					this.intake.execute();
+					this.intake_count = 0;
 				}
 			} else {
+				if(this.intake_count <= intake_continuation_cycles) {
+					this.intake.execute();
+					this.intake_count++;
+				} else {
+					this.intake.end(false);
+				}
 				this.drive.execute();
 			}
 		}
