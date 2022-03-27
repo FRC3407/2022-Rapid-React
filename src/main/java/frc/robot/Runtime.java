@@ -96,9 +96,8 @@ public class Runtime extends TimedRobot {
 		this.starting_pose = Constants.StartingPose.getSelectable(DriverStation.getAlliance());
 		SmartDashboard.putData("Starting Position", this.starting_pose);
 
-		this.auto_command.setDefaultOption("Basic-Taxi", new Auto.Basic(this.drivebase));
-		this.auto_command.addOption("Gyro-Taxi", new Auto.GyroCL(this.drivebase, this.spi_imu));
-		//this.auto_command.addOption("Test Trajectory", this.drivebase.followSingleTrajectory(test));
+		this.auto_command.setDefaultOption("Basic-Taxi", new Auto.OpenLoop(this.drivebase, this.cargo_sys));
+		this.auto_command.addOption("CL Auto", new Auto.ClosedLoop(this.drivebase, this.cargo_sys));
 		this.auto_command.addOption("Straight Trajectory", this.drivebase.followSingleTrajectory(Constants.test_straight1m));
 		this.auto_command.addOption("Arc-90(R) Trajectory", this.drivebase.followSingleTrajectory(Constants.test_arc90R));
 		this.auto_command.addOption("Arc-180(L) Trajectory", this.drivebase.followSingleTrajectory(Constants.test_arc180L));
@@ -271,7 +270,7 @@ public class Runtime extends TimedRobot {
 				this.cargo_sys.visionShoot(							// control the shooter with velocity determined by vision
 					actuate.getSupplier(this.input),				// press 'A' to feed
 					Constants.feed_voltage,
-					(double inches)-> Constants.shooter_static_voltage + (inches / Constants.max_hub_range_inches * (12 - Constants.shooter_static_voltage))
+					Constants.inches2volts_shooter
 				),
 				new RapidReactVision.HubAssistRoutine(
 					this.drivebase,

@@ -107,6 +107,11 @@ public final class Constants {
 		);
 
 
+	public static final VisionServer.Conversion
+		inches2volts_shooter = (double in)->
+			shooter_static_voltage + (in / max_hub_range_inches * (12 - shooter_static_voltage));
+
+
 
 // Vision presets
 	public static final int
@@ -165,6 +170,7 @@ public final class Constants {
 		}
 
 		public static void addOptions(SendableChooser<StartingPose> s, Alliance a) {
+			s.setDefaultOption("Origin", ORG);
 			if(a == Alliance.Red || a == Alliance.Invalid) {
 				s.addOption("Red 1", R1);
 				s.addOption("Red 2", R2);
@@ -176,9 +182,6 @@ public final class Constants {
 				s.addOption("Blue 2", B2);
 				s.addOption("Blue 3", B3);
 				s.addOption("Blue 4", B4);
-			}
-			if(a == Alliance.Invalid) {
-				s.addOption("Origin", ORG);
 			}
 		}
 		public static SendableChooser<StartingPose> getSelectable(Alliance a) {

@@ -13,40 +13,46 @@ import edu.wpi.first.wpilibj2.command.*;
 /** This class contains various composed commands that are either tests or for actual competition autonomous */
 public class Auto {
 
-	public static class Basic extends SequentialCommandGroup {
+	public static class OpenLoop extends SequentialCommandGroup {
 
-		public Basic(DriveBase db) {
+		public OpenLoop(DriveBase db, CargoSystem cs) {
 			super.addCommands(
-				new BasicDriveControl(db, 0.25, 0.25).withTimeout(3.0)
+				new ParallelCommandGroup(
+					new BasicDriveControl.Voltage(db, 3.0, 3.0),	// drive forward "taxi"
+					cs.managedIntake(Constants.intake_voltage)		// run intake
+				).withTimeout(3.5),
+				new BasicDriveControl.Voltage(db, -3.0, 3.0).withTimeout(1.0),	// turn
+				cs.shootAll(Constants.feed_voltage, 10.0, Constants.transfer_voltage)	// shoot all balls
 			);
 		}
 
 	}
-	public static class GyroCL extends SequentialCommandGroup {
-		
-		public GyroCL(DriveBase db, Gyro gy) {
-			super.addCommands(
-				new GyroDrive.Straight(db, gy, 0.25).withTimeout(3),
-				new GyroDrive.TurnInPlace(db, gy, 90)
-			);
-		}
+	public static class ClosedLoop extends SequentialCommandGroup {
 
-	}
-	public static class TaxiIntakeShoot extends SequentialCommandGroup {
-
-		/** Basic Driving, Vision CL when possible */
-		public TaxiIntakeShoot(DriveBase db, CargoSystem cs) {
-			/**
-			 * 1. 
-			 */
-		}
-		/** Open-loop driving with closed loop turning and Vision when possible */
-		public TaxiIntakeShoot(DriveBase db, CargoSystem cs, Gyro gy) {
-
-		}
-		/** Closed-loop driving (trajectories) with Vision CL when available */
-		public TaxiIntakeShoot(ClosedLoopDifferentialDrive db, CargoSystem cs) {
+		// /** Basic Driving, Vision CL when possible */
+		// public ClosedLoop(DriveBase db, CargoSystem cs) {
 			
+		// }
+		// /** Open-loop driving with closed loop turning and Vision when possible */
+		// public ClosedLoop(DriveBase db, CargoSystem cs, Gyro gy) {
+
+		// }
+		/** Closed-loop driving (trajectories) with Vision CL when available */
+		public ClosedLoop(ClosedLoopDifferentialDrive db, CargoSystem cs) {
+			super.addCommands(
+				new RapidReactVision.CargoAssistRoutine.EndOnIntake(		// find and intake the nearest cargo
+					db,
+					new RapidReactVision.CargoFind(db),
+					cs.managedIntake(Constants.intake_voltage),
+					cs.transfer
+				),
+				new RapidReactVision.HubFind(db),	// find hub
+				new RapidReactVision.HubTurn(db),	// hub aim
+				cs.visionShootAll(	// shoot all cargo
+					Constants.feed_voltage, Constants.transfer_voltage,
+					Constants.inches2volts_shooter
+				)
+			);
 		}
 
 	}

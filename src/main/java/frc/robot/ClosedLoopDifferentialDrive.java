@@ -114,7 +114,8 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 	private final DifferentialDriveKinematics kinematics;
 	private final SimpleMotorFeedforward feedforward;
 
-	private Transform2d position_offset = new Transform2d();
+	//private Transform2d position_offset = new Transform2d();
+	private Pose2d position_offset = new Pose2d();
 	private final Field2d map = new Field2d();
 
 	public ClosedLoopDifferentialDrive(DriveMap_2<WPI_TalonSRX> map, Gyro gy, CLDriveParams params) { this(map, gy, params, Inversions.NEITHER); }
@@ -208,8 +209,7 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 	// "Setters" -> require command key
 	public void resetOdometry(Pose2d p, CLDriveCommand c) {
 		this.resetEncoders(c);
-		Pose2d total = this.getTotalPose();
-		this.position_offset = new Transform2d(total.getTranslation(), total.getRotation());
+		this.position_offset = this.getTotalPose();
 		this.odometry.resetPosition(p, this.getRotation());
 	}
 	public void setDriveVoltage(double lv, double rv, CLDriveCommand c) {
@@ -226,8 +226,8 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 	}
 
 	public void setInitial(Pose2d init) {	// set the initial position based on where the robot is located on the field - used primarily for accurate dashboard view
-		if(this.position_offset.equals(new Transform2d())) {
-			this.position_offset = new Transform2d(init.getTranslation(), init.getRotation());
+		if(this.position_offset.equals(new Pose2d())) {
+			this.position_offset = init;
 		}
 	}
 
@@ -236,7 +236,9 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 		return this.odometry.getPoseMeters();
 	}
 	public Pose2d getTotalPose() {	// in meters
-		return this.odometry.getPoseMeters().plus(this.position_offset);
+		//return this.odometry.getPoseMeters().plus(this.position_offset);
+		Pose2d current = this.getCurrentPose();
+		return this.position_offset.plus(new Transform2d(current.getTranslation(), current.getRotation()));
 	}
 	public DifferentialDriveWheelSpeeds getWheelSpeeds() {
 		return new DifferentialDriveWheelSpeeds(this.getLeftVelocity(), this.getRightVelocity());
