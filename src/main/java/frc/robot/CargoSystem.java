@@ -378,9 +378,9 @@ public final class CargoSystem {
 
 
 
-	private final IntakeSubsystem intake;
-	private final TransferSubsystem transfer;
-	private final ShooterSubsystem shooter;
+	public final IntakeSubsystem intake;
+	public final TransferSubsystem transfer;
+	public final ShooterSubsystem shooter;
 
 	public CargoSystem(IntakeSubsystem i, TransferSubsystem t, ShooterSubsystem s) {
 		this.intake = i;

@@ -5,6 +5,8 @@ import frc.robot.modules.common.drive.DriveBase;
 import frc.robot.modules.common.drive.DriveBase.DriveCommandBase;
 import frc.robot.modules.vision.java.VisionServer;
 
+import java.util.function.BooleanSupplier;
+
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.filter.SlewRateLimiter;
 import edu.wpi.first.networktables.*;
@@ -591,6 +593,7 @@ public final class RapidReactVision {
 			}
 			this.drive.initialize();
 			this.intake.initialize();
+			this.intake_count = -1;
 		}
 		@Override public void execute() {
 			super.position = getClosestAllianceCargo(super.team);
@@ -601,11 +604,12 @@ public final class RapidReactVision {
 					this.intake_count = 0;
 				}
 			} else {
-				if(this.intake_count <= intake_continuation_cycles) {
+				if(this.intake_count <= intake_continuation_cycles && this.intake_count != -1) {
 					this.intake.execute();
 					this.intake_count++;
-				} else {
+				} else if(this.intake_count != -1) {
 					this.intake.end(false);
+					this.intake_count = -1;
 				}
 				this.drive.execute();
 			}
@@ -616,6 +620,35 @@ public final class RapidReactVision {
 		}
 		@Override public boolean isFinished() {
 			return false;
+		}
+
+		public static class EndOnIntake extends CargoAssistRoutine {
+
+			private final BooleanSupplier end;
+			private final boolean use_timeout;
+
+			public EndOnIntake(DriveBase db, DriveCommandBase d, CargoSystem.IntakeSubsystem.IntakeCommand i, CargoSystem.TransferSubsystem t) {
+				super(db, d, i);
+				this.end = ()->t.isInputRisingEdge();
+				this.use_timeout = !t.hasFeedback();
+			}
+			public EndOnIntake(
+				DriveBase db, DriveCommandBase d, 
+				CargoSystem.IntakeSubsystem.IntakeCommand i, 
+				CargoSystem.TransferSubsystem t,
+				Alliance a, 
+				double target_inches, double mfvolts, double mtvolts, double mfva
+			) {
+				super(db, d, i, a, target_inches, mfvolts, mtvolts, mfva);
+				this.end = ()->t.isInputRisingEdge();
+				this.use_timeout = !t.hasFeedback();
+			}
+
+			@Override public boolean isFinished() {
+				return this.end.getAsBoolean() || (this.use_timeout && super.intake_count > intake_continuation_cycles);
+			}
+
+
 		}
 
 

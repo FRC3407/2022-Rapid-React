@@ -107,6 +107,11 @@ public final class Constants {
 		);
 
 
+	public static final VisionServer.Conversion
+		inches2volts_shooter = (double in)->
+			shooter_static_voltage + (in / max_hub_range_inches * (12 - shooter_static_voltage));
+
+
 
 // Vision presets
 	public static final int
