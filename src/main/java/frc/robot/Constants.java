@@ -33,6 +33,7 @@ public final class Constants {
 		feed_port = 3,			// port for transfer system feed motor
 		shooter_canid = 4,		// port for shooter motor (can id for falcon)
 		w0_shooter_port = 0,
+		climber_port = 4,
 		lim_entering_dio = 0,
 		lim_exiting_dio = 1
 	;
@@ -77,6 +78,9 @@ public final class Constants {
 		transfer_voltage = 5,
 		feed_voltage = 4.5,
 		shooter_default_voltage = 9,
+		climber_extend_voltage = 5,
+		climber_hold_voltage = 4,
+		climber_retract_voltage = 8,
 
 // Physical properties
 		drivetrack_width_inches = 21.819,	// track width of drivebase

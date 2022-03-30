@@ -86,16 +86,20 @@ public class ClimberSubsystem implements Subsystem {
 	public static class ToggleControl extends ClimberCommand {
 
 		private final BooleanSupplier trigger;
+		private final double ext_voltage, ret_voltage, static_voltage;
 		private ClimberState state = ClimberState.RETRACTED;
 		private boolean last;
 
-		public ToggleControl(ClimberSubsystem cl, BooleanSupplier t) {
+		public ToggleControl(ClimberSubsystem cl, BooleanSupplier t, double ev, double rv, double sv) {
 			super(cl);
 			this.trigger = t;
+			this.ext_voltage = ev;
+			this.ret_voltage = rv;
+			this.static_voltage = sv;
 		}
 
 		@Override public void initialize() {
-
+			System.out.println("Toggle Climber: Running...");
 		}
 		@Override public void execute() {
 			boolean t = trigger.getAsBoolean();
@@ -104,25 +108,63 @@ public class ClimberSubsystem implements Subsystem {
 			}
 			switch(this.state) {
 				case RETRACTED: {
-					
+					super.setVoltage(this.static_voltage);
 				}
 				case EXTENDING: {
-
+					super.setVoltage(this.ext_voltage);
 				}
 				case EXTENDED: {
-
+					super.stop();
 				}
 				case RETRACTING: {
-
+					super.set(this.ret_voltage);
 				}
 			}
 			this.last = t;
 		}
 		@Override public void end(boolean i) {
-
+			super.stop();
+			System.out.println("ToggleClimber: " + (i ? "Terminated." : "Completed."));
 		}
 		@Override public boolean isFinished() {
 			return false;
+		}
+
+
+	}
+	public static class HoldToggleControl extends ToggleControl {
+
+		public HoldToggleControl(ClimberSubsystem cl, BooleanSupplier t, double ev, double rv, double sv) {
+			super(cl, t, ev, rv, sv);
+		}
+
+		@Override public void execute() {
+			switch(super.state) {
+				case RETRACTED: {
+					super.setVoltage(super.static_voltage);
+					if(super.trigger.getAsBoolean()) {
+						super.state = super.state.next();
+					}
+				}
+				case EXTENDING: {
+					super.setVoltage(super.ext_voltage);
+					if(!super.trigger.getAsBoolean()) {
+						super.state = super.state.next();
+					}
+				}
+				case EXTENDED: {
+					super.stop();
+					if(super.trigger.getAsBoolean()) {
+						super.state = super.state.next();
+					}
+				}
+				case RETRACTING: {
+					super.setVoltage(super.ret_voltage);
+					if(!super.trigger.getAsBoolean()) {
+						super.state = super.state.next();
+					}
+				}
+			}
 		}
 
 
