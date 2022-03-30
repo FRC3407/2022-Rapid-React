@@ -79,7 +79,7 @@ public final class Constants {
 		shooter_default_voltage = 9,
 
 // Physical properties
-		drivetrack_width_inches = 21.819,		// track width of drivebase
+		drivetrack_width_inches = 21.819,	// track width of drivebase
 		drivewheel_diameter_inches = 6.0,	// wheel diameter for drivebase
 		shooter_diameter_inches = 8.0,		// diameter of shooter wheel
 

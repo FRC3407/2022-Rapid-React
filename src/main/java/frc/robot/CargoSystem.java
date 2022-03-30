@@ -133,13 +133,17 @@ public final class CargoSystem {
 			this.output = o;
 		}
 
+		/**
+		 * Keeps track of the number of cargo that are being manipulated by the transfer system. 
+		 * The counter increments on a rising edge on the input, and decrements on a falling edge on the output.
+		 */
 		@Override public void periodic() {
 			if(this.input != null && this.output != null) {	// should be safe because of check within constructors -> uncomment if issue
 				this.last_input = this.now_input;
 				this.last_output = this.now_output;
 				this.now_input = this.input.get();
 				this.now_output = this.output.get();
-				if(this.isInputFallingEdge()) { this.cargo_cnt++; }
+				if(this.isInputRisingEdge()) { this.cargo_cnt++; }
 				if(this.isOutputFallingEdge()) { this.cargo_cnt--; }
 			}
 		}
