@@ -109,15 +109,19 @@ public class ClimberSubsystem implements Subsystem {
 			switch(this.state) {
 				case RETRACTED: {
 					super.setVoltage(this.static_voltage);
+					break;
 				}
 				case EXTENDING: {
 					super.setVoltage(this.ext_voltage);
+					break;
 				}
 				case EXTENDED: {
 					super.stop();
+					break;
 				}
 				case RETRACTING: {
-					super.set(this.ret_voltage);
+					super.setVoltage(this.ret_voltage);
+					break;
 				}
 			}
 			this.last = t;
@@ -145,24 +149,28 @@ public class ClimberSubsystem implements Subsystem {
 					if(super.trigger.getAsBoolean()) {
 						super.state = super.state.next();
 					}
+					break;
 				}
 				case EXTENDING: {
 					super.setVoltage(super.ext_voltage);
 					if(!super.trigger.getAsBoolean()) {
 						super.state = super.state.next();
 					}
+					break;
 				}
 				case EXTENDED: {
 					super.stop();
 					if(super.trigger.getAsBoolean()) {
 						super.state = super.state.next();
 					}
+					break;
 				}
 				case RETRACTING: {
 					super.setVoltage(super.ret_voltage);
 					if(!super.trigger.getAsBoolean()) {
 						super.state = super.state.next();
 					}
+					break;
 				}
 			}
 		}

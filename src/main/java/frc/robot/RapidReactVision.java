@@ -12,7 +12,6 @@ import edu.wpi.first.math.filter.SlewRateLimiter;
 import edu.wpi.first.networktables.*;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
-import edu.wpi.first.wpilibj2.command.button.Trigger;
 
 
 /**
@@ -559,7 +558,7 @@ public final class RapidReactVision {
 
 		private final DriveCommandBase drive;
 		private final CargoSystem.IntakeSubsystem.IntakeCommand intake;
-		private int intake_count = 0;
+		private int intake_count = -1;
 
 		public CargoAssistRoutine(DriveBase db, DriveCommandBase d, CargoSystem.IntakeSubsystem.IntakeCommand i) {
 			super(db);

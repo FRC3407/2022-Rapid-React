@@ -63,8 +63,12 @@ public class Runtime extends TimedRobot {
 	private final CargoSystem
 		cargo_sys = new CargoSystem(
 			new CargoSystem.IntakeSubsystem(Constants.intake_port),
-			new CargoSystem.TransferSubsystem(Constants.transfer_ports),
-			new CargoSystem.ShooterSubsystem(Motors.pwm_victorspx, Constants.w0_shooter_port, Motors.pwm_victorspx, Constants.feed_port)
+			new CargoSystem.TransferSubsystem(Constants.input_entering_dio, Constants.input_exiting_dio, Constants.transfer_ports),
+			new CargoSystem.ShooterSubsystem(Motors.pwm_victorspx, Constants.shooter_port, Motors.pwm_victorspx, Constants.feed_port)
+		);
+	private final ClimberSubsystem
+		climb_sys = new ClimberSubsystem(
+			Constants.climber_port
 		);
 
 	private final SendableChooser<Constants.StartingPose>
@@ -177,6 +181,7 @@ public class Runtime extends TimedRobot {
 			cargo_assist_toggle =	Xbox.Digital.START,
 			drivemode_increment =	Xbox.Digital.RS,
 			drivemode_decrement =	Xbox.Digital.LS,
+			climb_toggle = 			Xbox.Digital.B,
 			alt_vision =			Xbox.Digital.X,
 			override =				Xbox.Digital.Y,
 			camera_increment =		Xbox.Digital.DR,
@@ -185,7 +190,9 @@ public class Runtime extends TimedRobot {
 			toggle_stats =			Xbox.Digital.DT
 		;
 
-		TeleopTrigger.Get().whenActive( Constants.vision_driving ).whenActive(	// we can't compose a sequentialcommandgroup here because the modedrive command is used elsewhere
+		TeleopTrigger.Get().whenActive(
+			Constants.vision_driving
+		).whenActive(	// we can't compose a sequentialcommandgroup here because the modedrive command is used elsewhere
 			this.drivebase.modeDrive(
 				Xbox.Analog.LX.getLimitedSupplier(this.input, Constants.teleop_max_input_ramp),
 				Xbox.Analog.LY.getLimitedSupplier(this.input, Constants.teleop_max_input_ramp),
@@ -195,8 +202,15 @@ public class Runtime extends TimedRobot {
 				Xbox.Analog.RT.getLimitedSupplier(this.input, Constants.teleop_max_input_ramp),
 				drivemode_increment.getPressedSupplier(this.input),
 				drivemode_decrement.getPressedSupplier(this.input)
+			)	// schedule mode drive when in teleop mode
+		).whileActiveOnce(
+			new ClimberSubsystem.HoldToggleControl(
+				this.climb_sys, climb_toggle.getSupplier(this.input),
+				Constants.climber_extend_voltage,
+				Constants.climber_retract_voltage,
+				Constants.climber_hold_voltage
 			)
-		);	// schedule mode drive when in teleop mode
+		);
 
 		toggle_vision.getCallbackFrom(this.input).and(alt_vision.getCallbackFrom(this.input).negate()).whenActive(VisionSubsystem.ToggleProcessing.Get());
 		toggle_stats.getCallbackFrom(this.input).and(alt_vision.getCallbackFrom(this.input).negate()).whenActive(VisionSubsystem.ToggleStatistics.Get());
@@ -326,6 +340,7 @@ public class Runtime extends TimedRobot {
 			override =				Attack3.Digital.TB,		// right stick
 			camera_increment =		Attack3.Digital.TR,		// left stick
 			camera_decrement =		Attack3.Digital.TL,		// left stick
+			climb_toggle = 			Attack3.Digital.TB,		// left stick
 
 			toggle_vision =			Attack3.Digital.B1,
 			toggle_stats =			Attack3.Digital.B2,
@@ -333,7 +348,9 @@ public class Runtime extends TimedRobot {
 			pipeline_decrement =	Attack3.Digital.B3
 		;
 
-		TeleopTrigger.Get().whenActive( Constants.vision_driving ).whenActive(
+		TeleopTrigger.Get().whenActive(
+			Constants.vision_driving
+		).whenActive(
 			this.drivebase.modeDrive(
 				Attack3.Analog.X.getLimitedSupplier(this.stick_left, Constants.teleop_max_input_ramp),
 				Attack3.Analog.Y.getLimitedSupplier(this.stick_left, Constants.teleop_max_input_ramp),
@@ -341,6 +358,13 @@ public class Runtime extends TimedRobot {
 				Attack3.Analog.Y.getLimitedSupplier(this.stick_right, Constants.teleop_max_input_ramp),
 				drivemode_increment.getPressedSupplier(this.stick_right),
 				drivemode_decrement.getPressedSupplier(this.stick_right)
+			)
+		).whileActiveOnce(
+			new ClimberSubsystem.HoldToggleControl(
+				this.climb_sys, climb_toggle.getSupplier(this.stick_left),
+				Constants.climber_extend_voltage,
+				Constants.climber_retract_voltage,
+				Constants.climber_hold_voltage
 			)
 		);	// schedule mode drive when in teleop mode
 
