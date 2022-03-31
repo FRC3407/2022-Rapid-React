@@ -31,10 +31,11 @@ public final class Constants {
 	public static final int
 		intake_port = 1,		// port for intake motor
 		feed_port = 3,			// port for transfer system feed motor
-		shooter_canid = 4,		// port for shooter motor (can id for falcon)
-		w0_shooter_port = 0,
-		lim_entering_dio = 0,
-		lim_exiting_dio = 1
+		//shooter_canid = 4,		// port for shooter motor (can id for falcon)
+		shooter_port = 0,
+		climber_port = 4,
+		input_entering_dio = 0,
+		input_exiting_dio = 1
 	;
 	public static final int[]
 		transfer_ports = {2}	// ports for all additional motors in transfer system (all controlled together)
@@ -76,10 +77,13 @@ public final class Constants {
 		intake_voltage = 7,
 		transfer_voltage = 5,
 		feed_voltage = 4.5,
-		shooter_default_voltage = 9,
+		shooter_default_voltage = 11,
+		climber_extend_voltage = 5,
+		climber_hold_voltage = 4,
+		climber_retract_voltage = 8,
 
 // Physical properties
-		drivetrack_width_inches = 21.819,		// track width of drivebase
+		drivetrack_width_inches = 21.819,	// track width of drivebase
 		drivewheel_diameter_inches = 6.0,	// wheel diameter for drivebase
 		shooter_diameter_inches = 8.0,		// diameter of shooter wheel
 
