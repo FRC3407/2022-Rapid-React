@@ -11,7 +11,7 @@ import edu.wpi.first.math.geometry.*;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.Filesystem;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
-import edu.wpi.first.wpilibj.motorcontrol.PWMVictorSPX;
+//import edu.wpi.first.wpilibj.motorcontrol.PWMVictorSPX;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 
 import com.ctre.phoenix.motorcontrol.can.WPI_TalonSRX;
@@ -20,10 +20,10 @@ import com.ctre.phoenix.motorcontrol.can.WPI_TalonSRX;
 public final class Constants {
 
     //       				 descriptions >>  {fl fr bl br} {MotorController Type}  {inversion settings}  {Drive layout}
-    public static final DriveMap_4<PWMVictorSPX> 
-        drivebase_map_testbot = new DriveMap_4<>(8, 6, 7, 5, Motors.pwm_victorspx, Inversions.RIGHT, DriveLayout.DIFFERENTIAL)//,	// the test bot
-        //drivebase_map_2019 = new DriveMap_4<>(6, 8, 9, 7, Motors.pwm_victorsp, Inversions.RIGHT, DriveLayout.DIFFERENTIAL)		// the 2019 bot
-	;
+    // public static final DriveMap_4<PWMVictorSPX> 
+    //     drivebase_map_testbot = new DriveMap_4<>(8, 6, 7, 5, Motors.pwm_victorspx, Inversions.RIGHT, DriveLayout.DIFFERENTIAL)//,	// the test bot
+    //     //drivebase_map_2019 = new DriveMap_4<>(6, 8, 9, 7, Motors.pwm_victorsp, Inversions.RIGHT, DriveLayout.DIFFERENTIAL)		// the 2019 bot
+	// ;
 	public static final DriveMap_4<WPI_TalonSRX>
 		drivebase_map_2022 = new DriveMap_4<>(0, 3, 1, 2, Motors.can_talonsrx, Inversions.RIGHT, DriveLayout.DIFFERENTIAL)		// competition bot
 	;
@@ -77,7 +77,7 @@ public final class Constants {
 		intake_voltage = 7,
 		transfer_voltage = 5,
 		feed_voltage = 4.5,
-		shooter_default_voltage = 11,
+		shooter_default_voltage = 11.25,
 		climber_extend_voltage = 5,
 		climber_hold_voltage = 4,
 		climber_retract_voltage = 8,

@@ -467,6 +467,7 @@ public final class RapidReactVision {
 		private final double target, max_forward_voltage, max_turning_voltage;
 		private VisionServer.TargetData position = null;
 		private boolean failed = false;
+		protected double cont_percent = continuation_percent;
 
 		public CargoFollow(DriveBase db) { this(db, DriverStation.getAlliance()); }
 		public CargoFollow(DriveBase db, double target_inches) { this(db, target_inches, default_max_voltage_ramp); }
@@ -510,8 +511,8 @@ public final class RapidReactVision {
 					static_voltage * Math.signum(f_l + t) + f_l + t,	// static voltage (in correct direction) + limited forward voltage + normalized turning voltage
 					static_voltage * Math.signum(f_l - t) + f_l - t		// static voltage (in correct direction) + limited forward voltage - normalized turning voltage
 				);
-			} else {
-				super.fromLast(continuation_percent);	// handle jitters in vision detection -> worst case cenario this causes a gradual deceleration
+			} else { 
+				super.fromLast(this.cont_percent);	// handle jitters in vision detection -> worst case cenario this causes a gradual deceleration
 			}
 		}
 		@Override public void end(boolean i) {
@@ -564,6 +565,7 @@ public final class RapidReactVision {
 			super(db);
 			this.drive = d;
 			this.intake = i;
+			super.cont_percent = 1.0;
 
 			super.addRequirements(this.intake.getRequirements().toArray(new CargoSystem.IntakeSubsystem[]{}));
 			super.addRequirements(this.drive.getRequirements().toArray(new DriveBase[]{}));
@@ -577,6 +579,7 @@ public final class RapidReactVision {
 			super(db, a, target_inches, mfvolts, mtvolts, mfva);
 			this.drive = d;
 			this.intake = i;
+			super.cont_percent = 1.0;
 
 			super.addRequirements(this.intake.getRequirements().toArray(new CargoSystem.IntakeSubsystem[]{}));
 			super.addRequirements(this.drive.getRequirements().toArray(new DriveBase[]{}));
@@ -595,9 +598,8 @@ public final class RapidReactVision {
 			this.intake_count = -1;
 		}
 		@Override public void execute() {
-			super.position = getClosestAllianceCargo(super.team);
+			super.execute();
 			if(super.position != null) {
-				super.execute();
 				if(super.position.distance <= intake_enable_distance) {
 					this.intake.execute();
 					this.intake_count = 0;
@@ -620,6 +622,7 @@ public final class RapidReactVision {
 		@Override public boolean isFinished() {
 			return false;
 		}
+
 
 		public static class EndOnIntake extends CargoAssistRoutine {
 
