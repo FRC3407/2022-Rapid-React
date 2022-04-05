@@ -150,11 +150,11 @@ public final class Constants {
 
 // PathWeaver filesystem locations / Generated paths
 	public static final Path
-		test_straight1m = Filesystem.getDeployDirectory().toPath().resolve("pathweaver/json/Straight-1m.wpilib.json"),
-		test_arc90R = Filesystem.getDeployDirectory().toPath().resolve("pathweaver/json/Arc-90d(r)-0.5m.wpilib.json"),
-		test_arc180L = Filesystem.getDeployDirectory().toPath().resolve("pathweaver/json/Arc-180d(l)-0.5m.wpilib.json"),
-		test_arc360R = Filesystem.getDeployDirectory().toPath().resolve("pathweaver/json/Arc-360d(R)-1m.wpilib.json"),
-		test_zigzag = Filesystem.getDeployDirectory().toPath().resolve("pathweaver/json/ZigZag-4m.wpilib.json");
+		test_straight1m = Filesystem.getDeployDirectory().toPath().resolve("paths/output/Straight-1m.wpilib.json"),
+		test_arc90R = Filesystem.getDeployDirectory().toPath().resolve("paths/output/Arc-90d(r)-0.5m.wpilib.json"),
+		test_arc180L = Filesystem.getDeployDirectory().toPath().resolve("paths/output/Arc-180d(l)-0.5m.wpilib.json"),
+		test_arc360R = Filesystem.getDeployDirectory().toPath().resolve("paths/output/Arc-360d(R)-1m.wpilib.json"),
+		test_zigzag = Filesystem.getDeployDirectory().toPath().resolve("paths/output/ZigZag-4m.wpilib.json");
 
 
 	public static enum StartingPose {	// values sourced from pathweaver and "eyeballing" -> definately are not super accureate
