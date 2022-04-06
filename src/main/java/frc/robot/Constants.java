@@ -34,8 +34,8 @@ public final class Constants {
 		//shooter_canid = 4,		// port for shooter motor (can id for falcon)
 		shooter_port = 0,
 		climber_port = 4,
-		input_entering_dio = 0,
-		input_exiting_dio = 1
+		input_entering_dio = 8,
+		input_exiting_dio = 9
 	;
 	public static final int[]
 		transfer_ports = {2}	// ports for all additional motors in transfer system (all controlled together)

@@ -144,6 +144,14 @@ public class Runtime extends TimedRobot {
 		// 	);
 		// }
 
+		EnabledTrigger.Get().whileActiveOnce(	// beam break test
+			new Test.InputTest(
+				25, 	// 2 times per second @ a loop frequency of 50
+				()->this.cargo_sys.transfer.getCurrentInput(),
+				()->this.cargo_sys.transfer.getCurrentOutput()
+			)
+		);
+
 	}
 	@Override public void robotPeriodic() {
 		CommandScheduler.getInstance().run();
