@@ -19,21 +19,18 @@ import com.ctre.phoenix.motorcontrol.can.WPI_TalonSRX;
 
 public final class Constants {
 
-    //       				 descriptions >>  {fl fr bl br} {MotorController Type}  {inversion settings}  {Drive layout}
-    // public static final DriveMap_4<PWMVictorSPX> 
-    //     drivebase_map_testbot = new DriveMap_4<>(8, 6, 7, 5, Motors.pwm_victorspx, Inversions.RIGHT, DriveLayout.DIFFERENTIAL)//,	// the test bot
-    //     //drivebase_map_2019 = new DriveMap_4<>(6, 8, 9, 7, Motors.pwm_victorsp, Inversions.RIGHT, DriveLayout.DIFFERENTIAL)		// the 2019 bot
-	// ;
+    //       				descriptions >>  {fl fr bl br} {MotorController Type}  {inversion settings}  {Drive layout}
 	public static final DriveMap_4<WPI_TalonSRX>
 		drivebase_map_2022 = new DriveMap_4<>(0, 3, 1, 2, Motors.can_talonsrx, Inversions.RIGHT, DriveLayout.DIFFERENTIAL)		// competition bot
 	;
 
 	public static final int
-		intake_port = 1,		// port for intake motor
-		feed_port = 3,			// port for transfer system feed motor
-		//shooter_canid = 4,		// port for shooter motor (can id for falcon)
+	// pwm ports
+		intake_port = 1,
 		shooter_port = 0,
-		climber_port = 4,
+		climber_left_port = 3,
+		climber_right_port = 4,
+	// dio ports
 		input_entering_dio = 8,
 		input_exiting_dio = 9
 	;
@@ -60,7 +57,7 @@ public final class Constants {
 		uncertainty_continuation_percentage = 0.95,	// if break in target detection, keep powering motors at this percent of the last values used
 		motors_thresh_tozero = 0.1,		// the point where it is safe to go straight to zero (deceleration)
 
-		teleop_drivebase_scaling = -0.5,	// cap the voltage @50% -> negative because joysticks default to being inverted
+		teleop_drivebase_scaling = -0.7,	// cap the voltage @70% -> negative because joysticks default to being inverted
 		teleop_drivebase_deadband = 0.05,	// the input range that is discarded
 		teleop_max_input_ramp = 2.0,		// maximum input acceleration in percent/sec^2 -> no more than 200% per second per second
 
@@ -68,8 +65,8 @@ public final class Constants {
 		universal_max_voltage = 10.0,
 		shooter_static_voltage = 0.8,	// CURRENTLY JUST AN ESTIMATE
 
-		auto_max_turn_voltage = 2.0,	// maximum voltage for turning in place during auto
-		auto_max_forward_voltage = 4.0,	// maximum voltage for driving forward during auto
+		auto_max_turn_voltage = 2.5,	// maximum voltage for turning in place during auto
+		auto_max_forward_voltage = 4.5,	// maximum voltage for driving forward during auto
 		auto_max_voltage_ramp = 20.0,	// maximum voltage ramp (acceleration) in voltage/sec^2
 
 		teleop_assist_turn_voltage = 3.0,	// maximum turn voltage for finding the hub
