@@ -21,19 +21,19 @@ import edu.wpi.first.wpilibj2.command.button.*;
  x Create "helper" container for methods at the start of DriveBase
  x Make better names for "DB#..." and split into port map and motorcontroller object containers (this would be an extension)
  x Commands for CLDifferential -> Ramsete controller (characterization first)
- - Update C++ VisionServer-Robot API
+ x Update C++ VisionServer-Robot API
  - Methods/impelemtation to search DriverStation for a certain input (common.Input.InputDevice) and return object/port
  x max output/scaling method for drivebase
  - make a spreadsheet for camera presets (each pipeline) under different lighting conditions
  x fix controls being f'ed when not in sim mode and not connected on program startup
  - finalize/test Velocity-CL (TalonFX) shooter commands
  x Polish cargo manipulation controls
- - AUTO!!!!
+ x? AUTO!!!!
  x make AnalogSupplier and DigitalSupplier extend BooleanSupplier and DigitalSupplier respectively
  x? Path planning and drivebase cl (all of it...)
 
  x? Tune hubturn p-loop
- - Change camera params / configure switching when camera positions are finalized
+ x Change camera params / configure switching when camera positions are finalized
 
  x Polish "Vision Assist" -> re-schedule operator-turning after overcorrection or "dead zone"
  - Auto -> "Hierarchy" of closed-loop
@@ -51,8 +51,6 @@ public class Runtime extends TimedRobot {
 
 	private final ADIS16470
 		spi_imu = new ADIS16470();
-	// private final DriveBase
-	// 	drivebase = new DriveBase(Constants.drivebase_map_testbot);
 	private final ClosedLoopDifferentialDrive
 		drivebase = new ClosedLoopDifferentialDrive(
 			Constants.drivebase_map_2022,
@@ -64,11 +62,12 @@ public class Runtime extends TimedRobot {
 		cargo_sys = new CargoSystem(
 			new CargoSystem.IntakeSubsystem(Constants.intake_port),
 			new CargoSystem.TransferSubsystem(Constants.input_entering_dio, Constants.input_exiting_dio, Constants.transfer_ports),
-			new CargoSystem.ShooterSubsystem(Motors.pwm_victorspx, Constants.shooter_port, Motors.pwm_victorspx, Constants.feed_port)
+			new CargoSystem.ShooterSubsystem(Motors.pwm_victorspx, Constants.shooter_port/*, Motors.pwm_victorspx, Constants.feed_port*/)
 		);
 	private final ClimberSubsystem
 		climb_sys = new ClimberSubsystem(
-			Constants.climber_port
+			Constants.climber_left_port,
+			Constants.climber_right_port
 		);
 
 	private final SendableChooser<Constants.StartingPose>
@@ -89,27 +88,11 @@ public class Runtime extends TimedRobot {
 
 		this.cargo_sys.startAutomaticTransfer(Constants.transfer_voltage);
 
-		// Trajectory test = TrajectoryGenerator.generateTrajectory(
-		// 	new Pose2d(0, 0, new Rotation2d(0)),
-		// 	//List.of(new Translation2d(1, 1), new Translation2d(2, -1)),
-		// 	List.of(new Translation2d(1, 0)),
-		// 	new Pose2d(2, 0, new Rotation2d(0)),
-		// 	this.drivebase.getTrajectoryConfig()
-		// );
-
 		this.starting_pose = Constants.StartingPose.getSelectable(DriverStation.getAlliance());
 		SmartDashboard.putData("Starting Position", this.starting_pose);
 
 		this.auto_command.setDefaultOption("Basic-Taxi", new Auto.OpenLoop(this.drivebase, this.cargo_sys));
 		this.auto_command.addOption("CL Auto", new Auto.ClosedLoop(this.drivebase, this.cargo_sys));
-		this.auto_command.addOption("Straight Trajectory", this.drivebase.followSingleTrajectory(Constants.test_straight1m));
-		this.auto_command.addOption("Arc-90(R) Trajectory", this.drivebase.followSingleTrajectory(Constants.test_arc90R));
-		this.auto_command.addOption("Arc-180(L) Trajectory", this.drivebase.followSingleTrajectory(Constants.test_arc180L));
-		this.auto_command.addOption("Arc-360(R) Trajectory", this.drivebase.followSingleTrajectory(Constants.test_arc360R));
-		this.auto_command.addOption("ZigZag Trajectory", this.drivebase.followSingleTrajectory(Constants.test_zigzag));
-		this.auto_command.addOption("Demo-Follow", new RapidReactVision.CargoFollow.Demo(this.drivebase));
-		this.auto_command.addOption("Test", this.drivebase.followTrajectory(Constants.test_zigzag).alongWithFromPercentageDeadline(this.cargo_sys.managedIntake(Constants.intake_voltage), 0.8));
-		this.auto_command.addOption("Auto-Home", this.drivebase.autoPosition(Constants.StartingPose.ORG.pose));
 		SmartDashboard.putData("Auto Command", this.auto_command);
 	}
 
@@ -143,6 +126,14 @@ public class Runtime extends TimedRobot {
 		// 		}, true)
 		// 	);
 		// }
+
+		// EnabledTrigger.Get().whileActiveOnce(	// beam break test
+		// 	new Test.InputTest(
+		// 		25, 	// 2 times per second @ a loop frequency of 50
+		// 		()->this.cargo_sys.transfer.getCurrentInput(),
+		// 		()->this.cargo_sys.transfer.getCurrentOutput()
+		// 	)
+		// );
 
 	}
 	@Override public void robotPeriodic() {
@@ -181,7 +172,8 @@ public class Runtime extends TimedRobot {
 			cargo_assist_toggle =	Xbox.Digital.START,
 			drivemode_increment =	Xbox.Digital.RS,
 			drivemode_decrement =	Xbox.Digital.LS,
-			climb_toggle = 			Xbox.Digital.B,
+			climb_toggle = 			Xbox.Digital.A,
+			transfer =				Xbox.Digital.B,
 			alt_vision =			Xbox.Digital.X,
 			override =				Xbox.Digital.Y,
 			camera_increment =		Xbox.Digital.DR,
@@ -228,6 +220,7 @@ public class Runtime extends TimedRobot {
 
 			shoot_trigger = shoot_toggle.getToggleFrom(this.input),
 			actuate_trigger = actuate.getCallbackFrom(this.input),
+			transfer_trigger = transfer.getCallbackFrom(this.input),
 			override_trigger = override.getCallbackFrom(this.input),
 			hub_assist_trigger = hub_assist_toggle.getToggleFrom(this.input),
 			cargo_assist_trigger = cargo_assist_toggle.getToggleFrom(this.input),
@@ -239,7 +232,8 @@ public class Runtime extends TimedRobot {
 		// and the shooter is toggled on
 		teleop_trigger.and(shoot_trigger).and(override_trigger.negate()).and(routines_trigger.negate()).whileActiveOnce(
 			this.cargo_sys.managedShoot(
-				actuate.getSupplier(this.input),
+				//actuate.getSupplier(this.input),
+				()->false,
 				Constants.feed_voltage,
 				Constants.shooter_default_voltage
 			)
@@ -252,7 +246,8 @@ public class Runtime extends TimedRobot {
 		// and the shooter is toggled on
 		teleop_trigger.and(shoot_trigger).and(override_trigger).and(routines_trigger.negate()).whileActiveOnce(
 			this.cargo_sys.basicShoot(
-				actuate.getSupplier(this.input),
+				//actuate.getSupplier(this.input),
+				()->false,
 				Constants.feed_voltage,
 				Constants.shooter_default_voltage
 			)
@@ -262,15 +257,10 @@ public class Runtime extends TimedRobot {
 			this.cargo_sys.basicIntake(Constants.intake_voltage)
 		);
 
-		// transfer override?
-
-		// Xbox.Digital.Y.getCallbackFrom(this.input).and(				// when 'Y' is pressed...
-		// 	Xbox.Digital.LB.getCallbackFrom(this.input)				// and 'LB' IS pressed...
-		// ).and(
-		// 	Xbox.Digital.RB.getToggleFrom(this.input)
-		// ).and( TeleopTrigger.Get() ).whileActiveOnce(				// and in teleop mode...
-		// 	this.cargo_sys.basicTransfer(Constants.transfer_speed)	// override the transfer belts (unmanaged)
-		// );
+		// transfer override
+		teleop_trigger.and(transfer_trigger.and(override_trigger).or(shoot_trigger.and(actuate_trigger))).and(routines_trigger.negate()).whileActiveOnce(
+			this.cargo_sys.basicTransfer(Constants.transfer_voltage)
+		);
 
 		teleop_trigger.and(hub_assist_trigger).and(cargo_assist_state.negate()).whenActive(
 			()->{
@@ -282,7 +272,8 @@ public class Runtime extends TimedRobot {
 		).whileActiveOnce(
 			new ParallelCommandGroup(
 				this.cargo_sys.visionShoot(							// control the shooter with velocity determined by vision
-					actuate.getSupplier(this.input),				// press 'A' to feed
+					//actuate.getSupplier(this.input),				// press RB to feed
+					()->false,
 					Constants.feed_voltage,
 					Constants.inches2volts_shooter
 				),
@@ -299,6 +290,8 @@ public class Runtime extends TimedRobot {
 				hub_assist_state.disable();
 				System.out.println("\tHUB ASSIST TERMINATED.");
 			}
+		).and(actuate_trigger).whileActiveOnce(
+			this.cargo_sys.basicTransfer(Constants.transfer_voltage)
 		);
 		teleop_trigger.and(cargo_assist_trigger).and(hub_assist_state.negate()).whenActive(
 			()->{
@@ -328,6 +321,14 @@ public class Runtime extends TimedRobot {
 		);
 
 	}
+
+
+
+
+
+
+
+
 	public void arcadeControls() {
 
 		Attack3.Digital			// the button binds
@@ -395,7 +396,8 @@ public class Runtime extends TimedRobot {
 		// and the shooter is toggled on
 		teleop_trigger.and(shoot_trigger).and(override_trigger.negate()).and(routines_trigger.negate()).whileActiveOnce(
 			this.cargo_sys.managedShoot(
-				actuate.getSupplier(this.stick_right),
+				//actuate.getSupplier(this.stick_right),
+				()->false,
 				Constants.feed_voltage,
 				Constants.shooter_default_voltage
 			)
@@ -408,7 +410,8 @@ public class Runtime extends TimedRobot {
 		// and the shooter is toggled on
 		teleop_trigger.and(shoot_trigger).and(override_trigger).and(routines_trigger.negate()).whileActiveOnce(
 			this.cargo_sys.basicShoot(
-				actuate.getSupplier(this.stick_right),
+				//actuate.getSupplier(this.stick_right),
+				()->false,
 				Constants.feed_voltage,
 				Constants.shooter_default_voltage
 			)
@@ -418,13 +421,10 @@ public class Runtime extends TimedRobot {
 			this.cargo_sys.basicIntake(Constants.intake_voltage)
 		);
 
-		// transfer override?
-
-		// Attack3.Digital.TT.getCallbackFrom(this.stick_right).and(
-		// 	Attack3.Digital.TRI.getCallbackFrom(this.stick_left)
-		// ).and( TeleopTrigger.Get() ).whileActiveOnce(
-		// 	this.cargo_sys.basicTransfer(Constants.transfer_speed)
-		// );
+		// transfer override
+		teleop_trigger.and(/*transfer_trigger.and(override_trigger).or*/(shoot_trigger.and(actuate_trigger))).and(routines_trigger.negate()).whileActiveOnce(
+			this.cargo_sys.basicTransfer(Constants.transfer_voltage)
+		);
 
 		teleop_trigger.and(hub_assist_trigger).and(cargo_assist_state.negate()).whenActive(
 			()->{
@@ -436,7 +436,8 @@ public class Runtime extends TimedRobot {
 		).whileActiveOnce(
 			new ParallelCommandGroup(
 				this.cargo_sys.visionShoot(							// control the shooter with velocity determined by vision
-					actuate.getSupplier(this.stick_right),				// press 'A' to feed
+					//actuate.getSupplier(this.stick_right),		// press right trigger to feed
+					()->false,
 					Constants.feed_voltage,
 					(double inches)-> Constants.shooter_static_voltage + (inches / Constants.max_hub_range_inches * (12 - Constants.shooter_static_voltage))
 				),
@@ -453,6 +454,8 @@ public class Runtime extends TimedRobot {
 				hub_assist_state.disable();
 				System.out.println("\tHUB ASSIST TERMINATED.");
 			}
+		).and(actuate_trigger).whileActiveOnce(
+			this.cargo_sys.basicTransfer(Constants.transfer_voltage)
 		);
 		teleop_trigger.and(cargo_assist_trigger).and(hub_assist_state.negate()).whenActive(
 			()->{

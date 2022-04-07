@@ -12,6 +12,7 @@ import edu.wpi.first.wpilibj2.command.*;
 public class ClimberSubsystem implements Subsystem {
 
 	public static enum ClimberState {
+		//IDLE		(0),
 		RETRACTED	(-1),
 		EXTENDING	(1),
 		EXTENDED	(1),
