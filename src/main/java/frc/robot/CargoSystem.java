@@ -12,6 +12,7 @@ import com.ctre.phoenix.motorcontrol.can.*;
 import com.ctre.phoenix.sensors.SensorInitializationStrategy;
 
 import edu.wpi.first.wpilibj.DigitalInput;
+import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.motorcontrol.*;
 import edu.wpi.first.wpilibj2.command.*;
 
@@ -394,6 +395,7 @@ public final class CargoSystem {
 
 	public void startAutomaticTransfer(double s) { this.transfer.startAutomaticTransfer(s); }
 
+	public DeployIntake deployIntake() { return new DeployIntake(this.intake); }
 	public BasicIntake basicIntake(double volts) { return new BasicIntake(this.intake, volts); }
 	public BasicIntake basicIntake(DoubleSupplier volts) { return new BasicIntake(this.intake, volts); }
 	public ManagedIntake managedIntake(double volts) { return new ManagedIntake(this.intake, this.transfer, volts); }
@@ -425,6 +427,37 @@ public final class CargoSystem {
 // Intake Commands >>
 
 
+	/**
+	 * Spins the intake slowly for a short duration (under the assumption that pinwheel-type hardware is used to push the intake out)
+	 */
+	public static class DeployIntake extends IntakeSubsystem.IntakeCommand {
+
+		public static final double
+			voltage = Constants.intake_deploy_voltage,
+			duration = Constants.intake_deploy_time;
+		private final  Timer time = new Timer();
+
+		private DeployIntake(IntakeSubsystem i) { super(i); }
+
+		@Override public void initialize() {
+			System.out.println(getClass().getSimpleName() + ": Running...");
+			this.time.reset();
+			this.time.start();
+		}
+		@Override public void execute() {
+			super.setVoltage(voltage);
+		}
+		@Override public void end(boolean i) {
+			this.time.stop();
+			super.stop();
+			System.out.println(getClass().getSimpleName() + (i ? ": Terminated." : ": Completed."));
+		}
+		@Override public boolean isFinished() {
+			return this.time.hasElapsed(duration);
+		}
+
+
+	}
 	/**
 	 * Basic control over the intake with either constant voltage or variable if constructed with a {@link DoubleSupplier}.
 	 */
