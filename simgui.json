@@ -1,11 +1,6 @@
 {
   "HALProvider": {
     "Other Devices": {
-      "ADIS16470[0]": {
-        "header": {
-          "open": true
-        }
-      },
       "BuiltInAccel": {
         "header": {
           "open": true
@@ -64,9 +59,32 @@
       "/LiveWindow/Ungrouped/DifferentialDrive[2]": "DifferentialDrive",
       "/LiveWindow/Ungrouped/DigitalInput[0]": "Digital Input",
       "/LiveWindow/Ungrouped/DigitalInput[1]": "Digital Input",
+      "/LiveWindow/Ungrouped/DigitalInput[8]": "Digital Input",
+      "/LiveWindow/Ungrouped/DigitalInput[9]": "Digital Input",
+      "/LiveWindow/Ungrouped/MotorControllerGroup[1]": "Motor Controller",
       "/LiveWindow/Ungrouped/MotorControllerGroup[3]": "Motor Controller",
+      "/LiveWindow/Ungrouped/PIDController[10]": "PIDController",
+      "/LiveWindow/Ungrouped/PIDController[11]": "PIDController",
+      "/LiveWindow/Ungrouped/PIDController[12]": "PIDController",
+      "/LiveWindow/Ungrouped/PIDController[13]": "PIDController",
+      "/LiveWindow/Ungrouped/PIDController[14]": "PIDController",
+      "/LiveWindow/Ungrouped/PIDController[15]": "PIDController",
+      "/LiveWindow/Ungrouped/PIDController[16]": "PIDController",
+      "/LiveWindow/Ungrouped/PIDController[17]": "PIDController",
+      "/LiveWindow/Ungrouped/PIDController[18]": "PIDController",
+      "/LiveWindow/Ungrouped/PIDController[19]": "PIDController",
       "/LiveWindow/Ungrouped/PIDController[1]": "PIDController",
+      "/LiveWindow/Ungrouped/PIDController[20]": "PIDController",
+      "/LiveWindow/Ungrouped/PIDController[21]": "PIDController",
+      "/LiveWindow/Ungrouped/PIDController[22]": "PIDController",
       "/LiveWindow/Ungrouped/PIDController[2]": "PIDController",
+      "/LiveWindow/Ungrouped/PIDController[3]": "PIDController",
+      "/LiveWindow/Ungrouped/PIDController[4]": "PIDController",
+      "/LiveWindow/Ungrouped/PIDController[5]": "PIDController",
+      "/LiveWindow/Ungrouped/PIDController[6]": "PIDController",
+      "/LiveWindow/Ungrouped/PIDController[7]": "PIDController",
+      "/LiveWindow/Ungrouped/PIDController[8]": "PIDController",
+      "/LiveWindow/Ungrouped/PIDController[9]": "PIDController",
       "/LiveWindow/Ungrouped/PWMVictorSPX[0]": "Motor Controller",
       "/LiveWindow/Ungrouped/PWMVictorSPX[1]": "Motor Controller",
       "/LiveWindow/Ungrouped/PWMVictorSPX[2]": "Motor Controller",
@@ -89,7 +107,21 @@
       "/LiveWindow/W0_Transfer": "Subsystem",
       "/LiveWindow/WeekZero": "Subsystem",
       "/SmartDashboard/Auto Command": "String Chooser",
-      "/SmartDashboard/Auto Mode": "String Chooser"
+      "/SmartDashboard/Auto Mode": "String Chooser",
+      "/SmartDashboard/Robot Location": "Field2d",
+      "/SmartDashboard/Starting Position": "String Chooser"
+    },
+    "windows": {
+      "/SmartDashboard/Auto Command": {
+        "window": {
+          "visible": true
+        }
+      },
+      "/SmartDashboard/Starting Position": {
+        "window": {
+          "visible": true
+        }
+      }
     }
   },
   "NetworkTables": {
@@ -99,17 +131,14 @@
       }
     },
     "LiveWindow": {
+      "ClosedLoopDifferentialDrive": {
+        "open": true
+      },
       "DriveBase": {
         "open": true
       },
       "Ungrouped": {
         "DifferentialDrive[1]": {
-          "open": true
-        },
-        "PWMVictorSPX[0]": {
-          "open": true
-        },
-        "PWMVictorSPX[1]": {
           "open": true
         },
         "Scheduler": {
@@ -130,6 +159,12 @@
     },
     "SmartDashboard": {
       "Auto Mode": {
+        "open": true
+      },
+      "Robot Location": {
+        "open": true
+      },
+      "Starting Position": {
         "open": true
       },
       "open": true

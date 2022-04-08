@@ -1,6 +1,8 @@
 package frc.robot;
 
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.List;
 
 import frc.robot.modules.common.drive.DriveBase;
 import frc.robot.modules.common.drive.Types.*;
@@ -8,15 +10,24 @@ import frc.robot.modules.common.drive.Types.*;
 import edu.wpi.first.math.kinematics.*;
 import edu.wpi.first.math.trajectory.*;
 import edu.wpi.first.math.trajectory.constraint.*;
+import edu.wpi.first.util.sendable.SendableBuilder;
 import edu.wpi.first.wpilibj.interfaces.Gyro;
 import edu.wpi.first.wpilibj2.command.*;
 import edu.wpi.first.math.controller.*;
 import edu.wpi.first.math.geometry.*;
+import edu.wpi.first.wpilibj.smartdashboard.*;
 
 import com.ctre.phoenix.motorcontrol.can.*;
 import com.ctre.phoenix.motorcontrol.*;
 
 
+/**
+ * Extends {@link DriveBase} and represents a differential drivebase with srx-mag encoders. Constructors require a motor map of the type 
+ * {@link WPI_TalonSRX} in order to interface with the encoders. All 'super' functionality should still be possible, and a drivebase can be 
+ * created with either 2 or 4 motors. Note that it is expected that the encoders are plugged into the front motorcontrollers for each side. 
+ * This class allows for trajectory-following functionality provided that the supplied constants ("clparams") are accurate. Additionally,
+ * the position of the robot can be viewed in the dashboard from the "Robot Position" table under this subsystem's sendable table. 
+ */
 public class ClosedLoopDifferentialDrive extends DriveBase {
 
 	/**
@@ -101,10 +112,15 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 
 	private final DifferentialDriveOdometry odometry;
 	private final DifferentialDriveKinematics kinematics;
-	private final DifferentialDriveVoltageConstraint voltage_constraint;
 	private final SimpleMotorFeedforward feedforward;
 
-	public ClosedLoopDifferentialDrive(DriveMap_2<WPI_TalonSRX> map, Gyro gy, CLDriveParams params) {
+	//private Transform2d position_offset = new Transform2d();
+	private Pose2d position_offset = new Pose2d();
+	private final Field2d map = new Field2d();
+
+	public ClosedLoopDifferentialDrive(DriveMap_2<WPI_TalonSRX> map, Gyro gy, CLDriveParams params) { this(map, gy, params, Inversions.NEITHER); }
+	public ClosedLoopDifferentialDrive(DriveMap_4<WPI_TalonSRX> map, Gyro gy, CLDriveParams params) { this(map, gy, params, Inversions.NEITHER); }
+	public ClosedLoopDifferentialDrive(DriveMap_2<WPI_TalonSRX> map, Gyro gy, CLDriveParams params, Inversions ei) {
 		super(map);
 		this.gyro = gy;
 		this.params = params;
@@ -115,15 +131,20 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 		this.odometry = new DifferentialDriveOdometry(this.gyro.getRotation2d());
 		this.kinematics = new DifferentialDriveKinematics(this.params.track_width_meters);
 		this.feedforward = params.getFeedforward();
-		this.voltage_constraint = new DifferentialDriveVoltageConstraint(this.feedforward, this.kinematics, this.params.max_voltage);
 
 		// apply configs...
 		configDefault(this.left, this.right);
 		this.left.configSelectedFeedbackSensor(FeedbackDevice.CTRE_MagEncoder_Relative);
 		this.right.configSelectedFeedbackSensor(FeedbackDevice.CTRE_MagEncoder_Relative);
+		this.left.setSelectedSensorPosition(0.0);
+		this.right.setSelectedSensorPosition(0.0);
+		this.left.setSensorPhase(ei.left);
+		this.right.setSensorPhase(ei.right);
+
+		SmartDashboard.putData("Robot Location", this.map);
 	}
-	public ClosedLoopDifferentialDrive(DriveMap_4<WPI_TalonSRX> map, Gyro gy, CLDriveParams params) {
-		super(map);
+	public ClosedLoopDifferentialDrive(DriveMap_4<WPI_TalonSRX> map, Gyro gy, CLDriveParams params, Inversions ei) {
+		super(map.differentialDowncast());	// motorcontroller groups mess everything up, so only let the super control the front motors, the back can be set via the phoenix api
 		this.gyro = gy;
 		this.params = params;
 
@@ -133,16 +154,22 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 		this.odometry = new DifferentialDriveOdometry(this.gyro.getRotation2d());
 		this.kinematics = new DifferentialDriveKinematics(this.params.track_width_meters);
 		this.feedforward = params.getFeedforward();
-		this.voltage_constraint = new DifferentialDriveVoltageConstraint(this.feedforward, this.kinematics, this.params.max_voltage);
 
 		// apply configs...
 		configDefault(this.left, this.right, map.back_left, map.back_right);
 		this.left.configSelectedFeedbackSensor(FeedbackDevice.CTRE_MagEncoder_Relative);
 		this.right.configSelectedFeedbackSensor(FeedbackDevice.CTRE_MagEncoder_Relative);
-		map.back_left.follow(this.left);
+		this.left.setSelectedSensorPosition(0.0);
+		this.right.setSelectedSensorPosition(0.0);
+		this.left.setSensorPhase(ei.left);
+		this.right.setSensorPhase(ei.right);
+
+		map.back_left.follow(this.left);	// since we didn't pass these motors to the super, we can just set them to follow the front ones and nothing else will touch them
 		map.back_right.follow(this.right);
 		map.back_left.setInverted(InvertType.FollowMaster);
 		map.back_right.setInverted(InvertType.FollowMaster);
+
+		SmartDashboard.putData("Robot Location", this.map);
 	}
 
 	@Override public void periodic() {
@@ -151,7 +178,16 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 			this.getLeftPositionMeters(),
 			this.getRightPositionMeters()
 		);
-		// update robot field pose if we use that on the dashboard
+		this.map.setRobotPose(this.getTotalPose());
+	}
+
+	@Override public void initSendable(SendableBuilder b) {
+		super.initSendable(b);
+		b.addDoubleProperty("Left Distance", ()->this.getLeftPositionMeters(), null);
+		b.addDoubleProperty("Right Distance", ()->this.getRightPositionMeters(), null);
+		b.addDoubleProperty("Left Velocity", ()->this.getLeftVelocity(), null);
+		b.addDoubleProperty("Right Velocity", ()->this.getRightVelocity(), null);
+		b.addDoubleProperty("Rotation (Continuous)", ()->this.getContinuousAngle(), null);
 	}
 
 	public FollowTrajectory followTrajectory(Trajectory t) {
@@ -160,10 +196,20 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 	public FollowTrajectory followTrajectory(Path json_path) {
 		return new FollowTrajectory(this, json_path);
 	}
+	public FollowTrajectory followSingleTrajectory(Trajectory t) {	// stops when complete
+		return new FollowTrajectory(this, t, true);
+	}
+	public FollowTrajectory followSingleTrajectory(Path json_path) {	// stops when complete
+		return new FollowTrajectory(this, json_path, true);
+	}
+	public GoTo autoPosition(Pose2d p) {
+		return new GoTo(this, p);
+	}
 
 	// "Setters" -> require command key
 	public void resetOdometry(Pose2d p, CLDriveCommand c) {
 		this.resetEncoders(c);
+		this.position_offset = this.getTotalPose();
 		this.odometry.resetPosition(p, this.getRotation());
 	}
 	public void setDriveVoltage(double lv, double rv, CLDriveCommand c) {
@@ -179,9 +225,20 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 		this.gyro.reset();
 	}
 
+	public void setInitial(Pose2d init) {	// set the initial position based on where the robot is located on the field - used primarily for accurate dashboard view
+		if(this.position_offset.equals(new Pose2d())) {
+			this.position_offset = init;
+		}
+	}
 
-	public Pose2d getPose() {	// in meters
+
+	public Pose2d getCurrentPose() {	// in meters
 		return this.odometry.getPoseMeters();
+	}
+	public Pose2d getTotalPose() {	// in meters
+		//return this.odometry.getPoseMeters().plus(this.position_offset);
+		Pose2d current = this.getCurrentPose();
+		return this.position_offset.plus(new Transform2d(current.getTranslation(), current.getRotation()));
 	}
 	public DifferentialDriveWheelSpeeds getWheelSpeeds() {
 		return new DifferentialDriveWheelSpeeds(this.getLeftVelocity(), this.getRightVelocity());
@@ -201,16 +258,30 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 	}
 
 	public double getLeftPositionMeters() {
-		return this.getRawLeftPosition() / Constants.srx_mag_units_per_revolution * this.params.wheel_diameter_meters;
+		return this.getRawLeftPosition()				// output is in encoder units...
+			/ Constants.srx_mag_units_per_revolution		// to get total rotations
+			* this.params.wheel_diameter_meters * Math.PI;	// to get total distance
+			//* this.encoder_invrt.leftSign();				// to get total distance in the correct direction
 	}
 	public double getRightPositionMeters() {
-		return this.getRawRightPosition() / Constants.srx_mag_units_per_revolution * this.params.wheel_diameter_meters;
+		return this.getRawRightPosition()				// ^^^
+			/ Constants.srx_mag_units_per_revolution
+			* this.params.wheel_diameter_meters * Math.PI;
+			//* this.encoder_invrt.rightSign();
 	}
 	public double getLeftVelocity() {	// in meters per second
-		return this.getRawLeftVelocity() * 10 / Constants.srx_mag_units_per_revolution * this.params.wheel_diameter_meters;
+		return this.getRawLeftVelocity()				// output is in encoder units per 100 ms
+			* 10											// to get encoder units per second
+			/ Constants.srx_mag_units_per_revolution		// to get rotations per second
+			* this.params.wheel_diameter_meters * Math.PI;	// to get meters per second
+			//* this.encoder_invrt.leftSign();				// to get meters per second in the correct direction
 	}
 	public double getRightVelocity() {	// in meters per second
-		return this.getRawRightVelocity() * 10 / Constants.srx_mag_units_per_revolution * this.params.wheel_diameter_meters;
+		return this.getRawRightVelocity()				// ^^^
+			* 10
+			/ Constants.srx_mag_units_per_revolution
+			* this.params.wheel_diameter_meters * Math.PI;
+			//* this.encoder_invrt.rightSign();
 	}
 
 	public double getContinuousAngle() {	// in degrees
@@ -226,11 +297,20 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 		return this.gyro.getRotation2d();
 	}
 
+	public DifferentialDriveVoltageConstraint getVoltageConstraint() {
+		return new DifferentialDriveVoltageConstraint(
+			this.feedforward, this.kinematics, this.params.max_voltage
+		);
+	}
 	public TrajectoryConfig getTrajectoryConfig() {
 		return new TrajectoryConfig(
 			this.params.max_velocity_meters_per_sec,
 			this.params.max_acceleration_meters_per_sec_sqrd
-		).setKinematics(this.kinematics).addConstraint(this.voltage_constraint);
+		).setKinematics(
+			this.kinematics
+		).addConstraint(
+			this.getVoltageConstraint()
+		);
 	}
 
 
@@ -266,13 +346,17 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 
 		private final Trajectory trajectory;
 		private final RamseteCommand controller;
+		private final boolean stop;
 
-		public FollowTrajectory(ClosedLoopDifferentialDrive db, Trajectory t) {
+		public FollowTrajectory(ClosedLoopDifferentialDrive db, Trajectory t) { this(db, t, false); }
+		public FollowTrajectory(ClosedLoopDifferentialDrive db, Path json_path) { this(db, json_path, false); }
+		public FollowTrajectory(ClosedLoopDifferentialDrive db, Trajectory t, boolean s) {
 			super(db);
 			this.trajectory = t;
+			this.stop = s;
 			this.controller = new RamseteCommand(
 				this.trajectory,
-				super.drivebase_cl::getPose,
+				super.drivebase_cl::getCurrentPose,
 				new RamseteController(Constants.ramsete_B, Constants.ramsete_Zeta),
 				super.drivebase_cl.feedforward,
 				super.drivebase_cl.kinematics,
@@ -282,19 +366,20 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 				super::setDriveVoltage
 			);
 		}
-		public FollowTrajectory(ClosedLoopDifferentialDrive db, Path json_path) {	// accepts a path to a pathweaver json (deployed with robot program)
+		public FollowTrajectory(ClosedLoopDifferentialDrive db, Path json_path, boolean s) {	// accepts a path to a pathweaver json (deployed with robot program)
 			super(db);
+			this.stop = s;
 			Trajectory temp;
 			try {
 				temp = TrajectoryUtil.fromPathweaverJson(json_path);
 			} catch(Exception e) {
-				System.err.println(e.getMessage());
-				temp = null;
+				System.err.println("FAILED TO READ TRAJECTORY: " + json_path.toString() + " -> " + e.getMessage());
+				temp = new Trajectory(Arrays.asList(new Trajectory.State()));	// do-nothing trajectory as placeholder
 			}
 			this.trajectory = temp;
 			this.controller = new RamseteCommand(
 				this.trajectory,
-				super.drivebase_cl::getPose,
+				super.drivebase_cl::getCurrentPose,
 				new RamseteController(Constants.ramsete_B, Constants.ramsete_Zeta),
 				super.drivebase_cl.feedforward,
 				super.drivebase_cl.kinematics,
@@ -315,10 +400,99 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 		}
 		@Override public void end(boolean i) {
 			this.controller.end(i);
+			if(this.stop) {
+				super.setDriveVoltage(0, 0);
+			}
 			System.out.println("FollowTrajectory: " + (i ? "Terminated." : "Completed."));
 		}
 		@Override public boolean isFinished() {
 			return this.controller.isFinished();
+		}
+
+		public ParallelCommandGroup alongWithFromPercentage(Command c, double p) {	// starts the given command when the trajectory is the given percentage finished
+			return new ParallelCommandGroup(
+				this,
+				new SequentialCommandGroup(
+					new WaitCommand(this.trajectory.getTotalTimeSeconds() * p),
+					c
+				)
+			);
+		}
+		public ParallelDeadlineGroup alongWithFromPercentageDeadline(Command c, double p) {	// ^^^ but the given command is cancelled when the trajectory ends
+			return new ParallelDeadlineGroup(
+				this,
+				new SequentialCommandGroup(
+					new WaitCommand(this.trajectory.getTotalTimeSeconds() * p),
+					c
+				)
+			);
+		}
+		public ParallelCommandGroup alongWithUntilPercentage(Command c, double p) {	// starts the given command immediately and ends it when the given percentage is reached
+			return new ParallelCommandGroup(
+				this,
+				new ParallelRaceGroup(
+					c,
+					new WaitCommand(this.trajectory.getTotalTimeSeconds() * p)
+				)
+			);
+		}
+
+
+	}
+
+	public static class GoTo extends CLDriveCommand {
+
+		private final Pose2d destination;
+		private Trajectory generated = null;
+		private RamseteCommand controller = null;
+		private Thread builder = null;
+
+		public GoTo(ClosedLoopDifferentialDrive db, Pose2d gt) {
+			super(db);
+			this.destination = gt;
+		}
+
+		@Override public void initialize() {
+			this.generated = null;
+			this.controller = null;
+			this.builder = new Thread(()->{
+				System.out.println("GoTo (Pose): Generating Trajectory...");
+				this.generated = TrajectoryGenerator.generateTrajectory(
+					List.of(super.drivebase_cl.getTotalPose(), this.destination),
+					super.drivebase_cl.getTrajectoryConfig()
+				);
+				this.controller = new RamseteCommand(
+					this.generated,
+					super.drivebase_cl::getCurrentPose,
+					new RamseteController(Constants.ramsete_B, Constants.ramsete_Zeta),
+					super.drivebase_cl.feedforward,
+					super.drivebase_cl.kinematics,
+					super.drivebase_cl::getWheelSpeeds,
+					new PIDController(super.drivebase_cl.params.kP(), 0, 0),
+					new PIDController(super.drivebase_cl.params.kP(), 0, 0),
+					super::setDriveVoltage
+				);
+				this.controller.initialize();
+				System.out.println("GoTo (Pose): Trajectory Built. Running...");
+			});
+			this.builder.start();
+		}
+		@Override public void execute() {
+			if(this.controller != null) {
+				this.controller.execute();
+			} else {
+				super.setDriveVoltage(0, 0);
+			}
+		}
+		@Override public void end(boolean i) {
+			if(this.controller != null) {
+				this.controller.end(i);
+			}
+			// super.setDriveVoltage(0, 0);
+			System.out.println("GoTo (Pose): " + (i ? "Terminated." : "Completed."));
+		}
+		@Override public boolean isFinished() {
+			return this.controller != null && this.controller.isFinished();
 		}
 
 

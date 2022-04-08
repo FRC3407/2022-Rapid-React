@@ -2,9 +2,8 @@ package frc.robot;
 
 import frc.robot.commands.*;
 import frc.robot.modules.common.*;
-import frc.robot.modules.common.Input.*;
-import frc.robot.modules.common.drive.DriveBase;
 import frc.robot.modules.common.drive.*;
+import frc.robot.modules.common.Input.*;
 import frc.robot.modules.common.EventTriggers.*;
 import frc.robot.modules.vision.java.*;
 
@@ -12,7 +11,8 @@ import edu.wpi.first.wpilibj.*;
 import edu.wpi.first.wpilibj.smartdashboard.*;
 import edu.wpi.first.wpilibj2.command.*;
 import edu.wpi.first.wpilibj2.command.button.*;
-//import edu.wpi.first.networktables.*;
+// import edu.wpi.first.math.trajectory.*;
+// import edu.wpi.first.networktables.*;
 
 
 /* TODO:
@@ -20,24 +20,29 @@ import edu.wpi.first.wpilibj2.command.button.*;
  x Verify/imporve singleton for each ^^^
  x Create "helper" container for methods at the start of DriveBase
  x Make better names for "DB#..." and split into port map and motorcontroller object containers (this would be an extension)
- - Commands for CLDifferential -> Ramsete controller (characterization first)
- - Update C++ VisionServer-Robot API (actually already safe because of the use of LANGUAGE SUPPORT FOR UNSIGNED ~> smh java :| )
+ x Commands for CLDifferential -> Ramsete controller (characterization first)
+ x Update C++ VisionServer-Robot API
  - Methods/impelemtation to search DriverStation for a certain input (common.Input.InputDevice) and return object/port
  x max output/scaling method for drivebase
  - make a spreadsheet for camera presets (each pipeline) under different lighting conditions
  x fix controls being f'ed when not in sim mode and not connected on program startup
  - finalize/test Velocity-CL (TalonFX) shooter commands
  x Polish cargo manipulation controls
- - AUTO!!!!
+ x? AUTO!!!!
  x make AnalogSupplier and DigitalSupplier extend BooleanSupplier and DigitalSupplier respectively
  x? Path planning and drivebase cl (all of it...)
 
- - Tune hubturn p-loop
- - Change camera params / configure switching when camera positions are finalized
+ x? Tune hubturn p-loop
+ x Change camera params / configure switching when camera positions are finalized
+
+ x Polish "Vision Assist" -> re-schedule operator-turning after overcorrection or "dead zone"
+ - Auto -> "Hierarchy" of closed-loop
+ x Add cargo-following routine to vision assist
 */
 
 public class Runtime extends TimedRobot {
 
+	/* The input devices should always be setup with these port-id's on the driverstation so we can distinguish between input types */
 	private final InputDevice
 		input = new InputDevice(0),			// xbox controller
 
@@ -46,23 +51,32 @@ public class Runtime extends TimedRobot {
 
 	private final ADIS16470
 		spi_imu = new ADIS16470();
-	//private final DriveBase
-	//	drivebase = new DriveBase(Constants.drivebase_map_testbot);
 	private final ClosedLoopDifferentialDrive
 		drivebase = new ClosedLoopDifferentialDrive(
 			Constants.drivebase_map_2022,
 			this.spi_imu,
-			Constants.cl_params
+			Constants.cl_params,
+			Constants.cl_encoder_inversions
 		);
 	private final CargoSystem
 		cargo_sys = new CargoSystem(
 			new CargoSystem.IntakeSubsystem(Constants.intake_port),
-			new CargoSystem.TransferSubsystem(Constants.transfer_ports),
-			new CargoSystem.ShooterSubsystem(Motors.pwm_victorspx, Constants.w0_shooter_port, Motors.pwm_victorspx, Constants.feed_port)
+			new CargoSystem.TransferSubsystem(Constants.input_entering_dio, Constants.input_exiting_dio, Constants.transfer_ports),
+			new CargoSystem.ShooterSubsystem(Motors.pwm_victorspx, Constants.shooter_port/*, Motors.pwm_victorspx, Constants.feed_port*/)
+		);
+	private final ClimberSubsystem
+		climb_sys = new ClimberSubsystem(
+			Constants.climber_left_port,
+			Constants.climber_right_port
 		);
 
+	private final SendableChooser<Constants.StartingPose>
+		starting_pose;
 	private final SendableChooser<Command>
-		auto_command = new SendableChooser<>();
+		auto_command = new SendableChooser<Command>();
+
+
+
 
 
 	public Runtime() {
@@ -72,43 +86,58 @@ public class Runtime extends TimedRobot {
 		this.drivebase.setSpeedDeadband(Constants.teleop_drivebase_deadband);
 		this.drivebase.setSpeedSquaring(Constants.teleop_drivebase_speed_squaring);
 
-		this.cargo_sys.startAutomaticTransfer(Constants.transfer_speed);
+		this.cargo_sys.startAutomaticTransfer(Constants.transfer_voltage);
 
-		this.auto_command.setDefaultOption("Basic-Taxi", new Auto.Basic(this.drivebase));
-		this.auto_command.addOption("Gyro-Taxi", new Auto.GyroCL(this.drivebase, this.spi_imu));
-		this.auto_command.addOption("Test Trajectory", this.drivebase.followTrajectory(Constants.test_fromjson));
-		this.auto_command.addOption("Demo-Follow", new CargoFollow.Demo(this.drivebase, DriverStation.getAlliance(), Constants.cargo_cam_name));
+		this.starting_pose = Constants.StartingPose.getSelectable(DriverStation.getAlliance());
+		SmartDashboard.putData("Starting Position", this.starting_pose);
+
+		this.auto_command.setDefaultOption("Basic-Taxi", new Auto.OpenLoop(this.drivebase, this.cargo_sys));
+		this.auto_command.addOption("CL Auto", new Auto.ClosedLoop(this.drivebase, this.cargo_sys));
 		SmartDashboard.putData("Auto Command", this.auto_command);
 	}
 
-	@Override public void robotPeriodic() { CommandScheduler.getInstance().run(); }
 	@Override public void robotInit() {
-		AutonomousTrigger.Get().whenActive(()->this.auto_command.getSelected().schedule());
-		//AutonomousTrigger.Get().whenActive( new CargoFollow.Demo(this.drivebase, DriverStation.getAlliance(), Constants.cargo_cam_name) );
 
-		new Trigger(()->VisionServer.isConnected()).whenActive(new LambdaCommand(()->System.out.println("VisionServer Connected")));
+		new Trigger(()->VisionServer.isConnected()).whenActive(
+			new LambdaCommand(()->System.out.println("Coprocessor Connected!"))
+		);
+		AutonomousTrigger.Get().whenActive(()->this.auto_command.getSelected().schedule());
+		EnabledTrigger.Get().whenActive(new LambdaCommand.Singular(()->this.drivebase.setInitial(this.starting_pose.getSelected().pose)));
 
 		if(this.input.isConnected()) {
 			this.xboxControls();
+			System.out.println("Xbox Bindings Initialized.");
 		} else {
 			this.input.connectionTrigger().whenActive(
-				new LambdaCommand.Singular(()->{
+				new LambdaCommand.Singular(()->{		// bindings should only be bound once
 					this.xboxControls();
-					System.out.println("Xbox Bindings Scheduled.");
+					System.out.println("Xbox Bindings Initialized.");
 				}, true)
-			);
+			); 
 		}
 		// if(this.stick_left.isConnected() && this.stick_right.isConnected()) {
 		// 	this.arcadeControls();
+		// 	System.out.println("Arcade Bindings Initialized.");
 		// } else {
 		// 	this.stick_left.connectionTrigger().and(this.stick_right.connectionTrigger()).whenActive(
 		// 		new LambdaCommand.Singular(()->{
 		// 			this.arcadeControls();
-		// 			System.out.println("Arcade Bindings Scheduled.");
+		// 			System.out.println("Arcade Bindings Initialized.");
 		// 		}, true)
 		// 	);
 		// }
 
+		// EnabledTrigger.Get().whileActiveOnce(	// beam break test
+		// 	new Test.InputTest(
+		// 		25, 	// 2 times per second @ a loop frequency of 50
+		// 		()->this.cargo_sys.transfer.getCurrentInput(),
+		// 		()->this.cargo_sys.transfer.getCurrentOutput()
+		// 	)
+		// );
+
+	}
+	@Override public void robotPeriodic() {
+		CommandScheduler.getInstance().run();
 	}
 
 	@Override public void disabledInit() {}
@@ -129,201 +158,330 @@ public class Runtime extends TimedRobot {
 
 
 
-	private void xboxControls() {	// bindings for xbox controller
+
+
+
+
+
+	private void xboxControls() {	// setup bindings for xbox controller
+
+		Xbox.Digital			// the button binds
+			shoot_toggle =			Xbox.Digital.LB,
+			actuate =				Xbox.Digital.RB,
+			hub_assist_toggle =		Xbox.Digital.BACK,
+			cargo_assist_toggle =	Xbox.Digital.START,
+			drivemode_increment =	Xbox.Digital.RS,
+			drivemode_decrement =	Xbox.Digital.LS,
+			climb_toggle = 			Xbox.Digital.A,
+			transfer =				Xbox.Digital.B,
+			alt_vision =			Xbox.Digital.X,
+			override =				Xbox.Digital.Y,
+			camera_increment =		Xbox.Digital.DR,
+			camera_decrement =		Xbox.Digital.DL,
+			toggle_vision =			Xbox.Digital.DB,
+			toggle_stats =			Xbox.Digital.DT
+		;
 
 		TeleopTrigger.Get().whenActive(
-			new SequentialCommandGroup(
-				new LambdaCommand(()->VisionServer.setStatistics(false)),
-				new LambdaCommand(()->VisionServer.setProcessingEnabled(false)),
-				new LambdaCommand(()->VisionServer.applyCameraPreset(Constants.cam_driving))
-			)
-		).whenActive(
+			Constants.vision_driving
+		).whenActive(	// we can't compose a sequentialcommandgroup here because the modedrive command is used elsewhere
 			this.drivebase.modeDrive(
-				Xbox.Analog.LX.getLimitedSupplier(input, Constants.teleop_max_acceleration),
-				Xbox.Analog.LY.getLimitedSupplier(input, Constants.teleop_max_acceleration),
-				Xbox.Analog.LT.getLimitedSupplier(input, Constants.teleop_max_acceleration),
-				Xbox.Analog.RX.getLimitedSupplier(input, Constants.teleop_max_acceleration),
-				Xbox.Analog.RY.getLimitedSupplier(input, Constants.teleop_max_acceleration),
-				Xbox.Analog.RT.getLimitedSupplier(input, Constants.teleop_max_acceleration),
-				Xbox.Digital.RS.getPressedSupplier(input),
-				Xbox.Digital.LS.getPressedSupplier(input)
-			), false
-		);	// schedule mode drive when in teleop mode
-
-		Xbox.Digital.DT.getCallbackFrom(this.input).whenPressed(VisionSubsystem.IncrementPipeline.Get());	// dpad top -> increment pipeline
-		Xbox.Digital.DB.getCallbackFrom(this.input).whenPressed(VisionSubsystem.DecrementPipeline.Get());	// dpad bottom -> decrement pipeline
-		Xbox.Digital.DR.getCallbackFrom(this.input).whenPressed(VisionSubsystem.IncrementCamera.Get());		// dpad right -> increment camera
-		Xbox.Digital.DL.getCallbackFrom(this.input).whenPressed(VisionSubsystem.DecrementCamera.Get());		// dpad left -> decrement camera
-		Xbox.Digital.START.getCallbackFrom(this.input).whenPressed(VisionSubsystem.ToggleProcessing.Get());	// toggle visionserver processing
-		Xbox.Digital.BACK.getCallbackFrom(this.input).whenPressed(VisionSubsystem.ToggleStatistics.Get());	// toggle statistics in camera view
-
-		Xbox.Digital.X.getCallbackFrom(this.input).and(				// when 'X' is pressed...
-			Xbox.Digital.LB.getCallbackFrom(this.input).negate()	// and 'LB' IS NOT pressed...
-		).and( TeleopTrigger.Get() ).whileActiveOnce(				// and in teleop mode...
-			this.cargo_sys.managedIntake(Constants.intake_speed)	// run the intake (managed)
-		);
-		Xbox.Digital.X.getCallbackFrom(this.input).and(				// when 'X' is pressed...
-			Xbox.Digital.LB.getCallbackFrom(this.input)				// and 'LB' IS pressed...
-		).and( TeleopTrigger.Get() ).whileActiveOnce(				// and in teleop mode...
-			this.cargo_sys.basicIntake(Constants.intake_speed)		// override the intake (unmanaged)
-		);
-
-		Xbox.Digital.Y.getCallbackFrom(this.input).and(				// when 'Y' is pressed...
-			Xbox.Digital.LB.getCallbackFrom(this.input)				// and 'LB' IS pressed...
-		).and( TeleopTrigger.Get() ).whileActiveOnce(				// and in teleop mode...
-			this.cargo_sys.basicTransfer(Constants.transfer_speed)	// override the transfer belts (unmanaged)
-		);
-		Xbox.Digital.B.getCallbackFrom(this.input).and(				// when 'B' is pressed...
-			Xbox.Digital.LB.getCallbackFrom(this.input).negate()	// and 'LB' IS NOT pressed...
-		).and(
-			Xbox.Digital.RB.getToggleFrom(this.input).negate()		// and 'RB' IS NOT toggled...
-		).and( TeleopTrigger.Get() ).toggleWhenActive(				// and in teleop mode...
-			this.cargo_sys.managedShoot(							// control the shooter (managed)
-				Xbox.Digital.A.getSupplier(this.input),
-				Constants.feed_speed,
-				Constants.shooter_default_speed
-			)
-		);
-		Xbox.Digital.B.getCallbackFrom(this.input).and(				// when 'B' is pressed...
-			Xbox.Digital.LB.getCallbackFrom(this.input)				// and 'LB' IS pressed...
-		).and(
-			Xbox.Digital.RB.getToggleFrom(this.input).negate()		// and 'RB IS NOT toggled...'
-		).and( TeleopTrigger.Get() ).toggleWhenActive(				// and in teleop mode...
-			this.cargo_sys.basicShoot(								// control the shooter (unmanaged)
-			Xbox.Digital.A.getSupplier(this.input),
-				Constants.feed_speed,
-				Constants.shooter_default_speed
+				Xbox.Analog.LX.getLimitedSupplier(this.input, Constants.teleop_max_input_ramp),
+				Xbox.Analog.LY.getLimitedSupplier(this.input, Constants.teleop_max_input_ramp),
+				Xbox.Analog.LT.getLimitedSupplier(this.input, Constants.teleop_max_input_ramp),
+				Xbox.Analog.RX.getLimitedSupplier(this.input, Constants.teleop_max_input_ramp),
+				Xbox.Analog.RY.getLimitedSupplier(this.input, Constants.teleop_max_input_ramp),
+				Xbox.Analog.RT.getLimitedSupplier(this.input, Constants.teleop_max_input_ramp),
+				drivemode_increment.getPressedSupplier(this.input),
+				drivemode_decrement.getPressedSupplier(this.input)
+			)	// schedule mode drive when in teleop mode
+		).whileActiveOnce(
+			new ClimberSubsystem.HoldToggleControl(
+				this.climb_sys, climb_toggle.getSupplier(this.input),
+				Constants.climber_extend_voltage,
+				Constants.climber_retract_voltage,
+				Constants.climber_hold_voltage
 			)
 		);
 
-		Xbox.Digital.RB.getToggleFrom(this.input).and(
-			TeleopTrigger.Get()
-		).whenActive(
-			new SequentialCommandGroup(
-				new LambdaCommand(()->System.out.println("VISION ASSIST RUNNING...")),
-				new LambdaCommand(()->this.drivebase.modeDrive().cancel()),		// disable driving
-				new LambdaCommand(()->VisionServer.setStatistics(true)),
-				new LambdaCommand(()->VisionServer.setProcessingEnabled(true)),
-				new LambdaCommand(()->VisionServer.applyCameraPreset(Constants.cam_hub_pipeline))
+		toggle_vision.getCallbackFrom(this.input).and(alt_vision.getCallbackFrom(this.input).negate()).whenActive(VisionSubsystem.ToggleProcessing.Get());
+		toggle_stats.getCallbackFrom(this.input).and(alt_vision.getCallbackFrom(this.input).negate()).whenActive(VisionSubsystem.ToggleStatistics.Get());
+		alt_vision.getCallbackFrom(this.input).and(toggle_stats.getCallbackFrom(this.input)).whenActive(VisionSubsystem.IncrementPipeline.Get());
+		alt_vision.getCallbackFrom(this.input).and(toggle_vision.getCallbackFrom(this.input)).whenActive(VisionSubsystem.DecrementPipeline.Get());
+		camera_increment.getCallbackFrom(this.input).whenPressed(VisionSubsystem.IncrementCamera.Get());
+		camera_decrement.getCallbackFrom(this.input).whenPressed(VisionSubsystem.DecrementCamera.Get());
+
+		StaticTrigger
+			hub_assist_state = new StaticTrigger(false),
+			cargo_assist_state = new StaticTrigger(false)
+		;
+		Trigger
+			teleop_trigger = TeleopTrigger.Get(),
+
+			shoot_trigger = shoot_toggle.getToggleFrom(this.input),
+			actuate_trigger = actuate.getCallbackFrom(this.input),
+			transfer_trigger = transfer.getCallbackFrom(this.input),
+			override_trigger = override.getCallbackFrom(this.input),
+			hub_assist_trigger = hub_assist_toggle.getToggleFrom(this.input),
+			cargo_assist_trigger = cargo_assist_toggle.getToggleFrom(this.input),
+
+			routines_trigger = hub_assist_state.or(cargo_assist_state)
+		;
+
+	// when the override button is not pressed...
+		// and the shooter is toggled on
+		teleop_trigger.and(shoot_trigger).and(override_trigger.negate()).and(routines_trigger.negate()).whileActiveOnce(
+			this.cargo_sys.managedShoot(
+				//actuate.getSupplier(this.input),
+				()->false,
+				Constants.feed_voltage,
+				Constants.shooter_default_voltage
 			)
+		);
+		// and the shooter is toggled off
+		teleop_trigger.and(shoot_trigger.negate()).and(override_trigger.negate()).and(actuate_trigger).and(routines_trigger.negate()).whileActiveOnce(
+			this.cargo_sys.managedIntake(Constants.intake_voltage)
+		);
+	// when the override button is pressed...
+		// and the shooter is toggled on
+		teleop_trigger.and(shoot_trigger).and(override_trigger).and(routines_trigger.negate()).whileActiveOnce(
+			this.cargo_sys.basicShoot(
+				//actuate.getSupplier(this.input),
+				()->false,
+				Constants.feed_voltage,
+				Constants.shooter_default_voltage
+			)
+		);
+		// and the shooter is toggled off
+		teleop_trigger.and(shoot_trigger.negate()).and(override_trigger).and(actuate_trigger).and(routines_trigger.negate()).whileActiveOnce(
+			this.cargo_sys.basicIntake(Constants.intake_voltage)
+		);
+
+		// transfer override
+		teleop_trigger.and(transfer_trigger.and(override_trigger).or(shoot_trigger.and(actuate_trigger))).and(routines_trigger.negate()).whileActiveOnce(
+			this.cargo_sys.basicTransfer(Constants.transfer_voltage)
+		);
+
+		teleop_trigger.and(hub_assist_trigger).and(cargo_assist_state.negate()).whenActive(
+			()->{
+				hub_assist_state.enable();
+				System.out.println("\tHUB ASSIST RUNNING...");
+				this.drivebase.modeDrive().cancel();
+				Constants.vision_hub.run();
+			}
 		).whileActiveOnce(
 			new ParallelCommandGroup(
 				this.cargo_sys.visionShoot(							// control the shooter with velocity determined by vision
-					Xbox.Digital.A.getSupplier(this.input),				// press 'A' to feed
-					Constants.feed_speed,
-					(double inches)-> inches / 200.0 * 12.0			// 200 inches @ max power, 12v max voltage (obviously needs to be tuned)
+					//actuate.getSupplier(this.input),				// press RB to feed
+					()->false,
+					Constants.feed_voltage,
+					Constants.inches2volts_shooter
 				),
-				new SequentialCommandGroup(							// LT and RT control turning speed of aim assist
-					new HubFind.TeleopAssist(this.drivebase, ()->Xbox.Analog.RT.getValueOf(this.input) - Xbox.Analog.LT.getValueOf(this.input)),
-					new HubTurn.TeleopAssist(this.drivebase, ()->Xbox.Analog.RT.getValueOf(this.input) - Xbox.Analog.LT.getValueOf(this.input))
+				new RapidReactVision.HubAssistRoutine(
+					this.drivebase,
+					()->Xbox.Analog.RT.getValueOf(this.input) - Xbox.Analog.LT.getValueOf(this.input),
+					3.0, 10.0	// max turning voltage and max voltage ramp
 				)
 			)
 		).whenInactive(
-			new SequentialCommandGroup(
-				new LambdaCommand(()->System.out.println("VISION ASSIST TERMINATED.")),
-				new LambdaCommand(()->this.drivebase.modeDrive().schedule()),		// re-enable driving
-				new LambdaCommand(()->VisionServer.setStatistics(false)),
-				new LambdaCommand(()->VisionServer.setProcessingEnabled(false)),
-				new LambdaCommand(()->VisionServer.applyCameraPreset(Constants.cam_driving))
+			()->{
+				this.drivebase.modeDrive().schedule();
+				Constants.vision_driving.run();
+				hub_assist_state.disable();
+				System.out.println("\tHUB ASSIST TERMINATED.");
+			}
+		).and(actuate_trigger).whileActiveOnce(
+			this.cargo_sys.basicTransfer(Constants.transfer_voltage)
+		);
+		teleop_trigger.and(cargo_assist_trigger).and(hub_assist_state.negate()).whenActive(
+			()->{
+				cargo_assist_state.enable();
+				System.out.println("\tCARGO ASSIST RUNNING...");
+				this.drivebase.modeDrive().cancel();
+				Constants.vision_cargo.run();
+			}
+		).whileActiveOnce(
+			new RapidReactVision.CargoAssistRoutine(
+				this.drivebase,
+				this.drivebase.modeDrive(),
+				this.cargo_sys.managedIntake(Constants.intake_voltage),
+				DriverStation.getAlliance(),
+				Constants.cargo_follow_target_inches,
+				Constants.auto_max_forward_voltage,
+				Constants.auto_max_turn_voltage,
+				Constants.auto_max_voltage_ramp
 			)
+		).whenInactive(
+			()->{
+				this.drivebase.modeDrive().schedule();
+				Constants.vision_driving.run();
+				System.out.println("\tCARGO ASSIST TERMINATED.");
+				cargo_assist_state.disable();
+			}
 		);
 
 	}
-	private void arcadeControls() {	// bindings for arcade board
+
+
+
+
+
+
+
+
+	public void arcadeControls() {
+
+		Attack3.Digital			// the button binds
+			shoot_toggle =			Attack3.Digital.TRI,	// left stick
+			actuate =				Attack3.Digital.TRI,	// right stick
+			hub_assist_toggle =		Attack3.Digital.TT,		// left stick
+			cargo_assist_toggle =	Attack3.Digital.TT,		// right stick
+			drivemode_increment =	Attack3.Digital.TR,		// right stick
+			drivemode_decrement =	Attack3.Digital.TL,		// right stick
+			override =				Attack3.Digital.TB,		// right stick
+			camera_increment =		Attack3.Digital.TR,		// left stick
+			camera_decrement =		Attack3.Digital.TL,		// left stick
+			climb_toggle = 			Attack3.Digital.TB,		// left stick
+
+			toggle_vision =			Attack3.Digital.B1,
+			toggle_stats =			Attack3.Digital.B2,
+			pipeline_increment =	Attack3.Digital.B4,
+			pipeline_decrement =	Attack3.Digital.B3
+		;
 
 		TeleopTrigger.Get().whenActive(
-			new SequentialCommandGroup(
-				new LambdaCommand(()->VisionServer.setStatistics(false)),
-				new LambdaCommand(()->VisionServer.setProcessingEnabled(false)),
-				new LambdaCommand(()->VisionServer.applyCameraPreset(Constants.cam_driving))
-			)
+			Constants.vision_driving
 		).whenActive(
 			this.drivebase.modeDrive(
-				Attack3.Analog.X.getLimitedSupplier(this.stick_left, Constants.teleop_max_acceleration),
-				Attack3.Analog.Y.getLimitedSupplier(this.stick_left, Constants.teleop_max_acceleration),
-				Attack3.Analog.X.getLimitedSupplier(this.stick_right, Constants.teleop_max_acceleration),
-				Attack3.Analog.Y.getLimitedSupplier(this.stick_right, Constants.teleop_max_acceleration),
-				Attack3.Digital.TR.getPressedSupplier(this.stick_left),
-				Attack3.Digital.TL.getPressedSupplier(this.stick_left)
-			), false
-		);	// schedule mode drive when in teleop mode
-
-		//Attack3.Digital.TT.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.IncrementPipeline.Get());
-		//Attack3.Digital.TB.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.DecrementPipeline.Get());
-		Attack3.Digital.TT.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.IncrementCamera.Get());
-		Attack3.Digital.TB.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.DecrementCamera.Get());
-		//Attack3.Digital.TB.getCallbackFrom(this.stick_right).whenPressed(VisionSubsystem.ToggleProcessing.Get());
-		//Attack3.Digital.TB.getCallbackFrom(this.stick_right).whenPressed(VisionSubsystem.ToggleStatistics.Get());
-
-		Attack3.Digital.TL.getCallbackFrom(this.stick_right).and(
-			Attack3.Digital.TRI.getCallbackFrom(this.stick_left).negate()
-		).and( TeleopTrigger.Get() ).whileActiveOnce(
-			this.cargo_sys.managedIntake(Constants.intake_speed)
-		);
-		Attack3.Digital.TL.getCallbackFrom(this.stick_right).and(
-			Attack3.Digital.TRI.getCallbackFrom(this.stick_left)
-		).and( TeleopTrigger.Get() ).whileActiveOnce(
-			this.cargo_sys.basicIntake(Constants.intake_speed)
-		);
-
-		Attack3.Digital.TT.getCallbackFrom(this.stick_right).and(
-			Attack3.Digital.TRI.getCallbackFrom(this.stick_left)
-		).and( TeleopTrigger.Get() ).whileActiveOnce(
-			this.cargo_sys.basicTransfer(Constants.transfer_speed)
-		);
-		Attack3.Digital.TR.getCallbackFrom(this.stick_right).and(
-			Attack3.Digital.TRI.getCallbackFrom(this.stick_left).negate()
-		).and(
-			Attack3.Digital.TRI.getToggleFrom(this.stick_right).negate()
-		).and( TeleopTrigger.Get() ).toggleWhenActive(
-			this.cargo_sys.managedShoot(
-				Attack3.Digital.TB.getSupplier(this.stick_right),
-				Constants.feed_speed,
-				Constants.shooter_default_speed
-			)
-		);
-		Attack3.Digital.TR.getCallbackFrom(this.stick_right).and(
-			Attack3.Digital.TRI.getCallbackFrom(this.stick_left)
-		).and(
-			Attack3.Digital.TRI.getToggleFrom(this.stick_right).negate()
-		).and( TeleopTrigger.Get() ).toggleWhenActive(
-			this.cargo_sys.basicShoot(
-				Attack3.Digital.TB.getSupplier(this.stick_right),
-				Constants.feed_speed,
-				Constants.shooter_default_speed
-			)
-		);
-
-		Attack3.Digital.TRI.getToggleFrom(this.stick_right).and(
-			TeleopTrigger.Get()
-		).whenActive(
-			new SequentialCommandGroup(
-				new LambdaCommand(()->System.out.println("VISION ASSIST RUNNING...")),
-				new LambdaCommand(()->this.drivebase.modeDrive().cancel()),
-				new LambdaCommand(()->VisionServer.setStatistics(true)),
-				new LambdaCommand(()->VisionServer.setProcessingEnabled(true)),
-				new LambdaCommand(()->VisionServer.applyCameraPreset(Constants.cam_hub_pipeline))
+				Attack3.Analog.X.getLimitedSupplier(this.stick_left, Constants.teleop_max_input_ramp),
+				Attack3.Analog.Y.getLimitedSupplier(this.stick_left, Constants.teleop_max_input_ramp),
+				Attack3.Analog.X.getLimitedSupplier(this.stick_right, Constants.teleop_max_input_ramp),
+				Attack3.Analog.Y.getLimitedSupplier(this.stick_right, Constants.teleop_max_input_ramp),
+				drivemode_increment.getPressedSupplier(this.stick_right),
+				drivemode_decrement.getPressedSupplier(this.stick_right)
 			)
 		).whileActiveOnce(
+			new ClimberSubsystem.HoldToggleControl(
+				this.climb_sys, climb_toggle.getSupplier(this.stick_left),
+				Constants.climber_extend_voltage,
+				Constants.climber_retract_voltage,
+				Constants.climber_hold_voltage
+			)
+		);	// schedule mode drive when in teleop mode
+
+		toggle_vision.getCallbackFrom(this.stick_left).whenActive(VisionSubsystem.ToggleProcessing.Get());
+		toggle_stats.getCallbackFrom(this.stick_left).whenActive(VisionSubsystem.ToggleStatistics.Get());
+		pipeline_increment.getCallbackFrom(this.stick_left).whenActive(VisionSubsystem.IncrementPipeline.Get());
+		pipeline_decrement.getCallbackFrom(this.stick_left).whenActive(VisionSubsystem.DecrementPipeline.Get());
+		camera_increment.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.IncrementCamera.Get());
+		camera_decrement.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.DecrementCamera.Get());
+
+		StaticTrigger
+			hub_assist_state = new StaticTrigger(false),
+			cargo_assist_state = new StaticTrigger(false)
+		;
+		Trigger
+			teleop_trigger = TeleopTrigger.Get(),
+
+			shoot_trigger = shoot_toggle.getToggleFrom(this.stick_left),
+			actuate_trigger = actuate.getCallbackFrom(this.stick_right),
+			override_trigger = override.getCallbackFrom(this.stick_right),
+			hub_assist_trigger = hub_assist_toggle.getToggleFrom(this.stick_left),
+			cargo_assist_trigger = cargo_assist_toggle.getToggleFrom(this.stick_right),
+
+			routines_trigger = hub_assist_state.or(cargo_assist_state)
+		;
+
+	// when the override button is not pressed...
+		// and the shooter is toggled on
+		teleop_trigger.and(shoot_trigger).and(override_trigger.negate()).and(routines_trigger.negate()).whileActiveOnce(
+			this.cargo_sys.managedShoot(
+				//actuate.getSupplier(this.stick_right),
+				()->false,
+				Constants.feed_voltage,
+				Constants.shooter_default_voltage
+			)
+		);
+		// and the shooter is toggled off
+		teleop_trigger.and(shoot_trigger.negate()).and(override_trigger.negate()).and(actuate_trigger).and(routines_trigger.negate()).whileActiveOnce(
+			this.cargo_sys.managedIntake(Constants.intake_voltage)
+		);
+	// when the override button is pressed...
+		// and the shooter is toggled on
+		teleop_trigger.and(shoot_trigger).and(override_trigger).and(routines_trigger.negate()).whileActiveOnce(
+			this.cargo_sys.basicShoot(
+				//actuate.getSupplier(this.stick_right),
+				()->false,
+				Constants.feed_voltage,
+				Constants.shooter_default_voltage
+			)
+		);
+		// and the shooter is toggled off
+		teleop_trigger.and(shoot_trigger.negate()).and(override_trigger).and(actuate_trigger).and(routines_trigger.negate()).whileActiveOnce(
+			this.cargo_sys.basicIntake(Constants.intake_voltage)
+		);
+
+		// transfer override
+		teleop_trigger.and(/*transfer_trigger.and(override_trigger).or*/(shoot_trigger.and(actuate_trigger))).and(routines_trigger.negate()).whileActiveOnce(
+			this.cargo_sys.basicTransfer(Constants.transfer_voltage)
+		);
+
+		teleop_trigger.and(hub_assist_trigger).and(cargo_assist_state.negate()).whenActive(
+			()->{
+				hub_assist_state.enable();
+				System.out.println("\tHUB ASSIST RUNNING...");
+				this.drivebase.modeDrive().cancel();
+				Constants.vision_hub.run();
+			}
+		).whileActiveOnce(
 			new ParallelCommandGroup(
-				this.cargo_sys.visionShoot(
-					Attack3.Digital.TB.getSupplier(this.stick_right),
-					Constants.feed_speed,
-					(double inches)-> inches / 200.0 * 12.0			// 200 inches @ max power, 12v max voltage (obviously needs to be tuned)
+				this.cargo_sys.visionShoot(							// control the shooter with velocity determined by vision
+					//actuate.getSupplier(this.stick_right),		// press right trigger to feed
+					()->false,
+					Constants.feed_voltage,
+					(double inches)-> Constants.shooter_static_voltage + (inches / Constants.max_hub_range_inches * (12 - Constants.shooter_static_voltage))
 				),
-				new SequentialCommandGroup(
-					new HubFind.TeleopAssist(this.drivebase, Attack3.Analog.X.getSupplier(this.stick_left)),
-					new HubTurn.TeleopAssist(this.drivebase, Attack3.Analog.X.getSupplier(this.stick_left))
+				new RapidReactVision.HubAssistRoutine(
+					this.drivebase,
+					Attack3.Analog.X.getSupplier(this.stick_right),
+					3.0, 10.0	// max turning voltage and max voltage ramp
 				)
 			)
 		).whenInactive(
-			new SequentialCommandGroup(
-				new LambdaCommand(()->System.out.println("VISION ASSIST TERMINATED.")),
-				new LambdaCommand(()->this.drivebase.modeDrive().schedule()),		// re-enable driving
-				new LambdaCommand(()->VisionServer.setStatistics(false)),
-				new LambdaCommand(()->VisionServer.setProcessingEnabled(false)),
-				new LambdaCommand(()->VisionServer.applyCameraPreset(Constants.cam_driving))
+			()->{
+				this.drivebase.modeDrive().schedule();
+				Constants.vision_driving.run();
+				hub_assist_state.disable();
+				System.out.println("\tHUB ASSIST TERMINATED.");
+			}
+		).and(actuate_trigger).whileActiveOnce(
+			this.cargo_sys.basicTransfer(Constants.transfer_voltage)
+		);
+		teleop_trigger.and(cargo_assist_trigger).and(hub_assist_state.negate()).whenActive(
+			()->{
+				cargo_assist_state.enable();
+				System.out.println("\tCARGO ASSIST RUNNING...");
+				this.drivebase.modeDrive().cancel();
+				Constants.vision_cargo.run();
+			}
+		).whileActiveOnce(
+			new RapidReactVision.CargoAssistRoutine(
+				this.drivebase,
+				this.drivebase.modeDrive(),
+				this.cargo_sys.managedIntake(Constants.intake_voltage),
+				DriverStation.getAlliance(),
+				Constants.cargo_follow_target_inches,
+				Constants.auto_max_forward_voltage,
+				Constants.auto_max_turn_voltage,
+				Constants.auto_max_voltage_ramp
 			)
+		).whenInactive(
+			()->{
+				this.drivebase.modeDrive().schedule();
+				Constants.vision_driving.run();
+				System.out.println("\tCARGO ASSIST TERMINATED.");
+				cargo_assist_state.disable();
+			}
 		);
 
 	}
