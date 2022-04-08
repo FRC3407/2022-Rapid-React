@@ -71,8 +71,9 @@ public final class Constants {
 
 		teleop_assist_turn_voltage = 3.0,	// maximum turn voltage for finding the hub
 
-		intake_voltage = 7,
-		transfer_voltage = 5,
+		intake_voltage = 9,
+		intake_deploy_voltage = 1.5,	intake_deploy_time = 1.0,
+		transfer_voltage = 3,
 		feed_voltage = 4.5,
 		shooter_default_voltage = 11.25,
 		climber_extend_voltage = 5,
@@ -96,7 +97,8 @@ public final class Constants {
 		cl_encoder_inversions = Inversions.BOTH;	// which encoders should be inverted (aka "phase-changed" in the phoenix api)
 	public static final ClosedLoopDifferentialDrive.CLDriveParams
 		cl_params = new ClosedLoopDifferentialDrive.CLDriveParams(
-			Units.inchesToMeters(drivetrack_width_inches),		// drivebase track width in meters
+			//Units.inchesToMeters(drivetrack_width_inches),		// drivebase track width in meters
+			1.3553,	// empirical value from characterization -> seems very high?
 			Units.inchesToMeters(drivewheel_diameter_inches),	// drivebase wheel diameter in meters
 			1.1185,	// "kS"(volts) -> base voltage required to overcome static friction -> from SysID characterization
 			2.1132,	// "kV"(volts * seconds / meters) -> voltage required for each additional meter/second of velocity -> from SysID characterization

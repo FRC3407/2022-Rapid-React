@@ -40,6 +40,9 @@ public class Auto {
 		/** Closed-loop driving (trajectories) with Vision CL when available */
 		public ClosedLoop(ClosedLoopDifferentialDrive db, CargoSystem cs) {
 			super.addCommands(
+				//new BasicDriveControl(db, 0.6, 0.6).withTimeout(0.2),		// get the intake to pop down
+				//new BasicDriveControl(db, -0.6, -0.6).withTimeout(0.1),
+				cs.deployIntake(),
 				new RapidReactVision.CargoAssistRoutine.EndOnIntake(		// find and intake the nearest cargo
 					db,
 					new RapidReactVision.CargoFind(db),
