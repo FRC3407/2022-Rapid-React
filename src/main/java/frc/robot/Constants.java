@@ -131,8 +131,8 @@ public final class Constants {
 	public static final CameraPreset
 		driving_camera_preset = new CameraPreset(50, 40, 3500),
 		hub_camera_preset = new CameraPreset(50, 10, 3500),
-		cargo_blue_camera_preset = new CameraPreset(50, 30, 3500),
-		cargo_red_camera_preset = new CameraPreset(50, 25, 3500)
+		cargo_blue_camera_preset = new CameraPreset(50, 30, 4000),
+		cargo_red_camera_preset = new CameraPreset(50, 15, 3500)
 	;
 	public static final Runnable	// these functions contain all configs that should be applied before each vision usecase
 		vision_driving = ()->{
