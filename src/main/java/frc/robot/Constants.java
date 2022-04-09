@@ -71,6 +71,7 @@ public final class Constants {
 
 		teleop_assist_turn_voltage = 3.0,	// maximum turn voltage for finding the hub
 
+
 		turning_static_voltage = 1.586,
 
 		intake_voltage = 8,
