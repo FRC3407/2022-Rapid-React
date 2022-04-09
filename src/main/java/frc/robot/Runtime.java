@@ -87,7 +87,7 @@ public class Runtime extends TimedRobot {
 		this.drivebase.setSpeedSquaring(Constants.teleop_drivebase_speed_squaring);
 
 		//this.cargo_sys.startAutomaticTransfer(Constants.transfer_voltage);
-		RapidReactVision.setCargoPipelineScaling(Constants.cargo_pipeline_scaling);
+		Constants.vision_cargo.run();
 
 		this.starting_pose = Constants.StartingPose.getSelectable(DriverStation.getAlliance());
 		SmartDashboard.putData("Starting Position", this.starting_pose);

@@ -20,10 +20,20 @@ public class Auto {
 				cs.deployIntake(),
 				new ParallelCommandGroup(
 					new BasicDriveControl.Voltage(db, 3.0, 3.0),	// drive forward "taxi"
-					cs.managedIntake(Constants.intake_voltage)		// run intake
+					cs.basicIntake(Constants.intake_voltage)		// run intake
 				).withTimeout(3.5),
-				new BasicDriveControl.Voltage(db, -4.5, 4.5).withTimeout(2.0),	// turn
-				cs.shootAll(Constants.feed_voltage, 11.0, Constants.transfer_voltage)	// shoot all balls
+				new BasicDriveControl.Voltage(db, -4.5, 4.5).withTimeout(2.25),	// turn
+				//cs.shootAll(Constants.feed_voltage, 11.0, Constants.transfer_voltage)	// shoot all balls
+				new ParallelDeadlineGroup(
+					new SequentialCommandGroup(
+						new WaitCommand(0.5),
+						cs.basicTransfer(Constants.transfer_voltage).withTimeout(2.5)
+					),
+					cs.basicShoot(
+						()->false,
+						0, Constants.shooter_max_voltage
+					)
+				)
 			);
 		}
 
