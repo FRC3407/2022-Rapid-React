@@ -167,7 +167,7 @@ public class ClimberSubsystem implements Subsystem {
 					break;
 				}
 				case RETRACTING: {
-					super.setVoltage(super.ret_voltage);
+					super.setVoltage(super.ret_voltage * -1);
 					if(!super.trigger.getAsBoolean()) {
 						super.state = super.state.next();
 					}

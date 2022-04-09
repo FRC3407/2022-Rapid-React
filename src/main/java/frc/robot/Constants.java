@@ -10,6 +10,7 @@ import frc.robot.modules.vision.java.VisionServer.*;
 import edu.wpi.first.math.geometry.*;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.Filesystem;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
 //import edu.wpi.first.wpilibj.motorcontrol.PWMVictorSPX;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
@@ -50,12 +51,12 @@ public final class Constants {
 		max_heading_offset = 22.0,		// maximum angle range that a target could be offset (used as divisor for P-loop)
 		cargo_thresh = 20.0,			// threshold distance for a cargo to be considered close enough to influenced by intake
 		max_cargo_range_inches = 100.0,		// maximum range that a cargo could be (and detected - used as divisor for P-loop)
-		max_hub_range_inches = 200.0,		// maximum range that the hub can be detected from (used as divisor for P-loop)
 		cargo_follow_target_inches = 5.0,	// the distance away from a cargo that cargo-following commands will target
+		max_hub_range_inches = 215.0,		// maximum range that the hub can be detected from (used as divisor for P-loop)
+		min_hub_range_inches = 170.0,		// minimum range for shooting into the hub
 
 // "percent output" (1.0 as 100%)
 		uncertainty_continuation_percentage = 0.95,	// if break in target detection, keep powering motors at this percent of the last values used
-		motors_thresh_tozero = 0.1,		// the point where it is safe to go straight to zero (deceleration)
 
 		teleop_drivebase_scaling = -0.7,	// cap the voltage @70% -> negative because joysticks default to being inverted
 		teleop_drivebase_deadband = 0.05,	// the input range that is discarded
@@ -63,7 +64,6 @@ public final class Constants {
 
 // voltage
 		universal_max_voltage = 10.0,
-		shooter_static_voltage = 0.8,	// CURRENTLY JUST AN ESTIMATE
 
 		auto_max_turn_voltage = 2.5,	// maximum voltage for turning in place during auto
 		auto_max_forward_voltage = 4.5,	// maximum voltage for driving forward during auto
@@ -71,14 +71,19 @@ public final class Constants {
 
 		teleop_assist_turn_voltage = 3.0,	// maximum turn voltage for finding the hub
 
-		intake_voltage = 9,
-		intake_deploy_voltage = 1.5,	intake_deploy_time = 1.0,
+
+		turning_static_voltage = 1.586,
+
+		intake_voltage = 8,
+		intake_deploy_voltage = 5,	intake_deploy_time = 0.75,
 		transfer_voltage = 3,
 		feed_voltage = 4.5,
-		shooter_default_voltage = 11.25,
-		climber_extend_voltage = 5,
-		climber_hold_voltage = 4,
-		climber_retract_voltage = 8,
+		//shooter_static_voltage = 0.8,	// CURRENTLY JUST AN ESTIMATE
+		shooter_max_voltage = 11.25,
+		shooter_min_voltage = 10.75,
+		climber_extend_voltage = 8,
+		climber_hold_voltage = 0,
+		climber_retract_voltage = 10,
 
 // Physical properties
 		drivetrack_width_inches = 21.819,	// track width of drivebase
@@ -112,7 +117,10 @@ public final class Constants {
 
 	public static final VisionServer.Conversion
 		inches2volts_shooter = (double in)->
-			shooter_static_voltage + (in / max_hub_range_inches * (12 - shooter_static_voltage));
+			shooter_min_voltage + (	(
+					(in - min_hub_range_inches) / (max_hub_range_inches - min_hub_range_inches)
+				) * (shooter_max_voltage - shooter_min_voltage)
+			);
 
 
 
@@ -121,9 +129,10 @@ public final class Constants {
 		cargo_pipeline_scaling = 4	// the cargo pipeline lags pretty bad without downscaling -> full resolution actually doesn't help the detection either
 	;
 	public static final CameraPreset
-		driving_camera_preset = new CameraPreset(50, -1, -1),
+		driving_camera_preset = new CameraPreset(50, 40, 3500),
 		hub_camera_preset = new CameraPreset(50, 10, 3500),
-		cargo_camera_preset = new CameraPreset(50, 25, 3500)
+		cargo_blue_camera_preset = new CameraPreset(50, 30, 3500),
+		cargo_red_camera_preset = new CameraPreset(50, 25, 3500)
 	;
 	public static final Runnable	// these functions contain all configs that should be applied before each vision usecase
 		vision_driving = ()->{
@@ -134,7 +143,9 @@ public final class Constants {
 		vision_cargo = ()->{
 			VisionServer.setProcessingEnabled(true);
 			VisionServer.setStatistics(true);
-			VisionServer.applyCameraPreset(cargo_camera_preset);
+			VisionServer.applyCameraPreset(
+				DriverStation.getAlliance() == Alliance.Blue ? cargo_blue_camera_preset : cargo_red_camera_preset
+			);
 			RapidReactVision.setCargoPipelineScaling(cargo_pipeline_scaling);
 			RapidReactVision.Cameras.CARGO.setActive();
 		},
