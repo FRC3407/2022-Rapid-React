@@ -126,8 +126,16 @@ public class Runtime extends TimedRobot {
 					this.arcadeControls();
 					System.out.println("Arcade Bindings Initialized.");
 				}, true)
-			);
+			); 
 		}
+
+		// EnabledTrigger.Get().whileActiveOnce(	// beam break test
+		// 	new Test.InputTest(
+		// 		25, 	// 2 times per second @ a loop frequency of 50
+		// 		()->this.cargo_sys.transfer.getCurrentInput(),
+		// 		()->this.cargo_sys.transfer.getCurrentOutput()
+		// 	)
+		// );
 
 		// EnabledTrigger.Get().whileActiveOnce(	// beam break test
 		// 	new Test.InputTest(
