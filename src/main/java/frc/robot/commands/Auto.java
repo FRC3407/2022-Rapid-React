@@ -17,12 +17,13 @@ public class Auto {
 
 		public OpenLoop(DriveBase db, CargoSystem cs) {
 			super.addCommands(
+				cs.deployIntake(),
 				new ParallelCommandGroup(
 					new BasicDriveControl.Voltage(db, 3.0, 3.0),	// drive forward "taxi"
 					cs.managedIntake(Constants.intake_voltage)		// run intake
 				).withTimeout(3.5),
-				new BasicDriveControl.Voltage(db, -3.0, 3.0).withTimeout(1.0),	// turn
-				cs.shootAll(Constants.feed_voltage, 10.0, Constants.transfer_voltage)	// shoot all balls
+				new BasicDriveControl.Voltage(db, -4.5, 4.5).withTimeout(2.0),	// turn
+				cs.shootAll(Constants.feed_voltage, 11.0, Constants.transfer_voltage)	// shoot all balls
 			);
 		}
 
@@ -40,21 +41,41 @@ public class Auto {
 		/** Closed-loop driving (trajectories) with Vision CL when available */
 		public ClosedLoop(ClosedLoopDifferentialDrive db, CargoSystem cs) {
 			super.addCommands(
-				//new BasicDriveControl(db, 0.6, 0.6).withTimeout(0.2),		// get the intake to pop down
-				//new BasicDriveControl(db, -0.6, -0.6).withTimeout(0.1),
-				cs.deployIntake(),
-				new RapidReactVision.CargoAssistRoutine.EndOnIntake(		// find and intake the nearest cargo
-					db,
-					new RapidReactVision.CargoFind(db),
-					cs.managedIntake(Constants.intake_voltage),
-					cs.transfer
-				),
-				new RapidReactVision.HubFind(db),	// find hub
-				new RapidReactVision.HubTurn(db),	// hub aim
-				cs.visionShootAll(	// shoot all cargo
-					Constants.feed_voltage, Constants.transfer_voltage,
-					Constants.inches2volts_shooter
-				)
+				new ConditionalCommand(
+					new SequentialCommandGroup(
+						cs.deployIntake(),
+						new RapidReactVision.CargoAssistRoutine.EndOnIntake(		// find and intake the nearest cargo
+							db,
+							new RapidReactVision.CargoFind(db),
+							cs.basicIntake(Constants.intake_voltage),
+							cs.transfer
+						),
+						new RapidReactVision.HubFind(db),	// find hub
+						new EnsureFinishCommand(new RapidReactVision.HubTarget(
+							db,
+							(Constants.min_hub_range_inches + Constants.max_hub_range_inches / 2.0),
+							40,
+							Constants.auto_max_forward_voltage,
+							Constants.auto_max_turn_voltage,
+							Constants.auto_max_voltage_ramp
+						), 10),	// hub aim
+						new ParallelDeadlineGroup(
+							new SequentialCommandGroup(
+								new WaitCommand(0.5),	// wait for shooter to spin up
+								cs.basicTransfer(Constants.transfer_voltage).withTimeout(2.5)	// actuate transfer
+							),
+							cs.visionShoot(	// spin shooter based on distance
+								()->false, 0,
+								Constants.inches2volts_shooter
+							)
+						)
+					),
+					new OpenLoop(db, cs),
+					()->{
+						Constants.vision_cargo.run();
+						return RapidReactVision.isAllianceCargoDetected(DriverStation.getAlliance());
+					}
+				)				
 			);
 		}
 

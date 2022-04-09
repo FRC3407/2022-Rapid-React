@@ -105,7 +105,7 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 
 
 
-	private final Gyro gyro;
+	public final Gyro gyro;
 	private final WPI_TalonSRX left, right;		// front left and front right respectively for 4-motor systems
 
 	public final CLDriveParams params;

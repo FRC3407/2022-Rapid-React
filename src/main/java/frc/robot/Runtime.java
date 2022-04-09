@@ -86,13 +86,15 @@ public class Runtime extends TimedRobot {
 		this.drivebase.setSpeedDeadband(Constants.teleop_drivebase_deadband);
 		this.drivebase.setSpeedSquaring(Constants.teleop_drivebase_speed_squaring);
 
-		this.cargo_sys.startAutomaticTransfer(Constants.transfer_voltage);
+		//this.cargo_sys.startAutomaticTransfer(Constants.transfer_voltage);
+		RapidReactVision.setCargoPipelineScaling(Constants.cargo_pipeline_scaling);
 
 		this.starting_pose = Constants.StartingPose.getSelectable(DriverStation.getAlliance());
 		SmartDashboard.putData("Starting Position", this.starting_pose);
 
-		this.auto_command.setDefaultOption("Basic-Taxi", new Auto.OpenLoop(this.drivebase, this.cargo_sys));
-		this.auto_command.addOption("CL Auto", new Auto.ClosedLoop(this.drivebase, this.cargo_sys));
+		this.auto_command.setDefaultOption("CL Auto", new Auto.ClosedLoop(this.drivebase, this.cargo_sys));
+		this.auto_command.addOption("Basic-Taxi", new Auto.OpenLoop(this.drivebase, this.cargo_sys));
+		this.auto_command.addOption("Test Deploy", this.cargo_sys.deployIntake());
 		SmartDashboard.putData("Auto Command", this.auto_command);
 	}
 
@@ -104,28 +106,28 @@ public class Runtime extends TimedRobot {
 		AutonomousTrigger.Get().whenActive(()->this.auto_command.getSelected().schedule());
 		EnabledTrigger.Get().whenActive(new LambdaCommand.Singular(()->this.drivebase.setInitial(this.starting_pose.getSelected().pose)));
 
-		if(this.input.isConnected()) {
-			this.xboxControls();
-			System.out.println("Xbox Bindings Initialized.");
-		} else {
-			this.input.connectionTrigger().whenActive(
-				new LambdaCommand.Singular(()->{		// bindings should only be bound once
-					this.xboxControls();
-					System.out.println("Xbox Bindings Initialized.");
-				}, true)
-			); 
-		}
-		// if(this.stick_left.isConnected() && this.stick_right.isConnected()) {
-		// 	this.arcadeControls();
-		// 	System.out.println("Arcade Bindings Initialized.");
+		// if(this.input.isConnected()) {
+		// 	this.xboxControls();
+		// 	System.out.println("Xbox Bindings Initialized.");
 		// } else {
-		// 	this.stick_left.connectionTrigger().and(this.stick_right.connectionTrigger()).whenActive(
-		// 		new LambdaCommand.Singular(()->{
-		// 			this.arcadeControls();
-		// 			System.out.println("Arcade Bindings Initialized.");
+		// 	this.input.connectionTrigger().whenActive(
+		// 		new LambdaCommand.Singular(()->{		// bindings should only be bound once
+		// 			this.xboxControls();
+		// 			System.out.println("Xbox Bindings Initialized.");
 		// 		}, true)
-		// 	);
+		// 	); 
 		// }
+		if(this.stick_left.isConnected() && this.stick_right.isConnected()) {
+			this.arcadeControls();
+			System.out.println("Arcade Bindings Initialized.");
+		} else {
+			this.stick_left.connectionTrigger().and(this.stick_right.connectionTrigger()).whenActive(
+				new LambdaCommand.Singular(()->{
+					this.arcadeControls();
+					System.out.println("Arcade Bindings Initialized.");
+				}, true)
+			);
+		}
 
 		// EnabledTrigger.Get().whileActiveOnce(	// beam break test
 		// 	new Test.InputTest(
@@ -235,7 +237,7 @@ public class Runtime extends TimedRobot {
 				//actuate.getSupplier(this.input),
 				()->false,
 				Constants.feed_voltage,
-				Constants.shooter_default_voltage
+				Constants.shooter_max_voltage
 			)
 		);
 		// and the shooter is toggled off
@@ -249,7 +251,7 @@ public class Runtime extends TimedRobot {
 				//actuate.getSupplier(this.input),
 				()->false,
 				Constants.feed_voltage,
-				Constants.shooter_default_voltage
+				Constants.shooter_max_voltage
 			)
 		);
 		// and the shooter is toggled off
@@ -338,7 +340,7 @@ public class Runtime extends TimedRobot {
 			cargo_assist_toggle =	Attack3.Digital.TT,		// right stick
 			drivemode_increment =	Attack3.Digital.TR,		// right stick
 			drivemode_decrement =	Attack3.Digital.TL,		// right stick
-			override =				Attack3.Digital.TB,		// right stick
+			invert =				Attack3.Digital.TB,		// right stick
 			camera_increment =		Attack3.Digital.TR,		// left stick
 			camera_decrement =		Attack3.Digital.TL,		// left stick
 			climb_toggle = 			Attack3.Digital.TB,		// left stick
@@ -385,7 +387,7 @@ public class Runtime extends TimedRobot {
 
 			shoot_trigger = shoot_toggle.getToggleFrom(this.stick_left),
 			actuate_trigger = actuate.getCallbackFrom(this.stick_right),
-			override_trigger = override.getCallbackFrom(this.stick_right),
+			invert_trigger = invert.getCallbackFrom(this.stick_right),
 			hub_assist_trigger = hub_assist_toggle.getToggleFrom(this.stick_left),
 			cargo_assist_trigger = cargo_assist_toggle.getToggleFrom(this.stick_right),
 
@@ -394,36 +396,39 @@ public class Runtime extends TimedRobot {
 
 	// when the override button is not pressed...
 		// and the shooter is toggled on
-		teleop_trigger.and(shoot_trigger).and(override_trigger.negate()).and(routines_trigger.negate()).whileActiveOnce(
-			this.cargo_sys.managedShoot(
-				//actuate.getSupplier(this.stick_right),
-				()->false,
-				Constants.feed_voltage,
-				Constants.shooter_default_voltage
-			)
-		);
-		// and the shooter is toggled off
-		teleop_trigger.and(shoot_trigger.negate()).and(override_trigger.negate()).and(actuate_trigger).and(routines_trigger.negate()).whileActiveOnce(
-			this.cargo_sys.managedIntake(Constants.intake_voltage)
-		);
-	// when the override button is pressed...
-		// and the shooter is toggled on
-		teleop_trigger.and(shoot_trigger).and(override_trigger).and(routines_trigger.negate()).whileActiveOnce(
+		teleop_trigger.and(shoot_trigger).and(invert_trigger.negate()).and(routines_trigger.negate()).whileActiveOnce(
 			this.cargo_sys.basicShoot(
 				//actuate.getSupplier(this.stick_right),
 				()->false,
 				Constants.feed_voltage,
-				Constants.shooter_default_voltage
+				Constants.shooter_max_voltage
 			)
 		);
 		// and the shooter is toggled off
-		teleop_trigger.and(shoot_trigger.negate()).and(override_trigger).and(actuate_trigger).and(routines_trigger.negate()).whileActiveOnce(
+		teleop_trigger.and(shoot_trigger.negate()).and(invert_trigger.negate()).and(actuate_trigger).and(routines_trigger.negate()).whileActiveOnce(
 			this.cargo_sys.basicIntake(Constants.intake_voltage)
+		);
+	// when the override button is pressed...x
+		// and the shooter is toggled on
+		teleop_trigger.and(shoot_trigger).and(invert_trigger).and(routines_trigger.negate()).whileActiveOnce(
+			this.cargo_sys.basicShoot(
+				//actuate.getSupplier(this.stick_right),
+				()->false,
+				Constants.feed_voltage * -1,
+				Constants.shooter_max_voltage * -1
+			)
+		);
+		// and the shooter is toggled off
+		teleop_trigger.and(shoot_trigger.negate()).and(invert_trigger).and(actuate_trigger).and(routines_trigger.negate()).whileActiveOnce(
+			this.cargo_sys.basicIntake(Constants.intake_voltage * -1)
 		);
 
 		// transfer override
-		teleop_trigger.and(/*transfer_trigger.and(override_trigger).or*/(shoot_trigger.and(actuate_trigger))).and(routines_trigger.negate()).whileActiveOnce(
+		teleop_trigger.and(shoot_trigger.and(actuate_trigger).and(invert_trigger.negate())).and(routines_trigger.negate()).whileActiveOnce(
 			this.cargo_sys.basicTransfer(Constants.transfer_voltage)
+		);
+		teleop_trigger.and(shoot_trigger.and(actuate_trigger).and(invert_trigger)).and(routines_trigger.negate()).whileActiveOnce(
+			this.cargo_sys.basicTransfer(Constants.transfer_voltage * -1)
 		);
 
 		teleop_trigger.and(hub_assist_trigger).and(cargo_assist_state.negate()).whenActive(
@@ -439,13 +444,20 @@ public class Runtime extends TimedRobot {
 					//actuate.getSupplier(this.stick_right),		// press right trigger to feed
 					()->false,
 					Constants.feed_voltage,
-					(double inches)-> Constants.shooter_static_voltage + (inches / Constants.max_hub_range_inches * (12 - Constants.shooter_static_voltage))
+					Constants.inches2volts_shooter
 				),
-				new RapidReactVision.HubAssistRoutine(
-					this.drivebase,
-					Attack3.Analog.X.getSupplier(this.stick_right),
-					3.0, 10.0	// max turning voltage and max voltage ramp
-				)
+				// new RapidReactVision.HubAssistRoutine(
+				// 	this.drivebase,
+				// 	Attack3.Analog.X.getSupplier(this.stick_right),
+				// 	4.0, 10.0	// max turning voltage and max voltage ramp
+				// )
+				new RapidReactVision.HubAssistRoutineV2(
+					this.drivebase, this.drivebase.modeDrive(), 
+					(Constants.min_hub_range_inches + Constants.max_hub_range_inches / 2.0),
+					40,
+					Constants.auto_max_forward_voltage,
+					Constants.auto_max_turn_voltage,
+					Constants.auto_max_voltage_ramp)
 			)
 		).whenInactive(
 			()->{
@@ -457,6 +469,7 @@ public class Runtime extends TimedRobot {
 		).and(actuate_trigger).whileActiveOnce(
 			this.cargo_sys.basicTransfer(Constants.transfer_voltage)
 		);
+
 		teleop_trigger.and(cargo_assist_trigger).and(hub_assist_state.negate()).whenActive(
 			()->{
 				cargo_assist_state.enable();
@@ -471,8 +484,8 @@ public class Runtime extends TimedRobot {
 				this.cargo_sys.managedIntake(Constants.intake_voltage),
 				DriverStation.getAlliance(),
 				Constants.cargo_follow_target_inches,
-				Constants.auto_max_forward_voltage,
-				Constants.auto_max_turn_voltage,
+				Constants.auto_max_forward_voltage + 1.0,
+				Constants.auto_max_turn_voltage + 1.0,
 				Constants.auto_max_voltage_ramp
 			)
 		).whenInactive(

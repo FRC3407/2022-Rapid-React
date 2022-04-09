@@ -349,7 +349,8 @@ public final class RapidReactVision {
 
 		continuation_percent = Constants.uncertainty_continuation_percentage,
 
-		static_voltage = Constants.cl_params.static_voltage,
+		static_forward_voltage = Constants.cl_params.static_voltage,
+		static_turning_voltage = Constants.turning_static_voltage,
 		default_max_forward_voltage = Constants.auto_max_forward_voltage,
 		default_max_turning_voltage = Constants.auto_max_turn_voltage,
 		default_max_voltage_ramp = Constants.auto_max_voltage_ramp
@@ -396,7 +397,7 @@ public final class RapidReactVision {
 			System.out.println(this.failed || i ? "CargoFind: Terminated." : "CargoFind: Completed.");
 		}
 		@Override public boolean isFinished() {
-			return this.failed || (getClosestAllianceCargo(this.team) != null && this.last_voltage < static_voltage);
+			return this.failed || (getClosestAllianceCargo(this.team) != null && this.last_voltage < static_turning_voltage);
 		}
 	
 	
@@ -429,8 +430,8 @@ public final class RapidReactVision {
 		@Override public void execute() {
 			this.position = getClosestAllianceCargo(this.team);
 			if(this.position != null) {
-				double v = MathUtil.clamp(this.position.lr / max_heading_offset, -1.0, 1.0) * (this.max_turn_voltage - static_voltage);
-				super.autoTurn((Math.signum(v) * static_voltage) + v);
+				double v = MathUtil.clamp(this.position.lr / max_heading_offset, -1.0, 1.0) * (this.max_turn_voltage - static_turning_voltage);
+				super.autoTurn((Math.signum(v) * static_turning_voltage) + v);
 			} else {
 				super.fromLast(continuation_percent);	// % of what was last set (decelerating)
 			}
@@ -489,11 +490,11 @@ public final class RapidReactVision {
 		@Override public void initialize() {
 			Constants.vision_cargo.run();
 			if(!verifyCargoPipelineActive()) {
-				System.out.println("CargoFollow: Failed to set Cargo pipeline");
+				System.out.println(getClass().getSimpleName() + ": Failed to set Cargo pipeline");
 				this.failed = true;
 				return;
 			}
-			System.out.println("CargoFollow: Running...");
+			System.out.println(getClass().getSimpleName() + ": Running...");
 			this.failed = false;
 		}
 		@Override public void execute() {
@@ -501,15 +502,16 @@ public final class RapidReactVision {
 			if(this.position != null) {
 				double f = MathUtil.clamp(
 					(this.position.distance - this.target) / cargo_max_range, -1.0, 1.0		// the forward error, clamped to [-1, 1]
-				) * (this.max_forward_voltage - static_voltage);							// multiply by forward voltage range
-				double f_l = this.f_limit.calculate(f);				// calculate rate-limited voltage
+				) * (this.max_forward_voltage - static_forward_voltage);					// multiply by forward voltage range
+				double f_l = this.f_limit.calculate(f);						// calculate rate-limited voltage
 				double t = MathUtil.clamp(
-					this.position.lr / max_heading_offset, -1.0, 1.0	// the turning error, clamped to [-1, 1]
-				) * (this.max_turning_voltage - static_voltage);		// multiply by turning voltage range
+					this.position.lr / max_heading_offset, -1.0, 1.0		// the turning error, clamped to [-1, 1]
+				) * (this.max_turning_voltage - static_turning_voltage);		// multiply by turning voltage range
 				t *= (f_l / f);		// normalize turning so that it is proportional to the rate-limited forward speed
+				double st = static_forward_voltage + Math.abs((static_turning_voltage - static_forward_voltage) * (t / this.max_turning_voltage));	// recalculate static voltage based on proportion of turning (scaled from 'static forward' to 'static turning')
 				super.autoDriveVoltage(
-					static_voltage * Math.signum(f_l + t) + f_l + t,	// static voltage (in correct direction) + limited forward voltage + normalized turning voltage
-					static_voltage * Math.signum(f_l - t) + f_l - t		// static voltage (in correct direction) + limited forward voltage - normalized turning voltage
+					st * Math.signum(f_l + t) + f_l + t,	// static voltage (in correct direction) + limited forward voltage + normalized turning voltage
+					st * Math.signum(f_l - t) + f_l - t		// static voltage (in correct direction) + limited forward voltage - normalized turning voltage
 				);
 			} else { 
 				super.fromLast(this.cont_percent);	// handle jitters in vision detection -> worst case cenario this causes a gradual deceleration
@@ -517,7 +519,7 @@ public final class RapidReactVision {
 		}
 		@Override public void end(boolean i) {
 			super.autoDriveVoltage(0.0, 0.0);
-			System.out.println(this.failed || i ? "CargoFollow: Terminated." : "CargoFollow: Completed.");
+			System.out.println(getClass().getSimpleName() + (this.failed || i ? ": Terminated." : ": Completed."));
 		}
 		@Override public boolean isFinished() {
 			if(this.position != null) {
@@ -568,7 +570,6 @@ public final class RapidReactVision {
 			super.cont_percent = 1.0;
 
 			super.addRequirements(this.intake.getRequirements().toArray(new CargoSystem.IntakeSubsystem[]{}));
-			super.addRequirements(this.drive.getRequirements().toArray(new DriveBase[]{}));
 		}
 		public CargoAssistRoutine(
 			DriveBase db, DriveCommandBase d, 
@@ -582,7 +583,6 @@ public final class RapidReactVision {
 			super.cont_percent = 1.0;
 
 			super.addRequirements(this.intake.getRequirements().toArray(new CargoSystem.IntakeSubsystem[]{}));
-			super.addRequirements(this.drive.getRequirements().toArray(new DriveBase[]{}));
 		}
 
 		@Override public void initialize() {
@@ -617,6 +617,7 @@ public final class RapidReactVision {
 		}
 		@Override public void end(boolean i) {
 			super.end(i);
+			this.drive.end(i);
 			this.intake.end(i);
 		}
 		@Override public boolean isFinished() {
@@ -688,7 +689,7 @@ public final class RapidReactVision {
 			System.out.println(getClass().getSimpleName() + (this.failed || i ? ": Terminated." : ": Completed."));
 		}
 		@Override public boolean isFinished() {
-			return this.failed || (isHubDetected() && this.last_voltage < static_voltage);
+			return this.failed || (isHubDetected() && this.last_voltage < static_turning_voltage);
 		}
 
 
@@ -718,8 +719,10 @@ public final class RapidReactVision {
 		@Override public void execute() {
 			this.position = getHubPosition();
 			if(this.position != null) {
-				double v = MathUtil.clamp(this.position.lr / max_heading_offset, -1.0, 1.0) * (this.max_turn_voltage - static_voltage);
-				super.autoTurnVoltage((Math.signum(v) * static_voltage) + v);
+				double v = MathUtil.clamp(
+					this.position.lr / max_heading_offset, -1.0, 1.0
+				) * (this.max_turn_voltage - static_turning_voltage);
+				super.autoTurnVoltage((Math.signum(v) * static_turning_voltage) + v);
 			} else {
 				super.fromLast(continuation_percent);
 			}
@@ -731,6 +734,66 @@ public final class RapidReactVision {
 		@Override public boolean isFinished() {
 			if(this.position != null) {
 				return Math.abs(this.position.lr) <= heading_thresh;
+			}
+			return this.failed;
+		}
+
+
+	}
+	public static class HubTarget extends DriveBase.DriveCommandBase {
+
+		private final SlewRateLimiter f_limit;
+		private final double target, max_forward_voltage, max_turn_voltage, max_voltage_distance;
+		private VisionServer.TargetData position = null;
+		private boolean failed = false;
+		protected double cont_percent = continuation_percent;
+
+		public HubTarget(DriveBase db, double target_inches, double mvolts_distance, double mfvolts, double mtvolts, double mfvr) {
+			super(db);
+			this.f_limit = new SlewRateLimiter(mfvr);
+			this.target = target_inches;
+			this.max_voltage_distance = mvolts_distance;
+			this.max_forward_voltage = mfvolts;
+			this.max_turn_voltage = mtvolts;
+		}
+
+		@Override public void initialize() {
+			Constants.vision_hub.run();
+			if(!verifyHubPipelineActive()) {
+				System.out.println(getClass().getSimpleName() + ": Failed to set UpperHub pipeline");
+				this.failed = true;
+				return;
+			}
+			System.out.println(getClass().getSimpleName() + ": Running...");
+			this.failed = false;
+		}
+		@Override public void execute() {
+			this.position = getHubPosition();
+			if(this.position != null) {
+				double f = MathUtil.clamp(
+					(this.position.distance - this.target) / this.max_voltage_distance, -1.0, 1.0
+				) * (this.max_forward_voltage - static_forward_voltage);
+				double f_l = this.f_limit.calculate(f);
+				double t = MathUtil.clamp(
+					this.position.lr / max_heading_offset, -1.0, 1.0
+				) * (this.max_turn_voltage - static_turning_voltage);
+				t *= (f_l / f);
+				double st = static_forward_voltage + Math.abs((static_turning_voltage - static_forward_voltage) * (t / this.max_turn_voltage));
+				super.autoDriveVoltage(
+					st * Math.signum(f_l + t) + f_l + t,
+					st * Math.signum(f_l - t) + f_l - t
+				);
+			} else {
+				super.fromLast(this.cont_percent);
+			}
+		}
+		@Override public void end(boolean i) {
+			super.autoDriveVoltage(0.0, 0.0);
+			System.out.println(getClass().getSimpleName() + (this.failed || i ? ": Terminated." : ": Completed."));
+		}
+		@Override public boolean isFinished() {
+			if(this.position != null) {
+				return Math.abs(this.position.lr) <= heading_thresh && Math.abs(this.position.distance) <= this.target;
 			}
 			return this.failed;
 		}
@@ -757,8 +820,10 @@ public final class RapidReactVision {
 			super.position = getHubPosition();
 			if(super.position != null) {
 				this.misses = 0;
-				double p = MathUtil.clamp(super.position.lr / max_heading_offset, -1.0, 1.0) * (super.max_turn_voltage - static_voltage) * Math.abs(this.control.get());
-				this.last_voltage = (Math.signum(p) * static_voltage) + p;
+				double p = MathUtil.clamp(
+					super.position.lr / max_heading_offset, -1.0, 1.0
+				) * (super.max_turn_voltage - static_turning_voltage) * Math.abs(this.control.get());
+				this.last_voltage = (Math.signum(p) * static_turning_voltage) + p;
 				this.olimit.calculate(this.last_voltage);
 			} else if(this.misses >= discontinuity_timeout_cycles) {	// if hub goes undetected for more than a second
 				this.last_voltage = this.olimit.calculate(this.control.get() * super.max_turn_voltage);
@@ -770,6 +835,39 @@ public final class RapidReactVision {
 			super.autoTurnVoltage(this.last_voltage);
 		}
 		@Override public boolean isFinished() { return false; }
+
+
+	}
+	public static class HubAssistRoutineV2 extends HubTarget {
+
+		private final DriveCommandBase drive;
+		
+		public HubAssistRoutineV2(
+			DriveBase db, DriveCommandBase d, double target_inches, double mvolts_distance, double mfvolts, double mtvolts, double mfvr
+		) {
+			super(db, target_inches, mvolts_distance, mfvolts, mtvolts, mfvr);
+			this.drive = d;
+			this.cont_percent = 1.0;
+		}
+
+		@Override public void initialize() {
+			super.initialize();
+			if(this.drive.isScheduled()) {
+				this.drive.cancel();
+			}
+			this.drive.initialize();
+		}
+		@Override public void execute() {
+			super.execute();
+			if(super.position == null) {
+				this.drive.execute();
+			}
+		}
+		@Override public void end(boolean i) {
+			super.end(i);
+			this.drive.end(i);
+			System.out.println("\tHUB ASSIST {V2}: TARGETING COMPLETE.");
+		}
 
 
 	}
