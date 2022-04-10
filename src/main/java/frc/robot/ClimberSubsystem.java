@@ -1,12 +1,12 @@
 package frc.robot;
 
-import frc.robot.modules.common.drive.Motors;
-import frc.robot.modules.common.drive.Motors.MotorSupplier;
-
 import java.util.function.BooleanSupplier;
 
 import edu.wpi.first.wpilibj.motorcontrol.*;
 import edu.wpi.first.wpilibj2.command.*;
+
+import frc.robot.team3407.drive.Motors;
+import frc.robot.team3407.drive.Motors.MotorSupplier;
 
 
 public class ClimberSubsystem implements Subsystem {

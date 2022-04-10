@@ -3,6 +3,7 @@ package frc.robot.commands;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import edu.wpi.first.wpilibj2.command.CommandBase;
 
+
 public class EStop extends CommandBase {
 
 	private EStop() {}
@@ -15,5 +16,7 @@ public class EStop extends CommandBase {
 		System.out.println("All commands cancelled");
 	}
 	@Override public boolean isFinished() { return true; }
+	@Override public boolean runsWhenDisabled() { return true; }
+
 
 }

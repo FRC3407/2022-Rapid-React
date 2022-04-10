@@ -3,9 +3,9 @@ package frc.robot;
 import java.util.function.BooleanSupplier;
 import java.util.function.DoubleSupplier;
 
-import frc.robot.modules.common.drive.Motors;
-import frc.robot.modules.common.drive.Motors.MotorSupplier;
-import frc.robot.modules.vision.java.VisionServer;
+import frc.robot.team3407.drive.Motors;
+import frc.robot.team3407.drive.Motors.MotorSupplier;
+import frc.robot.vision.java.VisionServer;
 
 import com.ctre.phoenix.motorcontrol.*;
 import com.ctre.phoenix.motorcontrol.can.*;

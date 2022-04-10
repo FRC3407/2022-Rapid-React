@@ -1,18 +1,19 @@
 package frc.robot;
 
-import frc.robot.commands.*;
-import frc.robot.modules.common.*;
-import frc.robot.modules.common.drive.*;
-import frc.robot.modules.common.Input.*;
-import frc.robot.modules.common.EventTriggers.*;
-import frc.robot.modules.vision.java.*;
-
 import edu.wpi.first.wpilibj.*;
 import edu.wpi.first.wpilibj.smartdashboard.*;
 import edu.wpi.first.wpilibj2.command.*;
 import edu.wpi.first.wpilibj2.command.button.*;
 // import edu.wpi.first.math.trajectory.*;
 // import edu.wpi.first.networktables.*;
+
+import frc.robot.commands.*;
+import frc.robot.vision.java.*;
+import frc.robot.team3407.ADIS16470;
+import frc.robot.team3407.Input.*;
+import frc.robot.team3407.drive.*;
+import frc.robot.team3407.commandbased.*;
+import frc.robot.team3407.commandbased.EventTriggers.*;
 
 
 /* TODO:
@@ -105,29 +106,6 @@ public class Runtime extends TimedRobot {
 		);
 		AutonomousTrigger.Get().whenActive(()->this.auto_command.getSelected().schedule());
 		EnabledTrigger.Get().whenActive(new LambdaCommand.Singular(()->this.drivebase.setInitial(this.starting_pose.getSelected().pose)));
-
-		// if(this.input.isConnected()) {
-		// 	this.xboxControls();
-		// 	System.out.println("Xbox Bindings Initialized.");
-		// } else {
-		// 	this.input.connectionTrigger().whenActive(
-		// 		new LambdaCommand.Singular(()->{		// bindings should only be bound once
-		// 			this.xboxControls();
-		// 			System.out.println("Xbox Bindings Initialized.");
-		// 		}, true)
-		// 	); 
-		// }
-		// if(this.stick_left.isConnected() && this.stick_right.isConnected()) {
-		// 	this.arcadeControls();
-		// 	System.out.println("Arcade Bindings Initialized.");
-		// } else {
-		// 	this.stick_left.connectionTrigger().and(this.stick_right.connectionTrigger()).whenActive(
-		// 		new LambdaCommand.Singular(()->{
-		// 			this.arcadeControls();
-		// 			System.out.println("Arcade Bindings Initialized.");
-		// 		}, true)
-		// 	); 
-		// }
 
 		if(this.input.isConnected()) {
 			this.xboxControls();

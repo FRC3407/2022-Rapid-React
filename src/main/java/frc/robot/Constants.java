@@ -2,11 +2,6 @@ package frc.robot;
 
 import java.nio.file.Path;
 
-import frc.robot.modules.common.drive.*;
-import frc.robot.modules.common.drive.Types.*;
-import frc.robot.modules.vision.java.VisionServer;
-import frc.robot.modules.vision.java.VisionServer.*;
-
 import edu.wpi.first.math.geometry.*;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.Filesystem;
@@ -16,6 +11,11 @@ import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 
 import com.ctre.phoenix.motorcontrol.can.WPI_TalonSRX;
+
+import frc.robot.team3407.drive.*;
+import frc.robot.team3407.drive.Types.*;
+import frc.robot.vision.java.VisionServer;
+import frc.robot.vision.java.VisionServer.*;
 
 
 public final class Constants {

@@ -1,11 +1,11 @@
 package frc.robot.commands;
 
-import frc.robot.modules.common.drive.DriveBase;
-import frc.robot.modules.vision.java.VisionServer;
-
 import java.util.function.BooleanSupplier;
 
 import edu.wpi.first.wpilibj2.command.CommandBase;
+
+import frc.robot.team3407.drive.DriveBase;
+import frc.robot.vision.java.VisionServer;
 
 
 public final class Test {

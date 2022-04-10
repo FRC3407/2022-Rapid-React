@@ -1,9 +1,9 @@
 package frc.robot;
 
-import frc.robot.modules.common.Input.AnalogSupplier;
-import frc.robot.modules.common.drive.DriveBase;
-import frc.robot.modules.common.drive.DriveBase.DriveCommandBase;
-import frc.robot.modules.vision.java.VisionServer;
+import frc.robot.team3407.Input.AnalogSupplier;
+import frc.robot.team3407.drive.DriveBase;
+import frc.robot.team3407.drive.DriveBase.DriveCommandBase;
+import frc.robot.vision.java.VisionServer;
 
 import java.util.function.BooleanSupplier;
 
