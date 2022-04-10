@@ -117,25 +117,41 @@ public class Runtime extends TimedRobot {
 		// 		}, true)
 		// 	); 
 		// }
-		if(this.stick_left.isConnected() && this.stick_right.isConnected()) {
+		// if(this.stick_left.isConnected() && this.stick_right.isConnected()) {
+		// 	this.arcadeControls();
+		// 	System.out.println("Arcade Bindings Initialized.");
+		// } else {
+		// 	this.stick_left.connectionTrigger().and(this.stick_right.connectionTrigger()).whenActive(
+		// 		new LambdaCommand.Singular(()->{
+		// 			this.arcadeControls();
+		// 			System.out.println("Arcade Bindings Initialized.");
+		// 		}, true)
+		// 	); 
+		// }
+
+		if(this.input.isConnected()) {
+			this.xboxControls();
+			System.out.println("Xbox Bindings Initialized.");
+		} else if(this.stick_left.isConnected() && this.stick_right.isConnected()) {
 			this.arcadeControls();
 			System.out.println("Arcade Bindings Initialized.");
 		} else {
-			this.stick_left.connectionTrigger().and(this.stick_right.connectionTrigger()).whenActive(
-				new LambdaCommand.Singular(()->{
-					this.arcadeControls();
-					System.out.println("Arcade Bindings Initialized.");
-				}, true)
-			); 
+			new Thread(()->{
+				for(;;) {
+					try{ Thread.sleep(500); }	// half a second
+					catch(InterruptedException e) { System.out.println(e.getMessage()); }
+					if(this.input.isConnected()) {
+						this.xboxControls();
+						System.out.println("Xbox Bindings Initialized.");
+						return;
+					} else if(this.stick_left.isConnected() && this.stick_right.isConnected()) {
+						this.arcadeControls();
+						System.out.println("Arcade Bindings Initialized.");
+						return;
+					}
+				}
+			}).start();
 		}
-
-		// EnabledTrigger.Get().whileActiveOnce(	// beam break test
-		// 	new Test.InputTest(
-		// 		25, 	// 2 times per second @ a loop frequency of 50
-		// 		()->this.cargo_sys.transfer.getCurrentInput(),
-		// 		()->this.cargo_sys.transfer.getCurrentOutput()
-		// 	)
-		// );
 
 		// EnabledTrigger.Get().whileActiveOnce(	// beam break test
 		// 	new Test.InputTest(
@@ -185,7 +201,7 @@ public class Runtime extends TimedRobot {
 			climb_toggle = 			Xbox.Digital.A,
 			transfer =				Xbox.Digital.B,
 			alt_vision =			Xbox.Digital.X,
-			override =				Xbox.Digital.Y,
+			invert =				Xbox.Digital.Y,
 			camera_increment =		Xbox.Digital.DR,
 			camera_decrement =		Xbox.Digital.DL,
 			toggle_vision =			Xbox.Digital.DB,
@@ -206,11 +222,12 @@ public class Runtime extends TimedRobot {
 				drivemode_decrement.getPressedSupplier(this.input)
 			)	// schedule mode drive when in teleop mode
 		).whileActiveOnce(
-			new ClimberSubsystem.HoldToggleControl(
+			new ClimberSubsystem.HoldToggleControl.FullLoop(
 				this.climb_sys, climb_toggle.getSupplier(this.input),
 				Constants.climber_extend_voltage,
 				Constants.climber_retract_voltage,
-				Constants.climber_hold_voltage
+				Constants.climber_hold_ext_voltage,
+				Constants.climber_hold_ret_voltage
 			)
 		);
 
@@ -231,7 +248,7 @@ public class Runtime extends TimedRobot {
 			shoot_trigger = shoot_toggle.getToggleFrom(this.input),
 			actuate_trigger = actuate.getCallbackFrom(this.input),
 			transfer_trigger = transfer.getCallbackFrom(this.input),
-			override_trigger = override.getCallbackFrom(this.input),
+			invert_trigger = invert.getCallbackFrom(this.input),
 			hub_assist_trigger = hub_assist_toggle.getToggleFrom(this.input),
 			cargo_assist_trigger = cargo_assist_toggle.getToggleFrom(this.input),
 
@@ -240,35 +257,38 @@ public class Runtime extends TimedRobot {
 
 	// when the override button is not pressed...
 		// and the shooter is toggled on
-		teleop_trigger.and(shoot_trigger).and(override_trigger.negate()).and(routines_trigger.negate()).whileActiveOnce(
-			this.cargo_sys.managedShoot(
-				//actuate.getSupplier(this.input),
+		teleop_trigger.and(shoot_trigger).and(invert_trigger.negate()).and(routines_trigger.negate()).whileActiveOnce(
+			this.cargo_sys.basicShoot(
+				//actuate.getSupplier(this.stick_right),
 				()->false,
 				Constants.feed_voltage,
 				Constants.shooter_max_voltage
 			)
 		);
 		// and the shooter is toggled off
-		teleop_trigger.and(shoot_trigger.negate()).and(override_trigger.negate()).and(actuate_trigger).and(routines_trigger.negate()).whileActiveOnce(
-			this.cargo_sys.managedIntake(Constants.intake_voltage)
+		teleop_trigger.and(shoot_trigger.negate()).and(invert_trigger.negate()).and(actuate_trigger).and(routines_trigger.negate()).whileActiveOnce(
+			this.cargo_sys.basicIntake(Constants.intake_voltage)
 		);
 	// when the override button is pressed...
 		// and the shooter is toggled on
-		teleop_trigger.and(shoot_trigger).and(override_trigger).and(routines_trigger.negate()).whileActiveOnce(
+		teleop_trigger.and(shoot_trigger).and(invert_trigger).and(routines_trigger.negate()).whileActiveOnce(
 			this.cargo_sys.basicShoot(
-				//actuate.getSupplier(this.input),
+				//actuate.getSupplier(this.stick_right),
 				()->false,
-				Constants.feed_voltage,
-				Constants.shooter_max_voltage
+				Constants.feed_voltage * -1,
+				Constants.shooter_max_voltage * -1
 			)
 		);
 		// and the shooter is toggled off
-		teleop_trigger.and(shoot_trigger.negate()).and(override_trigger).and(actuate_trigger).and(routines_trigger.negate()).whileActiveOnce(
-			this.cargo_sys.basicIntake(Constants.intake_voltage)
+		teleop_trigger.and(shoot_trigger.negate()).and(invert_trigger).and(actuate_trigger).and(routines_trigger.negate()).whileActiveOnce(
+			this.cargo_sys.basicIntake(Constants.intake_voltage * -1)
 		);
 
 		// transfer override
-		teleop_trigger.and(transfer_trigger.and(override_trigger).or(shoot_trigger.and(actuate_trigger))).and(routines_trigger.negate()).whileActiveOnce(
+		teleop_trigger.and(transfer_trigger.and(invert_trigger).or(shoot_trigger.and(actuate_trigger).and(invert_trigger))).and(routines_trigger.negate()).whileActiveOnce(
+			this.cargo_sys.basicTransfer(Constants.transfer_voltage * -1)
+		);
+		teleop_trigger.and(shoot_trigger.and(actuate_trigger).and(invert_trigger.negate())).and(routines_trigger.negate()).whileActiveOnce(
 			this.cargo_sys.basicTransfer(Constants.transfer_voltage)
 		);
 
@@ -282,15 +302,23 @@ public class Runtime extends TimedRobot {
 		).whileActiveOnce(
 			new ParallelCommandGroup(
 				this.cargo_sys.visionShoot(							// control the shooter with velocity determined by vision
-					//actuate.getSupplier(this.input),				// press RB to feed
+					//actuate.getSupplier(this.stick_right),		// press right trigger to feed
 					()->false,
 					Constants.feed_voltage,
 					Constants.inches2volts_shooter
 				),
-				new RapidReactVision.HubAssistRoutine(
-					this.drivebase,
-					()->Xbox.Analog.RT.getValueOf(this.input) - Xbox.Analog.LT.getValueOf(this.input),
-					3.0, 10.0	// max turning voltage and max voltage ramp
+				// new RapidReactVision.HubAssistRoutine(
+				// 	this.drivebase,
+				// 	Attack3.Analog.X.getSupplier(this.stick_right),
+				// 	4.0, 10.0	// max turning voltage and max voltage ramp
+				// )
+				new RapidReactVision.HubAssistRoutineV2(
+					this.drivebase, this.drivebase.modeDrive(), 
+					(Constants.min_hub_range_inches + Constants.max_hub_range_inches / 2.0),
+					40,
+					Constants.auto_max_forward_voltage,
+					Constants.auto_max_turn_voltage,
+					Constants.auto_max_voltage_ramp
 				)
 			)
 		).whenInactive(
@@ -303,6 +331,7 @@ public class Runtime extends TimedRobot {
 		).and(actuate_trigger).whileActiveOnce(
 			this.cargo_sys.basicTransfer(Constants.transfer_voltage)
 		);
+
 		teleop_trigger.and(cargo_assist_trigger).and(hub_assist_state.negate()).whenActive(
 			()->{
 				cargo_assist_state.enable();
@@ -317,8 +346,8 @@ public class Runtime extends TimedRobot {
 				this.cargo_sys.managedIntake(Constants.intake_voltage),
 				DriverStation.getAlliance(),
 				Constants.cargo_follow_target_inches,
-				Constants.auto_max_forward_voltage,
-				Constants.auto_max_turn_voltage,
+				Constants.auto_max_forward_voltage + 1.0,
+				Constants.auto_max_turn_voltage + 1.0,
 				Constants.auto_max_voltage_ramp
 			)
 		).whenInactive(
@@ -372,10 +401,11 @@ public class Runtime extends TimedRobot {
 			)
 		).whileActiveOnce(
 			new ClimberSubsystem.HoldToggleControl(
-				this.climb_sys, climb_toggle.getSupplier(this.stick_left),
+				this.climb_sys, climb_toggle.getSupplier(this.input),
 				Constants.climber_extend_voltage,
 				Constants.climber_retract_voltage,
-				Constants.climber_hold_voltage
+				Constants.climber_hold_ext_voltage,
+				Constants.climber_hold_ret_voltage
 			)
 		);	// schedule mode drive when in teleop mode
 
@@ -465,7 +495,8 @@ public class Runtime extends TimedRobot {
 					40,
 					Constants.auto_max_forward_voltage,
 					Constants.auto_max_turn_voltage,
-					Constants.auto_max_voltage_ramp)
+					Constants.auto_max_voltage_ramp
+				)
 			)
 		).whenInactive(
 			()->{

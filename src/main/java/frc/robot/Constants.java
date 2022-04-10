@@ -82,8 +82,9 @@ public final class Constants {
 		shooter_max_voltage = 11.25,
 		shooter_min_voltage = 10.75,
 		climber_extend_voltage = 8,
-		climber_hold_voltage = 0,
+		climber_hold_ext_voltage = 1,
 		climber_retract_voltage = 10,
+		climber_hold_ret_voltage = 2,
 
 // Physical properties
 		drivetrack_width_inches = 21.819,	// track width of drivebase
