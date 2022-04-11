@@ -292,7 +292,7 @@ public class Runtime extends TimedRobot {
 				// )
 				new RapidReactVision.HubAssistRoutineV2(
 					this.drivebase, this.drivebase.modeDrive(), 
-					(Constants.min_hub_range_inches + Constants.max_hub_range_inches / 2.0),
+					((Constants.min_hub_range_inches + Constants.max_hub_range_inches) / 2.0),
 					40,
 					Constants.auto_max_forward_voltage,
 					Constants.auto_max_turn_voltage,
@@ -469,7 +469,7 @@ public class Runtime extends TimedRobot {
 				// )
 				new RapidReactVision.HubAssistRoutineV2(
 					this.drivebase, this.drivebase.modeDrive(), 
-					(Constants.min_hub_range_inches + Constants.max_hub_range_inches / 2.0),
+					((Constants.min_hub_range_inches + Constants.max_hub_range_inches) / 2.0),
 					40,
 					Constants.auto_max_forward_voltage,
 					Constants.auto_max_turn_voltage,

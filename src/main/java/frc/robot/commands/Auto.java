@@ -53,7 +53,7 @@ public class Auto {
 						new RapidReactVision.HubFind(db),	// find hub
 						new EnsureFinishCommand(new RapidReactVision.HubTarget(
 							db,
-							(Constants.min_hub_range_inches + Constants.max_hub_range_inches / 2.0),
+							((Constants.min_hub_range_inches + Constants.max_hub_range_inches) / 2.0),
 							40,
 							Constants.auto_max_forward_voltage,
 							Constants.auto_max_turn_voltage,

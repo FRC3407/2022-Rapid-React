@@ -344,6 +344,7 @@ public final class RapidReactVision {
 		hub_max_range = Constants.max_hub_range_inches,
 		max_heading_offset = Constants.max_heading_offset,
 		heading_thresh = Constants.heading_offset_thresh,
+		distance_thresh = 2.0,	// for hub-assist
 
 		default_cargo_target = Constants.cargo_follow_target_inches,
 
@@ -793,7 +794,7 @@ public final class RapidReactVision {
 		}
 		@Override public boolean isFinished() {
 			if(this.position != null) {
-				return Math.abs(this.position.lr) <= heading_thresh && Math.abs(this.position.distance) <= this.target;
+				return Math.abs(this.position.lr) <= heading_thresh && Math.abs(this.position.distance - this.target) <= distance_thresh;
 			}
 			return this.failed;
 		}
@@ -867,6 +868,9 @@ public final class RapidReactVision {
 			super.end(i);
 			this.drive.end(i);
 			System.out.println("\tHUB ASSIST {V2}: TARGETING COMPLETE.");
+		}
+		@Override public boolean isFinished() {
+			return false;
 		}
 
 
