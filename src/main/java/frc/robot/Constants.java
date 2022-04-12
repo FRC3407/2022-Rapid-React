@@ -4,6 +4,7 @@ import java.nio.file.Path;
 
 import edu.wpi.first.math.geometry.*;
 import edu.wpi.first.math.util.Units;
+import edu.wpi.first.wpilibj.util.Color;
 import edu.wpi.first.wpilibj.Filesystem;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
@@ -54,6 +55,7 @@ public final class Constants {
 		cargo_follow_target_inches = 5.0,	// the distance away from a cargo that cargo-following commands will target
 		max_hub_range_inches = 215.0,		// maximum range that the hub can be detected from (used as divisor for P-loop)
 		min_hub_range_inches = 170.0,		// minimum range for shooting into the hub
+		hub_targeting_inches = (max_hub_range_inches + min_hub_range_inches) / 2,	// average shooting range - target for automated hub targeting
 
 // "percent output" (1.0 as 100%)
 		uncertainty_continuation_percentage = 0.95,	// if break in target detection, keep powering motors at this percent of the last values used
@@ -156,6 +158,12 @@ public final class Constants {
 			VisionServer.applyCameraPreset(hub_camera_preset);
 			RapidReactVision.Cameras.HUB.setActive();
 		}
+	;
+
+
+	public static final Color
+		blue_cargo_colormatch = Color.kFirstBlue,
+		red_cargo_colormatch = Color.kFirstRed
 	;
 
 

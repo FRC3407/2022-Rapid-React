@@ -4,41 +4,22 @@ import edu.wpi.first.wpilibj.*;
 import edu.wpi.first.wpilibj.smartdashboard.*;
 import edu.wpi.first.wpilibj2.command.*;
 import edu.wpi.first.wpilibj2.command.button.*;
-// import edu.wpi.first.math.trajectory.*;
-// import edu.wpi.first.networktables.*;
+
+import com.revrobotics.*;
 
 import frc.robot.commands.*;
 import frc.robot.vision.java.*;
 import frc.robot.team3407.ADIS16470;
 import frc.robot.team3407.Input.*;
 import frc.robot.team3407.drive.*;
+import frc.robot.team3407.drive.Types.DriveMode;
 import frc.robot.team3407.commandbased.*;
 import frc.robot.team3407.commandbased.EventTriggers.*;
 
 
 /* TODO:
- x Split VisionServer into base and an extension that integrates command-based structure (this would extend SubsystemBase)
- x Verify/imporve singleton for each ^^^
- x Create "helper" container for methods at the start of DriveBase
- x Make better names for "DB#..." and split into port map and motorcontroller object containers (this would be an extension)
- x Commands for CLDifferential -> Ramsete controller (characterization first)
- x Update C++ VisionServer-Robot API
- - Methods/impelemtation to search DriverStation for a certain input (common.Input.InputDevice) and return object/port
- x max output/scaling method for drivebase
- - make a spreadsheet for camera presets (each pipeline) under different lighting conditions
- x fix controls being f'ed when not in sim mode and not connected on program startup
- - finalize/test Velocity-CL (TalonFX) shooter commands
- x Polish cargo manipulation controls
- x? AUTO!!!!
- x make AnalogSupplier and DigitalSupplier extend BooleanSupplier and DigitalSupplier respectively
- x? Path planning and drivebase cl (all of it...)
-
- x? Tune hubturn p-loop
- x Change camera params / configure switching when camera positions are finalized
-
- x Polish "Vision Assist" -> re-schedule operator-turning after overcorrection or "dead zone"
- - Auto -> "Hierarchy" of closed-loop
- x Add cargo-following routine to vision assist
+ - ColorSensor for transfer system?
+ - Test new hub/cargo targeting algos
 */
 
 public class Runtime extends TimedRobot {
@@ -75,6 +56,9 @@ public class Runtime extends TimedRobot {
 		starting_pose;
 	private final SendableChooser<Command>
 		auto_command = new SendableChooser<Command>();
+
+	private final ColorSensorV3
+		color_src = new ColorSensorV3(I2C.Port.kOnboard);
 
 
 
@@ -139,6 +123,22 @@ public class Runtime extends TimedRobot {
 		// 	)
 		// );
 
+		ColorMatch matcher = new ColorMatch();
+		matcher.addColorMatch(Constants.blue_cargo_colormatch);
+		matcher.addColorMatch(Constants.red_cargo_colormatch);
+		DisabledTrigger.Get().whileActiveOnce(
+			new LambdaCommand.Continuous(
+				()->{
+					ColorMatchResult r = matcher.matchClosestColor(color_src.getColor());
+					if(r.color == Constants.blue_cargo_colormatch) {
+						System.out.println("Blue detected: " + r.confidence);
+					} else if(r.color == Constants.red_cargo_colormatch) {
+						System.out.println("Red detected: " + r.confidence);
+					}
+				}
+			)
+		);
+
 	}
 	@Override public void robotPeriodic() {
 		CommandScheduler.getInstance().run();
@@ -169,23 +169,24 @@ public class Runtime extends TimedRobot {
 
 	private void xboxControls() {	// setup bindings for xbox controller
 
-		Xbox.Digital			// the button binds
+		Xbox.Digital		// the button binds
 			shoot_toggle =			Xbox.Digital.LB,
 			actuate =				Xbox.Digital.RB,
 			hub_assist_toggle =		Xbox.Digital.BACK,
 			cargo_assist_toggle =	Xbox.Digital.START,
-			drivemode_increment =	Xbox.Digital.RS,
-			drivemode_decrement =	Xbox.Digital.LS,
-			climb_toggle = 			Xbox.Digital.A,
+			change_drivemode =		Xbox.Digital.RS,
+			change_camera =			Xbox.Digital.LS,
+			climb_toggle =			Xbox.Digital.A,
 			transfer =				Xbox.Digital.B,
-			alt_vision =			Xbox.Digital.X,
+			//alt_vision =			Xbox.Digital.X,
 			invert =				Xbox.Digital.Y,
-			camera_increment =		Xbox.Digital.DR,
-			camera_decrement =		Xbox.Digital.DL,
+			pipe_increment =		Xbox.Digital.DR,
+			pipe_decrement =		Xbox.Digital.DL,
 			toggle_vision =			Xbox.Digital.DB,
 			toggle_stats =			Xbox.Digital.DT
 		;
 
+		DigitalSupplier dm = change_drivemode.getPressedSupplier(this.input);
 		TeleopTrigger.Get().whenActive(
 			Constants.vision_driving
 		).whenActive(	// we can't compose a sequentialcommandgroup here because the modedrive command is used elsewhere
@@ -196,8 +197,7 @@ public class Runtime extends TimedRobot {
 				Xbox.Analog.RX.getLimitedSupplier(this.input, Constants.teleop_max_input_ramp),
 				Xbox.Analog.RY.getLimitedSupplier(this.input, Constants.teleop_max_input_ramp),
 				Xbox.Analog.RT.getLimitedSupplier(this.input, Constants.teleop_max_input_ramp),
-				drivemode_increment.getPressedSupplier(this.input),
-				drivemode_decrement.getPressedSupplier(this.input)
+				dm, dm		// supply the same input for inc and dec so that wrap-around is used instead
 			)	// schedule mode drive when in teleop mode
 		).whileActiveOnce(
 			new ClimberSubsystem.HoldToggleControl.FullLoop(
@@ -208,13 +208,14 @@ public class Runtime extends TimedRobot {
 				Constants.climber_hold_ret_voltage
 			)
 		);
+		// limit drive options
+		this.drivebase.modeDrive().setDriveOptions(new DriveMode[]{DriveMode.TANK, DriveMode.ARCADE});
 
-		toggle_vision.getCallbackFrom(this.input).and(alt_vision.getCallbackFrom(this.input).negate()).whenActive(VisionSubsystem.ToggleProcessing.Get());
-		toggle_stats.getCallbackFrom(this.input).and(alt_vision.getCallbackFrom(this.input).negate()).whenActive(VisionSubsystem.ToggleStatistics.Get());
-		alt_vision.getCallbackFrom(this.input).and(toggle_stats.getCallbackFrom(this.input)).whenActive(VisionSubsystem.IncrementPipeline.Get());
-		alt_vision.getCallbackFrom(this.input).and(toggle_vision.getCallbackFrom(this.input)).whenActive(VisionSubsystem.DecrementPipeline.Get());
-		camera_increment.getCallbackFrom(this.input).whenPressed(VisionSubsystem.IncrementCamera.Get());
-		camera_decrement.getCallbackFrom(this.input).whenPressed(VisionSubsystem.DecrementCamera.Get());
+		toggle_vision.getCallbackFrom(this.input).whenActive(VisionSubsystem.ToggleProcessing.Get());
+		toggle_stats.getCallbackFrom(this.input).whenActive(VisionSubsystem.ToggleStatistics.Get());
+		pipe_increment.getCallbackFrom(this.input).whenActive(VisionSubsystem.IncrementPipeline.Get());
+		pipe_decrement.getCallbackFrom(this.input).whenActive(VisionSubsystem.DecrementPipeline.Get());
+		change_camera.getCallbackFrom(this.input).whenPressed(VisionSubsystem.IncrementCamera.Get());
 
 		StaticTrigger
 			hub_assist_state = new StaticTrigger(false),
@@ -292,7 +293,7 @@ public class Runtime extends TimedRobot {
 				// )
 				new RapidReactVision.HubAssistRoutineV2(
 					this.drivebase, this.drivebase.modeDrive(), 
-					((Constants.min_hub_range_inches + Constants.max_hub_range_inches) / 2.0),
+					Constants.hub_targeting_inches,
 					40,
 					Constants.auto_max_forward_voltage,
 					Constants.auto_max_turn_voltage,
@@ -348,36 +349,35 @@ public class Runtime extends TimedRobot {
 
 	public void arcadeControls() {
 
-		Attack3.Digital			// the button binds
+		Attack3.Digital		// the button binds
 			shoot_toggle =			Attack3.Digital.TRI,	// left stick
-			actuate =				Attack3.Digital.TRI,	// right stick
 			hub_assist_toggle =		Attack3.Digital.TT,		// left stick
+			change_camera =			Attack3.Digital.TR,		// left stick
+			change_drivemode =		Attack3.Digital.TL,		// left stick
+
+			actuate =				Attack3.Digital.TRI,	// right stick
 			cargo_assist_toggle =	Attack3.Digital.TT,		// right stick
-			drivemode_increment =	Attack3.Digital.TR,		// right stick
-			drivemode_decrement =	Attack3.Digital.TL,		// right stick
-			invert =				Attack3.Digital.TB,		// right stick
-			camera_increment =		Attack3.Digital.TR,		// left stick
-			camera_decrement =		Attack3.Digital.TL,		// left stick
-			climb_toggle = 			Attack3.Digital.TB,		// left stick
+			invert =				Attack3.Digital.TL,		// right stick
+			climb_toggle = 			Attack3.Digital.TB,		// right stick
 
 			toggle_vision =			Attack3.Digital.B1,
 			toggle_stats =			Attack3.Digital.B2,
-			pipeline_increment =	Attack3.Digital.B4,
-			pipeline_decrement =	Attack3.Digital.B3
+			pipe_increment =		Attack3.Digital.B4,
+			pipe_decrement =		Attack3.Digital.B3
 		;
 
+		DigitalSupplier dm = change_drivemode.getPressedSupplier(this.input);
 		TeleopTrigger.Get().whenActive(
 			Constants.vision_driving
-		).whenActive(
+		).whenActive(		// schedule mode drive when in teleop mode
 			this.drivebase.modeDrive(
 				Attack3.Analog.X.getLimitedSupplier(this.stick_left, Constants.teleop_max_input_ramp),
 				Attack3.Analog.Y.getLimitedSupplier(this.stick_left, Constants.teleop_max_input_ramp),
 				Attack3.Analog.X.getLimitedSupplier(this.stick_right, Constants.teleop_max_input_ramp),
 				Attack3.Analog.Y.getLimitedSupplier(this.stick_right, Constants.teleop_max_input_ramp),
-				drivemode_increment.getPressedSupplier(this.stick_right),
-				drivemode_decrement.getPressedSupplier(this.stick_right)
+				dm, dm	// supply the same input for inc and dec so that wrap-around is used instead
 			)
-		).whileActiveOnce(
+		).whileActiveOnce(		// start climb controls
 			new ClimberSubsystem.HoldToggleControl(
 				this.climb_sys, climb_toggle.getSupplier(this.input),
 				Constants.climber_extend_voltage,
@@ -385,14 +385,15 @@ public class Runtime extends TimedRobot {
 				Constants.climber_hold_ext_voltage,
 				Constants.climber_hold_ret_voltage
 			)
-		);	// schedule mode drive when in teleop mode
+		);
+		// limit drive options
+		this.drivebase.modeDrive().setDriveOptions(new DriveMode[]{DriveMode.TANK, DriveMode.ARCADE});
 
 		toggle_vision.getCallbackFrom(this.stick_left).whenActive(VisionSubsystem.ToggleProcessing.Get());
 		toggle_stats.getCallbackFrom(this.stick_left).whenActive(VisionSubsystem.ToggleStatistics.Get());
-		pipeline_increment.getCallbackFrom(this.stick_left).whenActive(VisionSubsystem.IncrementPipeline.Get());
-		pipeline_decrement.getCallbackFrom(this.stick_left).whenActive(VisionSubsystem.DecrementPipeline.Get());
-		camera_increment.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.IncrementCamera.Get());
-		camera_decrement.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.DecrementCamera.Get());
+		pipe_increment.getCallbackFrom(this.stick_left).whenActive(VisionSubsystem.IncrementPipeline.Get());
+		pipe_decrement.getCallbackFrom(this.stick_left).whenActive(VisionSubsystem.DecrementPipeline.Get());
+		change_camera.getCallbackFrom(this.stick_left).whenPressed(VisionSubsystem.IncrementCamera.Get());
 
 		StaticTrigger
 			hub_assist_state = new StaticTrigger(false),
@@ -469,7 +470,7 @@ public class Runtime extends TimedRobot {
 				// )
 				new RapidReactVision.HubAssistRoutineV2(
 					this.drivebase, this.drivebase.modeDrive(), 
-					((Constants.min_hub_range_inches + Constants.max_hub_range_inches) / 2.0),
+					Constants.hub_targeting_inches,
 					40,
 					Constants.auto_max_forward_voltage,
 					Constants.auto_max_turn_voltage,
