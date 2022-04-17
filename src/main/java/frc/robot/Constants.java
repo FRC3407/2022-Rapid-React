@@ -62,10 +62,11 @@ public final class Constants {
 
 		teleop_drivebase_scaling = -0.7,	// cap the voltage @70% -> negative because joysticks default to being inverted
 		teleop_drivebase_deadband = 0.05,	// the input range that is discarded
-		teleop_max_input_ramp = 2.0,		// maximum input acceleration in percent/sec^2 -> no more than 200% per second per second
+		teleop_max_input_ramp = 2.5,		// maximum input acceleration in percent/sec^2 -> no more than 200% per second per second
+		teleop_input_power = 1.5,			// power to raise analog (joystick) inputs to for driving
 
 // voltage
-		universal_max_voltage = 10.0,
+		universal_max_voltage = 10.0,	// not really used :?
 
 		auto_max_turn_voltage = 2.5,	// maximum voltage for turning in place during auto
 		auto_max_forward_voltage = 4.5,	// maximum voltage for driving forward during auto
@@ -83,6 +84,7 @@ public final class Constants {
 		//shooter_static_voltage = 0.8,	// CURRENTLY JUST AN ESTIMATE
 		shooter_max_voltage = 11.25,
 		shooter_min_voltage = 10.75,
+		shooter_ramp_limit = 12.0,		// volts per second -> ~12.0 means that it will take a second to get to max speed
 		climber_extend_voltage = 8,
 		climber_hold_ext_voltage = 1,
 		climber_retract_voltage = 10,

@@ -3,18 +3,19 @@ package frc.robot;
 import java.util.function.BooleanSupplier;
 import java.util.function.DoubleSupplier;
 
-import frc.robot.team3407.drive.Motors;
-import frc.robot.team3407.drive.Motors.MotorSupplier;
-import frc.robot.vision.java.VisionServer;
+import edu.wpi.first.wpilibj.DigitalInput;
+import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.motorcontrol.*;
+import edu.wpi.first.wpilibj2.command.*;
+import edu.wpi.first.math.filter.SlewRateLimiter;
 
 import com.ctre.phoenix.motorcontrol.*;
 import com.ctre.phoenix.motorcontrol.can.*;
 import com.ctre.phoenix.sensors.SensorInitializationStrategy;
 
-import edu.wpi.first.wpilibj.DigitalInput;
-import edu.wpi.first.wpilibj.Timer;
-import edu.wpi.first.wpilibj.motorcontrol.*;
-import edu.wpi.first.wpilibj2.command.*;
+import frc.robot.team3407.drive.Motors;
+import frc.robot.team3407.drive.Motors.MotorSupplier;
+import frc.robot.vision.java.VisionServer;
 
 
 /**
@@ -228,6 +229,7 @@ public final class CargoSystem {
 
 		private final WPI_TalonFX main, secondary;
 		private final MotorController feed, base_main;
+		private double vlimit = Double.MAX_VALUE;
 
 		private void configureFalcons() {
 			if(this.main != null) {
@@ -284,6 +286,19 @@ public final class CargoSystem {
 				this.base_main = new MotorControllerGroup(m, s);
 			} else {
 				this.base_main = m;
+			}
+		}
+
+		/** In VOLTAGE not PERCENT OUTPUT */
+		public void rateLimit(double voltage_rate) {
+			this.vlimit = voltage_rate;
+			if(this.main != null) {
+				this.main.configOpenloopRamp(voltage_rate / 12);
+				this.main.configClosedloopRamp(voltage_rate / 12);
+			}
+			if(this.secondary != null) {
+				this.secondary.configOpenloopRamp(voltage_rate / 12);
+				this.secondary.configClosedloopRamp(voltage_rate / 12);
 			}
 		}
 
@@ -359,6 +374,8 @@ public final class CargoSystem {
 		public static abstract class ShooterCommand extends CommandBase {
 
 			protected final ShooterSubsystem shooter_sys;
+			protected SlewRateLimiter rate_limit;
+
 			protected ShooterCommand(ShooterSubsystem s) {
 				this.shooter_sys = s;
 				super.addRequirements(s);
@@ -366,6 +383,15 @@ public final class CargoSystem {
 			@Override public void end(boolean i) {
 				this.shooter_sys.stopFeed(this);
 				this.shooter_sys.stopShooter(this);
+			}
+
+			/** Make sure this method is called on initialization */
+			protected void initRateLimit() {
+				this.rate_limit = new SlewRateLimiter(this.shooter_sys.vlimit);
+			}
+			/** Applies rate limit */
+			protected void setShooterVoltage(double v) {
+				this.shooter_sys.setShooterVoltage(this.rate_limit.calculate(v), this);
 			}
 
 			// add shooter access methods
@@ -608,10 +634,11 @@ public final class CargoSystem {
 		}
 
 		@Override public void initialize() {
+			super.initRateLimit();
 			System.out.println(getClass().getSimpleName() + ": Running...");
 		}
 		@Override public void execute() {
-			super.shooter_sys.setShooterVoltage(this.shooter_voltage.getAsDouble(), this);
+			super.setShooterVoltage(this.shooter_voltage.getAsDouble());
 			if(this.feed_actuate.getAsBoolean()) {
 				super.shooter_sys.setFeedVoltage(this.feed_voltage.getAsDouble(), this);
 			} else {
@@ -648,7 +675,7 @@ public final class CargoSystem {
 			if(!this.transfer_sys.hasFeedback()) {
 				System.out.println(getClass().getSimpleName() + ": No feedback sensors detected. Defaulting to BasicShoot.");
 			}
-			System.out.println(getClass().getSimpleName() + ": Running...");
+			super.initialize();
 		}
 		@Override public boolean isFinished() {
 			return this.transfer_sys.hasFeedback() && this.transfer_sys.getCargoCount() <= 0;
@@ -677,11 +704,12 @@ public final class CargoSystem {
 
 		@Override public void initialize() {
 			this.transfer_command.initialize();
+			super.initRateLimit();
 			System.out.println(getClass().getSimpleName() + ": Running...");
 		}
 		@Override public void execute() {
 			this.transfer_command.execute();
-			super.shooter_sys.setShooterVoltage(this.shoot_voltage, this);		// spin up shooter
+			super.setShooterVoltage(this.shoot_voltage);		// spin up shooter
 			super.shooter_sys.setFeedVoltage(this.transfer_sys.getCurrentOutput() ? this.feed_voltage : 0, this);	// set feed if output limit triggered
 		}
 		@Override public void end(boolean i) {
@@ -734,7 +762,7 @@ public final class CargoSystem {
 				System.out.println(getClass().getSimpleName() + ": TalonFX not detected. Shooter disabled.");
 				return;
 			}
-			System.out.println(getClass().getSimpleName() + ": Running...");
+			super.initialize();
 		}
 		@Override public void execute() {
 			if(super.shooter_sys.hasTalonShooter()) {	// if no talon, do nothing, else set to given speed
@@ -768,11 +796,7 @@ public final class CargoSystem {
 			if(!this.transfer_sys.hasFeedback()) {
 				System.out.println(getClass().getSimpleName() + ": No feedback sensors detected. Defaulting to BasicShootCL.");
 			}
-			if(!super.shooter_sys.hasTalonShooter()) {
-				System.out.println(getClass().getSimpleName() + ": TalonFX shooter not detected. Shooter disabled.");
-				return;
-			}
-			System.out.println(getClass().getSimpleName() + ": Running...");
+			super.initialize();
 		}
 		// @Override public void execute() {
 		// 	if(super.shooter_sys.hasTalonShooter()) {	// if no talon, do nothing, else set to given speed
@@ -832,6 +856,7 @@ public final class CargoSystem {
 				this.failed = true;
 				return;
 			}
+			super.initRateLimit();
 			System.out.println(getClass().getSimpleName() + ": Running...");
 			this.failed = false;
 		}
@@ -841,7 +866,7 @@ public final class CargoSystem {
 				if(this.position != null) {
 					this.last_voltage = this.inches2voltage.convert(this.position.distance);	// update calculated voltage
 				}
-				super.shooter_sys.setShooterVoltage(this.last_voltage, this);		// set shooter speed
+				super.setShooterVoltage(this.last_voltage);		// set shooter speed
 				super.shooter_sys.setFeedVoltage(super.feed_actuate.getAsBoolean() ? super.feed_voltage.getAsDouble() : 0, this);	// set feed if booleansupplier allows
 			} else {	// otherwise stop motors
 				super.shooter_sys.setShooter(0, this);
@@ -883,6 +908,7 @@ public final class CargoSystem {
 				return;
 			}
 			super.transfer_command.initialize();
+			super.initRateLimit();
 			System.out.println(getClass().getSimpleName() + ": Running...");
 			this.failed = false;
 		}
@@ -892,7 +918,7 @@ public final class CargoSystem {
 			if(this.position != null) {
 				this.last_voltage = this.inches2voltage.convert(this.position.distance);
 			}
-			super.shooter_sys.setShooterVoltage(this.last_voltage, this);
+			super.setShooterVoltage(this.last_voltage);
 			super.shooter_sys.setFeedVoltage(super.transfer_sys.getCurrentOutput() ? super.feed_voltage : 0, this);
 		}
 		@Override public boolean isFinished() {

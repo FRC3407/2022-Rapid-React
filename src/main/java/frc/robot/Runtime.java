@@ -4,6 +4,7 @@ import edu.wpi.first.wpilibj.*;
 import edu.wpi.first.wpilibj.smartdashboard.*;
 import edu.wpi.first.wpilibj2.command.*;
 import edu.wpi.first.wpilibj2.command.button.*;
+import edu.wpi.first.networktables.*;
 
 import com.revrobotics.*;
 
@@ -20,6 +21,10 @@ import frc.robot.team3407.commandbased.EventTriggers.*;
 /* TODO:
  - ColorSensor for transfer system?
  - Test new hub/cargo targeting algos
+ - Rate limit tank drive turning (somehow)
+ - ramp-up for shooter
+
+ - RPI LIKELY IN 'SERVER' MODE FROM TESTING -> PLZ DONT FORGET TO CHANGE!!!
 */
 
 public class Runtime extends TimedRobot {
@@ -57,8 +62,16 @@ public class Runtime extends TimedRobot {
 	private final SendableChooser<Command>
 		auto_command = new SendableChooser<Command>();
 
-	private final ColorSensorV3
-		color_src = new ColorSensorV3(I2C.Port.kOnboard);
+	// private final ColorSensorV3
+	// 	color_src = new ColorSensorV3(I2C.Port.kOnboard);
+
+	private final NetworkTable
+		variables = NetworkTableInstance.getDefault().getTable("Variables");
+	private final NetworkTableEntry
+		shooter_volts = variables.getEntry("Shooter voltage"),
+		intake_volts = variables.getEntry("Intake voltage"),
+		transfer_volts = variables.getEntry("Transfer voltage")
+	;
 
 
 
@@ -70,6 +83,12 @@ public class Runtime extends TimedRobot {
 		this.drivebase.setSpeedScaling(Constants.teleop_drivebase_scaling);
 		this.drivebase.setSpeedDeadband(Constants.teleop_drivebase_deadband);
 		this.drivebase.setSpeedSquaring(Constants.teleop_drivebase_speed_squaring);
+
+		this.cargo_sys.shooter.rateLimit(Constants.shooter_ramp_limit);
+
+		this.shooter_volts.setDouble(Constants.shooter_max_voltage);
+		this.intake_volts.setDouble(Constants.intake_voltage);
+		this.transfer_volts.setDouble(Constants.transfer_voltage);
 
 		//this.cargo_sys.startAutomaticTransfer(Constants.transfer_voltage);
 		Constants.vision_cargo.run();
@@ -115,6 +134,10 @@ public class Runtime extends TimedRobot {
 			}).start();
 		}
 
+		System.out.println(Math.pow(0.1, 1.5));
+
+		//System.out.println(NetworkTableInstance.getDefault().getTable("/").getSubTables());
+
 		// EnabledTrigger.Get().whileActiveOnce(	// beam break test
 		// 	new Test.InputTest(
 		// 		25, 	// 2 times per second @ a loop frequency of 50
@@ -123,21 +146,21 @@ public class Runtime extends TimedRobot {
 		// 	)
 		// );
 
-		ColorMatch matcher = new ColorMatch();
-		matcher.addColorMatch(Constants.blue_cargo_colormatch);
-		matcher.addColorMatch(Constants.red_cargo_colormatch);
-		DisabledTrigger.Get().whileActiveOnce(
-			new LambdaCommand.Continuous(
-				()->{
-					ColorMatchResult r = matcher.matchClosestColor(color_src.getColor());
-					if(r.color == Constants.blue_cargo_colormatch) {
-						System.out.println("Blue detected: " + r.confidence);
-					} else if(r.color == Constants.red_cargo_colormatch) {
-						System.out.println("Red detected: " + r.confidence);
-					}
-				}
-			)
-		);
+		// ColorMatch matcher = new ColorMatch();
+		// matcher.addColorMatch(Constants.blue_cargo_colormatch);
+		// matcher.addColorMatch(Constants.red_cargo_colormatch);
+		// DisabledTrigger.Get().whileActiveOnce(
+		// 	new LambdaCommand.Continuous(
+		// 		()->{
+		// 			ColorMatchResult r = matcher.matchClosestColor(color_src.getColor());
+		// 			if(r.color == Constants.blue_cargo_colormatch) {
+		// 				System.out.println("Blue detected: " + r.confidence);
+		// 			} else if(r.color == Constants.red_cargo_colormatch) {
+		// 				System.out.println("Red detected: " + r.confidence);
+		// 			}
+		// 		}
+		// 	)
+		// );
 
 	}
 	@Override public void robotPeriodic() {
@@ -191,12 +214,12 @@ public class Runtime extends TimedRobot {
 			Constants.vision_driving
 		).whenActive(	// we can't compose a sequentialcommandgroup here because the modedrive command is used elsewhere
 			this.drivebase.modeDrive(
-				Xbox.Analog.LX.getLimitedSupplier(this.input, Constants.teleop_max_input_ramp),
-				Xbox.Analog.LY.getLimitedSupplier(this.input, Constants.teleop_max_input_ramp),
-				Xbox.Analog.LT.getLimitedSupplier(this.input, Constants.teleop_max_input_ramp),
-				Xbox.Analog.RX.getLimitedSupplier(this.input, Constants.teleop_max_input_ramp),
-				Xbox.Analog.RY.getLimitedSupplier(this.input, Constants.teleop_max_input_ramp),
-				Xbox.Analog.RT.getLimitedSupplier(this.input, Constants.teleop_max_input_ramp),
+				Xbox.Analog.LX.getExponentialLimitedSupplier(this.input, Constants.teleop_max_input_ramp, Constants.teleop_input_power),
+				Xbox.Analog.LY.getExponentialLimitedSupplier(this.input, Constants.teleop_max_input_ramp, Constants.teleop_input_power),
+				Xbox.Analog.LT.getExponentialLimitedSupplier(this.input, Constants.teleop_max_input_ramp, Constants.teleop_input_power),
+				Xbox.Analog.RX.getExponentialLimitedSupplier(this.input, Constants.teleop_max_input_ramp, Constants.teleop_input_power),
+				Xbox.Analog.RY.getExponentialLimitedSupplier(this.input, Constants.teleop_max_input_ramp, Constants.teleop_input_power),
+				Xbox.Analog.RT.getExponentialLimitedSupplier(this.input, Constants.teleop_max_input_ramp, Constants.teleop_input_power),
 				dm, dm		// supply the same input for inc and dec so that wrap-around is used instead
 			)	// schedule mode drive when in teleop mode
 		).whileActiveOnce(
@@ -281,16 +304,15 @@ public class Runtime extends TimedRobot {
 		).whileActiveOnce(
 			new ParallelCommandGroup(
 				this.cargo_sys.visionShoot(							// control the shooter with velocity determined by vision
-					//actuate.getSupplier(this.stick_right),		// press right trigger to feed
+					//actuate.getSupplier(this.input),				// press right trigger to feed
 					()->false,
 					Constants.feed_voltage,
 					Constants.inches2volts_shooter
 				),
 				// new RapidReactVision.HubAssistRoutine(
 				// 	this.drivebase,
-				// 	Attack3.Analog.X.getSupplier(this.stick_right),
-				// 	4.0, 10.0	// max turning voltage and max voltage ramp
-				// )
+				// 	()->Xbox.Analog.RT.getValueOf(this.input) - Xbox.Analog.LT.getValueOf(this.input),
+				// 	3.0, 10.0	// max turning voltage and max voltage ramp
 				new RapidReactVision.HubAssistRoutineV2(
 					this.drivebase, this.drivebase.modeDrive(), 
 					Constants.hub_targeting_inches,
@@ -371,10 +393,10 @@ public class Runtime extends TimedRobot {
 			Constants.vision_driving
 		).whenActive(		// schedule mode drive when in teleop mode
 			this.drivebase.modeDrive(
-				Attack3.Analog.X.getLimitedSupplier(this.stick_left, Constants.teleop_max_input_ramp),
-				Attack3.Analog.Y.getLimitedSupplier(this.stick_left, Constants.teleop_max_input_ramp),
-				Attack3.Analog.X.getLimitedSupplier(this.stick_right, Constants.teleop_max_input_ramp),
-				Attack3.Analog.Y.getLimitedSupplier(this.stick_right, Constants.teleop_max_input_ramp),
+				Attack3.Analog.X.getExponentialLimitedSupplier(this.stick_left, Constants.teleop_max_input_ramp, Constants.teleop_input_power),
+				Attack3.Analog.Y.getExponentialLimitedSupplier(this.stick_left, Constants.teleop_max_input_ramp, Constants.teleop_input_power),
+				Attack3.Analog.X.getExponentialLimitedSupplier(this.stick_right, Constants.teleop_max_input_ramp, Constants.teleop_input_power),
+				Attack3.Analog.Y.getExponentialLimitedSupplier(this.stick_right, Constants.teleop_max_input_ramp, Constants.teleop_input_power),
 				dm, dm	// supply the same input for inc and dec so that wrap-around is used instead
 			)
 		).whileActiveOnce(		// start climb controls

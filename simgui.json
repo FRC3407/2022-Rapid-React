@@ -131,6 +131,9 @@
         "open": true
       }
     },
+    "FMSInfo": {
+      "open": true
+    },
     "LiveWindow": {
       "ClosedLoopDifferentialDrive": {
         "open": true
@@ -146,8 +149,7 @@
           "open": true
         },
         "open": true
-      },
-      "open": true
+      }
     },
     "Motion": {
       "Position": {
@@ -167,8 +169,7 @@
       },
       "Starting Position": {
         "open": true
-      },
-      "open": true
+      }
     },
     "Targets": {
       "Cargo-1b": {

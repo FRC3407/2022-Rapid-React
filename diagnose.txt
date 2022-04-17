@@ -1,0 +1,9 @@
+Weird things that have previously happened and hopefully won't happen again...
+
+1)	- No connection to RPI
+	- Either RPi ntables options showing up (and cameras), or robot options (no cameras), but not both (shuffleboard)
+	- RioLog showing that all buttons working, but not actually
+: RPI in SERVER mode, not CLIENT mode
+
+2)	- Camera freezing, RPi connection intermittant
+: Check radio power, check all ehternet connections (status lights)
