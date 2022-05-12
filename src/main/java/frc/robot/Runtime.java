@@ -2,6 +2,7 @@ package frc.robot;
 
 import edu.wpi.first.wpilibj.*;
 import edu.wpi.first.wpilibj.smartdashboard.*;
+//import edu.wpi.first.wpilibj.util.Color;
 import edu.wpi.first.wpilibj2.command.*;
 import edu.wpi.first.wpilibj2.command.button.*;
 import edu.wpi.first.networktables.*;
@@ -19,12 +20,10 @@ import frc.robot.team3407.commandbased.EventTriggers.*;
 
 
 /* TODO:
- - ColorSensor for transfer system?
+ x? ColorSensor for transfer system?
  - Test new hub/cargo targeting algos
  - Rate limit tank drive turning (somehow)
- - ramp-up for shooter
-
- - RPI LIKELY IN 'SERVER' MODE FROM TESTING -> PLZ DONT FORGET TO CHANGE!!!
+ x ramp-up for shooter
 */
 
 public class Runtime extends TimedRobot {
@@ -34,36 +33,47 @@ public class Runtime extends TimedRobot {
 		input = new InputDevice(0),			// xbox controller
 
 		stick_left = new InputDevice(1),	// acrade stick (left)
-		stick_right = new InputDevice(2);	// arcade stick (right)
+		stick_right = new InputDevice(2)	// arcade stick (right)
+	;
 
 	private final ADIS16470
-		spi_imu = new ADIS16470();
+		spi_imu = new ADIS16470()
+	;
+	private final ColorSensorV3
+		front_color = new ColorSensorV3(Constants.front_colorsensor),
+		back_color = new ColorSensorV3(Constants.back_colorsensor)
+	;
 	private final ClosedLoopDifferentialDrive
 		drivebase = new ClosedLoopDifferentialDrive(
 			Constants.drivebase_map_2022,
 			this.spi_imu,
 			Constants.cl_params,
 			Constants.cl_encoder_inversions
-		);
+		)
+	;
 	private final CargoSystem
 		cargo_sys = new CargoSystem(
 			new CargoSystem.IntakeSubsystem(Constants.intake_port),
-			new CargoSystem.TransferSubsystem(Constants.input_entering_dio, Constants.input_exiting_dio, Constants.transfer_ports),
+			new CargoSystem.TransferSubsystem(
+				this.front_color, this.back_color,
+				Constants.red_cargo_colormatch, Constants.blue_cargo_colormatch, Constants.nothing_colormatch,
+				Motors.pwm_victorspx, Constants.transfer_ports
+			),
 			new CargoSystem.ShooterSubsystem(Motors.pwm_victorspx, Constants.shooter_port/*, Motors.pwm_victorspx, Constants.feed_port*/)
-		);
+		)
+	;
 	private final ClimberSubsystem
 		climb_sys = new ClimberSubsystem(
 			Constants.climber_left_port,
 			Constants.climber_right_port
-		);
+		)
+	;
 
 	private final SendableChooser<Constants.StartingPose>
 		starting_pose;
 	private final SendableChooser<Command>
 		auto_command = new SendableChooser<Command>();
 
-	// private final ColorSensorV3
-	// 	color_src = new ColorSensorV3(I2C.Port.kOnboard);
 
 	private final NetworkTable
 		variables = NetworkTableInstance.getDefault().getTable("Variables");
@@ -90,7 +100,7 @@ public class Runtime extends TimedRobot {
 		this.intake_volts.setDouble(Constants.intake_voltage);
 		this.transfer_volts.setDouble(Constants.transfer_voltage);
 
-		//this.cargo_sys.startAutomaticTransfer(Constants.transfer_voltage);
+		this.cargo_sys.startAutomaticTransfer(Constants.transfer_voltage);
 		Constants.vision_cargo.run();
 
 		this.starting_pose = Constants.StartingPose.getSelectable(DriverStation.getAlliance());
@@ -134,30 +144,41 @@ public class Runtime extends TimedRobot {
 			}).start();
 		}
 
-		System.out.println(Math.pow(0.1, 1.5));
-
-		//System.out.println(NetworkTableInstance.getDefault().getTable("/").getSubTables());
-
-		// EnabledTrigger.Get().whileActiveOnce(	// beam break test
-		// 	new Test.InputTest(
-		// 		25, 	// 2 times per second @ a loop frequency of 50
-		// 		()->this.cargo_sys.transfer.getCurrentInput(),
-		// 		()->this.cargo_sys.transfer.getCurrentOutput()
-		// 	)
-		// );
-
 		// ColorMatch matcher = new ColorMatch();
 		// matcher.addColorMatch(Constants.blue_cargo_colormatch);
 		// matcher.addColorMatch(Constants.red_cargo_colormatch);
-		// DisabledTrigger.Get().whileActiveOnce(
+		// matcher.addColorMatch(Constants.nothing_colormatch);
+		// //matcher.setConfidenceThreshold(0.92);
+		// TestTrigger.Get().whileActiveOnce(
 		// 	new LambdaCommand.Continuous(
 		// 		()->{
-		// 			ColorMatchResult r = matcher.matchClosestColor(color_src.getColor());
-		// 			if(r.color == Constants.blue_cargo_colormatch) {
-		// 				System.out.println("Blue detected: " + r.confidence);
-		// 			} else if(r.color == Constants.red_cargo_colormatch) {
-		// 				System.out.println("Red detected: " + r.confidence);
+		// 			Color
+		// 				fraw = this.front_color.getColor(),
+		// 				braw = this.back_color.getColor()
+		// 			;
+		// 			ColorMatchResult r = matcher.matchColor(fraw);
+		// 			if(r == null) {
+		// 				System.out.print("F: Null\t");
+		// 			} else {
+		// 				System.out.print(
+		// 					"F: " + (r.color == Constants.blue_cargo_colormatch ? "Blue" : 
+		// 						r.color == Constants.red_cargo_colormatch ? "Red" : "Noth") + '\t'
+		// 				);
+		// 			}					
+		// 			r = matcher.matchColor(braw);
+		// 			if(r == null) {
+		// 				System.out.println("B: Null");
+		// 			} else {
+		// 				System.out.println(
+		// 					"B: " + (r.color == Constants.blue_cargo_colormatch ? "Blue" : 
+		// 						r.color == Constants.red_cargo_colormatch ? "Red" : "Noth")
+		// 				);
 		// 			}
+					
+		// 			// System.out.println(
+		// 			// 	"F: {r: " + (int)(fraw.red * 1000) + " g: " + (int)(fraw.green * 1000) + " g: " + (int)(fraw.blue * 1000) +
+		// 			// 	"}\tB: {r: " + (int)(braw.red * 1000) + " g: " + (int)(braw.green * 1000) + " g: " + (int)(braw.blue * 1000) + "}"
+		// 			// );
 		// 		}
 		// 	)
 		// );
@@ -260,7 +281,7 @@ public class Runtime extends TimedRobot {
 	// when the override button is not pressed...
 		// and the shooter is toggled on
 		teleop_trigger.and(shoot_trigger).and(invert_trigger.negate()).and(routines_trigger.negate()).whileActiveOnce(
-			this.cargo_sys.basicShoot(
+			this.cargo_sys.managedShoot(
 				//actuate.getSupplier(this.stick_right),
 				()->false,
 				Constants.feed_voltage,
@@ -274,7 +295,7 @@ public class Runtime extends TimedRobot {
 	// when the override button is pressed...
 		// and the shooter is toggled on
 		teleop_trigger.and(shoot_trigger).and(invert_trigger).and(routines_trigger.negate()).whileActiveOnce(
-			this.cargo_sys.basicShoot(
+			this.cargo_sys.managedShoot(
 				//actuate.getSupplier(this.stick_right),
 				()->false,
 				Constants.feed_voltage * -1,
@@ -436,7 +457,7 @@ public class Runtime extends TimedRobot {
 	// when the override button is not pressed...
 		// and the shooter is toggled on
 		teleop_trigger.and(shoot_trigger).and(invert_trigger.negate()).and(routines_trigger.negate()).whileActiveOnce(
-			this.cargo_sys.basicShoot(
+			this.cargo_sys.managedShoot(
 				//actuate.getSupplier(this.stick_right),
 				()->false,
 				Constants.feed_voltage,
@@ -450,7 +471,7 @@ public class Runtime extends TimedRobot {
 	// when the override button is pressed...x
 		// and the shooter is toggled on
 		teleop_trigger.and(shoot_trigger).and(invert_trigger).and(routines_trigger.negate()).whileActiveOnce(
-			this.cargo_sys.basicShoot(
+			this.cargo_sys.managedShoot(
 				//actuate.getSupplier(this.stick_right),
 				()->false,
 				Constants.feed_voltage * -1,

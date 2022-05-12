@@ -209,6 +209,9 @@
         "Cargo Pipeline": {
           "open": true
         },
+        "TargetSolver Pipeline": {
+          "open": true
+        },
         "Upper-Hub Pipeline": {
           "open": true
         },

@@ -4,14 +4,21 @@ import java.util.function.BooleanSupplier;
 import java.util.function.DoubleSupplier;
 
 import edu.wpi.first.wpilibj.DigitalInput;
+import edu.wpi.first.wpilibj.I2C;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.motorcontrol.*;
+import edu.wpi.first.wpilibj.util.Color;
+import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj2.command.*;
 import edu.wpi.first.math.filter.SlewRateLimiter;
+import edu.wpi.first.networktables.NetworkTableInstance;
+import edu.wpi.first.networktables.NetworkTable;
 
 import com.ctre.phoenix.motorcontrol.*;
 import com.ctre.phoenix.motorcontrol.can.*;
 import com.ctre.phoenix.sensors.SensorInitializationStrategy;
+import com.revrobotics.*;
 
 import frc.robot.team3407.drive.Motors;
 import frc.robot.team3407.drive.Motors.MotorSupplier;
@@ -95,35 +102,181 @@ public final class CargoSystem {
 	 */
 	public static class TransferSubsystem implements Subsystem {
 
+		public static abstract class IndexerSystem implements Subsystem {
+
+			protected int count = 0;
+			protected boolean
+				front_state = false, back_state = false,
+				front_state_last = false, back_state_last = false;
+
+			public IndexerSystem() {
+				if(hasFeedback()) {
+					CommandScheduler.getInstance().registerSubsystem(this);
+				}
+			}
+
+			@Override public void periodic() {
+				this.front_state_last = this.front_state;
+				this.back_state_last = this.back_state;
+				this.front_state = this.getFrontRaw();
+				this.back_state = this.getBackRaw();
+				if(this.isFrontRisingEdge()) {
+					this.count++;
+				}
+				if(this.isBackFallingEdge()) {
+					this.count--;
+				}
+			}
+
+			/** Override this method to return true when the sensors are valid */
+			public boolean hasFeedback() { return false; }
+			/** Override this method to return true if the implementation supports color detection */
+			public boolean hasColorDetection() { return false; }
+			/** Override this method so that indexing is functional */
+			public boolean getFrontRaw() { return false; }
+			/** Override this method so that indexing is functional */
+			public boolean getBackRaw() { return false; }
+
+			public final boolean isFrontRisingEdge() {
+				return this.front_state && !this.front_state_last;
+			}
+			public final boolean isFrontFallingEdge() {
+				return !this.front_state && this.front_state_last;
+			}
+			public final boolean isBackRisingEdge() {
+				return this.back_state && !this.back_state_last;
+			}
+			public final boolean isBackFallingEdge() {
+				return !this.back_state && this.back_state_last;
+			}
+			public final int getCount() {
+				return this.count;
+			}
+
+			public Alliance getFrontCargoAlliance() {
+				return Alliance.Invalid;
+			}
+			public Alliance getBackCargoAlliance() {
+				return Alliance.Invalid;
+			}
+			public Alliance getLastBackDetected() {
+				return Alliance.Invalid;
+			}
+
+
+		}
+		public static class DigitalInputIndexer extends IndexerSystem {
+
+			private final DigitalInput front, back;
+
+			public DigitalInputIndexer(int f, int b) {
+				this.front = new DigitalInput(f);
+				this.back = new DigitalInput(b);
+			}
+			public DigitalInputIndexer(DigitalInput f, DigitalInput b) {
+				this.front = f;
+				this.back = b;
+			}
+
+			@Override public boolean hasFeedback() { return this.front != null && this.back != null; }
+			@Override public boolean getFrontRaw() { return this.front != null ? this.front.get() : false; }
+			@Override public boolean getBackRaw() { return this.back != null ? this.back.get() : false; }
+
+
+		}
+		public static class ColorSensorIndexer extends IndexerSystem {
+
+			private static final Color ncolor = Constants.nothing_colormatch;
+			private static final NetworkTable status_table = NetworkTableInstance.getDefault().getTable("ColorSensor Indexer");
+
+			private final ColorSensorV3 front, back;
+			private final ColorMatch matcher = new ColorMatch();
+			private final Color red, blue;
+			private ColorMatchResult f_color, b_color;
+			private Color last_leaving = null;
+
+			public ColorSensorIndexer(ColorSensorV3 f, ColorSensorV3 b, Color red, Color blue, Color n) {
+				this.front = f;
+				this.back = b;
+				this.red = red;
+				this.blue = blue;
+				this.matcher.addColorMatch(red);
+				this.matcher.addColorMatch(blue);
+				this.matcher.addColorMatch(n);
+				CommandScheduler.getInstance().registerSubsystem(this);
+			}
+			public ColorSensorIndexer(I2C.Port f, I2C.Port b, Color red, Color blue, Color n) {
+				this(new ColorSensorV3(f), new ColorSensorV3(b), red, blue, n);
+			}
+
+			@Override public void periodic() {
+				this.f_color = this.matcher.matchClosestColor(this.front != null ? this.front.getColor() : ncolor);
+				this.b_color = this.matcher.matchClosestColor(this.back != null ? this.back.getColor() : ncolor);
+				//System.out.println(this.f_color.color == this.red);
+				super.periodic();
+				if(this.getBackRaw()) {
+					this.last_leaving = this.b_color.color;
+				}
+				status_table.getEntry("Last Back Alliance").setString(this.last_leaving == this.blue ? "Blue" : this.last_leaving == this.red ? "Red" : "Null");
+			}
+			@Override public boolean hasFeedback() {
+				return this.front != null || this.back != null;
+				//return true;
+			}
+			@Override public boolean hasColorDetection() {
+				return this.hasFeedback();
+			}
+			@Override public boolean getFrontRaw() {
+				//System.out.println("Front is null: " + this.f_color == null);
+				return this.f_color != null && (this.f_color.color == this.red || this.f_color.color == this.blue);
+			}
+			@Override public boolean getBackRaw() {
+				//System.out.println("Back is null: " + this.b_color == null);
+				return this.b_color != null && (this.b_color.color == this.red || this.b_color.color == this.blue);
+			}
+
+			@Override public Alliance getFrontCargoAlliance() {
+				return this.f_color.color == this.red ? Alliance.Red : this.f_color.color == this.blue ? Alliance.Blue : Alliance.Invalid;
+			}
+			@Override public Alliance getBackCargoAlliance() {
+				return this.b_color.color == this.red ? Alliance.Red : this.b_color.color == this.blue ? Alliance.Blue : Alliance.Invalid;
+			}
+			@Override public Alliance getLastBackDetected() {
+				return this.last_leaving == this.red ? Alliance.Red : this.last_leaving == this.blue ? Alliance.Blue : Alliance.Invalid; 
+			}
+
+
+		}
+
 		private final MotorControllerGroup motors;
-		private final DigitalInput input, output;
-		private int cargo_cnt = 0;
-		private boolean
-			now_input = false, now_output = false,
-			last_input = false, last_output = false;
+		private final IndexerSystem indexer;
 
 		public TransferSubsystem(MotorController... ms) { this(null, null, ms); }
 		public TransferSubsystem(DigitalInput i, DigitalInput o, MotorController... ms) {
 			this.motors = new MotorControllerGroup(ms);
-			this.input = i;
-			this.output = o;
-			if(i != null && o != null) {
-				this.register();
-			}
+			this.indexer = new DigitalInputIndexer(i, o);
+		}
+		public TransferSubsystem(ColorSensorV3 f, ColorSensorV3 b, Color red, Color blue, Color n, MotorController... ms) {
+			this.motors = new MotorControllerGroup(ms);
+			this.indexer = new ColorSensorIndexer(f, b, red, blue, n);
 		}
 		public TransferSubsystem(int... ps) {
 			this(null, null, Motors.pwm_victorspx, ps);
 		}
 		public TransferSubsystem(int i, int o, int... ps) {
 			this(new DigitalInput(i), new DigitalInput(o), Motors.pwm_victorspx, ps);
-			this.register();
+		}
+		public TransferSubsystem(I2C.Port f, I2C.Port b, Color red, Color blue, Color n, int... ps) {
+			this(new ColorSensorV3(f), new ColorSensorV3(b), red, blue, n, Motors.pwm_victorspx, ps);
 		}
 		public<M extends MotorController> TransferSubsystem(MotorSupplier<M> t, int... ps) {
 			this(null, null, t, ps);
 		}
 		public<M extends MotorController> TransferSubsystem(int i, int o, MotorSupplier<M> t, int... ps) {
 			this(new DigitalInput(i), new DigitalInput(o), t, ps);
-			this.register();
+		}
+		public<M extends MotorController> TransferSubsystem(I2C.Port f, I2C.Port b, Color red, Color blue, Color n, MotorSupplier<M> t, int... ps) {
+			this(new ColorSensorV3(f), new ColorSensorV3(b), red, blue, n, t, ps);
 		}
 		public<M extends MotorController> TransferSubsystem(DigitalInput i, DigitalInput o, MotorSupplier<M> t, int... ps) {
 			MotorController[] temp = new MotorController[ps.length];
@@ -131,23 +284,15 @@ public final class CargoSystem {
 				temp[k] = t.create(ps[k]);
 			}
 			this.motors = new MotorControllerGroup(temp);
-			this.input = i;
-			this.output = o;
+			this.indexer = new DigitalInputIndexer(i, o);
 		}
-
-		/**
-		 * Keeps track of the number of cargo that are being manipulated by the transfer system. 
-		 * The counter increments on a rising edge on the input, and decrements on a falling edge on the output.
-		 */
-		@Override public void periodic() {
-			if(this.input != null && this.output != null) {	// should be safe because of check within constructors -> uncomment if issue
-				this.last_input = this.now_input;
-				this.last_output = this.now_output;
-				this.now_input = this.input.get();
-				this.now_output = this.output.get();
-				if(this.isInputRisingEdge()) { this.cargo_cnt++; }
-				if(this.isOutputFallingEdge()) { this.cargo_cnt--; }
+		public<M extends MotorController> TransferSubsystem(ColorSensorV3 f, ColorSensorV3 b, Color red, Color blue, Color n, MotorSupplier<M> t, int... ps) {
+			MotorController[] temp = new MotorController[ps.length];
+			for(int k = 0; k < ps.length; k++) {
+				temp[k] = t.create(ps[k]);
 			}
+			this.motors = new MotorControllerGroup(temp);
+			this.indexer = new ColorSensorIndexer(f, b, red, blue, n);
 		}
 
 		public void startAutomaticTransfer(double s) {
@@ -164,34 +309,40 @@ public final class CargoSystem {
 			this.motors.stopMotor();
 		}
 		public boolean hasFeedback() {
-			return this.input != null && this.output != null;
+			return this.indexer.hasFeedback();
+		}
+		public boolean hasColorDetection() {
+			return this.indexer.hasColorDetection();
 		}
 		public boolean getCurrentInput() {
-			if(this.input != null) {
-				return this.input.get();
-			}
-			return false;
+			return this.indexer.getFrontRaw();
 		}
 		public boolean getCurrentOutput() {
-			if(this.output != null) {
-				return this.output.get();
-			}
-			return false;
+			return this.indexer.getBackRaw();
 		}
 		public boolean isInputRisingEdge() {
-			return !this.last_input && this.now_input;
+			return this.indexer.isFrontRisingEdge();
 		}
 		public boolean isInputFallingEdge() {
-			return this.last_input && !this.now_input;
+			return this.indexer.isFrontFallingEdge();
 		}
 		public boolean isOutputRisingEdge() {
-			return !this.last_output && this.now_output;
+			return this.indexer.isBackRisingEdge();
 		}
 		public boolean isOutputFallingEdge() {
-			return this.last_output && !this.now_output;
+			return this.indexer.isBackFallingEdge();
 		}
 		public int getCargoCount() {
-			return this.cargo_cnt;
+			return this.indexer.getCount();
+		}
+		public Alliance getFrontCargoAlliance() {
+			return this.indexer.getFrontCargoAlliance();
+		}
+		public Alliance getBackCargoAlliance() {
+			return this.indexer.getBackCargoAlliance();
+		}
+		public Alliance getLastBackDetected() {
+			return this.indexer.getLastBackDetected();
 		}
 
 		/**
@@ -532,7 +683,7 @@ public final class CargoSystem {
 			System.out.println(getClass().getSimpleName() + ": Running...");
 		}
 		@Override public void execute() {
-			if(this.transfer_sys.cargo_cnt < 2) {
+			if(this.transfer_sys.getCargoCount() < 2) {
 				super.execute();
 			} else {
 				super.setVoltage(0);
@@ -596,7 +747,9 @@ public final class CargoSystem {
 			}
 		}
 		@Override public void execute() {
-			if(super.transfer_sys.getCurrentInput() && !super.transfer_sys.getCurrentOutput() && super.transfer_sys.getCargoCount() <= 2) {
+			//System.out.println("F: " + super.transfer_sys.getCurrentInput() + "\tB: " + super.transfer_sys.getCurrentOutput());
+			if(super.transfer_sys.getCurrentInput() && !super.transfer_sys.getCurrentOutput()/* && !super.transfer_sys.getCurrentOutput() && super.transfer_sys.getCargoCount() <= 2*/) {
+				//System.out.println("running transfer");
 				super.execute();
 			} else {
 				super.set(0);
@@ -663,11 +816,29 @@ public final class CargoSystem {
 		private final TransferSubsystem transfer_sys;
 
 		private ManagedShoot(ShooterSubsystem s, TransferSubsystem t, BooleanSupplier ftrigger, double fvolts, double svolts) {
-			super(s, ftrigger, fvolts, svolts);
+			super(s, ftrigger, ()->fvolts, 
+				t.hasColorDetection() ? 
+					()->{
+						if(DriverStation.getAlliance() == t.getLastBackDetected()) {
+							return svolts;
+						} else {
+							return svolts / 2.0;
+						}
+					} : ()->svolts
+			);
 			this.transfer_sys = t;
 		}
 		private ManagedShoot(ShooterSubsystem s, TransferSubsystem t, BooleanSupplier ftrigger, DoubleSupplier fvolts, DoubleSupplier svolts) {
-			super(s, ftrigger, fvolts, svolts);
+			super(s, ftrigger, fvolts, 
+				t.hasColorDetection() ? 
+				()->{
+					if(DriverStation.getAlliance() == t.getLastBackDetected()) {
+						return svolts.getAsDouble();
+					} else {
+						return svolts.getAsDouble() / 2.0;
+					}
+				} : svolts
+			);
 			this.transfer_sys = t;
 		}
 
@@ -677,9 +848,9 @@ public final class CargoSystem {
 			}
 			super.initialize();
 		}
-		@Override public boolean isFinished() {
-			return this.transfer_sys.hasFeedback() && this.transfer_sys.getCargoCount() <= 0;
-		}
+		// @Override public boolean isFinished() {
+		// 	return this.transfer_sys.hasFeedback() && this.transfer_sys.getCargoCount() <= 0;
+		// }
 
 
 	}
@@ -865,6 +1036,9 @@ public final class CargoSystem {
 				this.position = RapidReactVision.getHubPosition();
 				if(this.position != null) {
 					this.last_voltage = this.inches2voltage.convert(this.position.distance);	// update calculated voltage
+					if(super.transfer_sys.hasColorDetection() && DriverStation.getAlliance() != super.transfer_sys.getLastBackDetected()) {
+						this.last_voltage /= 2;
+					}
 				}
 				super.setShooterVoltage(this.last_voltage);		// set shooter speed
 				super.shooter_sys.setFeedVoltage(super.feed_actuate.getAsBoolean() ? super.feed_voltage.getAsDouble() : 0, this);	// set feed if booleansupplier allows

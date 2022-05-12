@@ -6,6 +6,7 @@ import edu.wpi.first.math.geometry.*;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.util.Color;
 import edu.wpi.first.wpilibj.Filesystem;
+import edu.wpi.first.wpilibj.I2C;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
 //import edu.wpi.first.wpilibj.motorcontrol.PWMVictorSPX;
@@ -133,7 +134,7 @@ public final class Constants {
 	public static final int
 		cargo_pipeline_scaling = 4	// the cargo pipeline lags pretty bad without downscaling -> full resolution actually doesn't help the detection either
 	;
-	public static final CameraPreset
+	public static final CameraPreset	// these are currently the values from competition - make different values for different locations?
 		driving_camera_preset = new CameraPreset(50, 40, 3500),
 		hub_camera_preset = new CameraPreset(50, 10, 3500),
 		cargo_blue_camera_preset = new CameraPreset(50, 30, 4000),
@@ -163,9 +164,14 @@ public final class Constants {
 	;
 
 
+	public static final I2C.Port
+		front_colorsensor = I2C.Port.kOnboard,
+		back_colorsensor = I2C.Port.kMXP
+	;
 	public static final Color
-		blue_cargo_colormatch = Color.kFirstBlue,
-		red_cargo_colormatch = Color.kFirstRed
+		blue_cargo_colormatch = new Color(0.22, 0.45, 0.32),	// calibrated for detecting through a plastic sheet. Originally used Color.kFirstBlue
+		red_cargo_colormatch = new Color(0.32, 0.45, 0.22),		// ^^^ Color.kFirstRed
+		nothing_colormatch = new Color(0.25, 0.45, 0.25)		// the color that is detected when there is no cargo present
 	;
 
 
