@@ -5,3 +5,6 @@
 [submodule "src/main/java/frc/robot/team3407"]
 	path = src/main/java/frc/robot/team3407
 	url = https://github.com/S1ink/FRC-Java-Modules/
+[submodule "vision/VisionServer"]
+	path = vision/VisionServer
+	url = https://github.com/FRC3407/VisionServer
