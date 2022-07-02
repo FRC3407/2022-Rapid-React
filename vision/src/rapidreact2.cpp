@@ -42,10 +42,9 @@ void UHPipeline::process(cv::Mat& io_frame) {
 	for(size_t i = 0; i < this->contours.size(); i++) {
 		::rescale(this->contours.at(i), this->scale);
 	}
+
 	for(size_t i = 0; i < this->contours.size(); i++) {
-		if(i < reinserted) {
-			i = reinserted;
-		}
+
 		this->rect_buff = cv::boundingRect(this->contours.at(i));
 		if(::inRange(((float)this->rect_buff.width / this->rect_buff.height), 1.75f, 2.75f)) {
 			
@@ -138,6 +137,9 @@ void UHPipeline::process(cv::Mat& io_frame) {
 
 			} else {
 				this->in_range.clear();
+				if(i + 1 < reinserted) {
+					i = reinserted - 1;
+				}
 			}
 		} else {
 

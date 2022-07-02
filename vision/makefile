@@ -86,7 +86,7 @@ $(PROGRAM): $(OBJS) | $(OUT_DIR)
 	$(CXX) $(LOPTS) -o $@ $(LDFLAGS) $(foreach file,$(^F),$(OBJ_DIR)/$(file)) $(LDLIBS)
 
 $(VISIONSERVER):
-	cd VisionServer/lib-vs && $(MAKE) shared
+	$(MAKE) -C VisionServer/lib-vs shared
 
 $(OUT_DIR) $(OBJ_DIR):
 	mkdir $@

@@ -1,15 +1,8 @@
 #include <vector>
-#include <array>
-#include <string>
-#include <sstream>
 #include <thread>
+#include <chrono>
 
-#include <tensorflow/lite/interpreter.h>
-#include <tensorflow/lite/interpreter_builder.h>
-#include <tensorflow/lite/model_builder.h>
-#include <tensorflow/lite/kernels/register.h>
-#include <edgetpu.h>
-#include <opencv4/opencv2/opencv.hpp>
+#include <cameraserver/CameraServer.h>
 
 #include "cpp-tools/src/resources.h"
 #include "cpp-tools/src/sighandle.h"
@@ -42,29 +35,23 @@ int main(int argc, char* argv[]) {
 
 	vs2::VisionServer::Init();
 	vs2::VisionServer::addCameras(std::move(cameras));
-	vs2::VisionServer::addStream("stream");
+	vs2::VisionServer::addStreams(3);
 	UHPipeline uh_pipe(vs2::BGR::BLUE);
-	vs2::VisionServer::addPipeline(&uh_pipe);
+	AxonRunner a(2);
+	vs2::VisionServer::addPipelines({&uh_pipe, &a});
 	vs2::VisionServer::compensate();
 	vs2::VisionServer::run(60);
 	atexit(vs2::VisionServer::stopExit);
 
-	//VisionServer vserver(std::move(cameras));
-	// HttpServer hserver(
+
+
+	//HttpServer hserver(
 	// 	&std::cout,
 	// 	"/home/pi",
 	// 	nullptr,
 	// 	Version::HTTP_1_1,
 	// 	"81"	// the main WPILibPi page uses port 80
 	// );
-	//vserver.runVision_S<CargoFinder, StripFinder<VThreshold::LED::GREEN> >(25);
-	// vserver.runVision<
-	// 	CargoFinder,
-	// 	StripFinder<VThreshold::LED::BLUE>,
-	// 	SquareTargetPNP,
-	// 	TargetSolver<Test6x6, WeightedSubtraction<VThreshold::LED::BLUE> >,
-	// 	BBoxDemo
-	// >(25);
 	//hserver.serve<HttpNTables>();
 }
 
@@ -80,11 +67,11 @@ x Modularize?
 x Target abstraction and generalization (pipeline template param)
 x System for telling the robot when targeting info is outdated
 x Toggle pipeline processing (processing or just streaming)
-- Networktables continuity with multiple class instances
+x Networktables continuity with multiple class instances
 x Multiple VisionServer processing instances, data protection/management -> vector of threads?
 - Robot-program mode where all settings are determined by robot program over ntables
 - Automatically deduce nt-connection mode
 x TensorFlow models
-- VS2 Targets/ntables output
-- Coral Edge TPU delegate support
+x VS2 Targets/ntables output
+x Coral Edge TPU delegate support
 */
