@@ -114,6 +114,8 @@ public class Runtime extends TimedRobot {
 
 	@Override public void robotInit() {
 
+		NetworkTableInstance.getDefault().setUpdateRate(1.0 / 30.0);
+
 		new Trigger(()->VisionServer.isConnected()).whenActive(
 			new LambdaCommand(()->System.out.println("Coprocessor Connected!"))
 		);
@@ -468,7 +470,7 @@ public class Runtime extends TimedRobot {
 		teleop_trigger.and(shoot_trigger.negate()).and(invert_trigger.negate()).and(actuate_trigger).and(routines_trigger.negate()).whileActiveOnce(
 			this.cargo_sys.basicIntake(Constants.intake_voltage)
 		);
-	// when the override button is pressed...x
+	// when the override button is pressed...
 		// and the shooter is toggled on
 		teleop_trigger.and(shoot_trigger).and(invert_trigger).and(routines_trigger.negate()).whileActiveOnce(
 			this.cargo_sys.managedShoot(

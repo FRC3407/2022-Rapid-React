@@ -250,6 +250,7 @@ public final class CargoSystem {
 
 		private final MotorControllerGroup motors;
 		private final IndexerSystem indexer;
+		private int shooter_override_mult = 1;
 
 		public TransferSubsystem(MotorController... ms) { this(null, null, ms); }
 		public TransferSubsystem(DigitalInput i, DigitalInput o, MotorController... ms) {
@@ -300,14 +301,18 @@ public final class CargoSystem {
 		}
 
 		public void set(double s, TransferCommand c) {
-			this.motors.set(s);
+			this.motors.set(s * this.shooter_override_mult);
 		}
 		public void setVoltage(double v, TransferCommand c) {
-			this.motors.setVoltage(v);
+			this.motors.setVoltage(v * this.shooter_override_mult);
 		}
 		public void stop(TransferCommand c) {
 			this.motors.stopMotor();
 		}
+		public void setShooterOverride(boolean v, ShooterSubsystem.ShooterCommand c) {	// TRUE to enable override, FALSE to disable
+			this.shooter_override_mult = v ? 0 : 1;
+		}
+
 		public boolean hasFeedback() {
 			return this.indexer.hasFeedback();
 		}
@@ -469,17 +474,17 @@ public final class CargoSystem {
 			}
 		}
 		public void setShooter(double s, ShooterCommand c) {
-			if(this.main != null) {
-				this.main.set(ControlMode.PercentOutput, s);
-			} else if(this.base_main != null) {
+			if(this.base_main != null) {
 				this.base_main.set(s);
+			} else if(this.main != null) {
+				this.main.set(ControlMode.PercentOutput, s);
 			}
 		}
 		public void setShooterVoltage(double v, ShooterCommand c) {
-			if(this.main != null) {
-				this.main.setVoltage(v);
-			} else if(this.base_main != null) {
+			if(this.base_main != null) {
 				this.base_main.setVoltage(v);
+			} else if(this.main != null) {
+				this.main.setVoltage(v);
 			}
 		}
 		public void setShooterRawVelocity(double vr, ShooterCommand c) {
@@ -491,11 +496,19 @@ public final class CargoSystem {
 			this.setShooterRawVelocity(rpm / 600 * Constants.falcon_units_per_revolution, c);
 		}
 		public void stopShooter(ShooterCommand c) {
-			if(this.main != null) {
-				this.main.stopMotor();
-			} else if(this.base_main != null) {
+			if(this.base_main != null) {
 				this.base_main.stopMotor();
+			} else if(this.main != null) {
+				this.main.stopMotor();
 			}
+		}
+		public double getLastShooterSpeed() {
+			if(this.base_main != null) {
+				return this.base_main.get();
+			} else if(this.main != null) {
+				return this.main.get();
+			}
+			return 0.0;
 		}
 		public double getShooterRawPosition() {
 			if(this.main != null) {
@@ -538,11 +551,13 @@ public final class CargoSystem {
 
 			/** Make sure this method is called on initialization */
 			protected void initRateLimit() {
-				this.rate_limit = new SlewRateLimiter(this.shooter_sys.vlimit);
+				this.rate_limit = new SlewRateLimiter(this.shooter_sys.vlimit, 0);
 			}
-			/** Applies rate limit */
-			protected void setShooterVoltage(double v) {
-				this.shooter_sys.setShooterVoltage(this.rate_limit.calculate(v), this);
+			/** Applies rate limit, returns the limited value */
+			protected double setShooterVoltage(double v) {
+				double limited = this.rate_limit.calculate(v);
+				this.shooter_sys.setShooterVoltage(limited, this);
+				return limited;
 			}
 
 			// add shooter access methods
@@ -842,11 +857,26 @@ public final class CargoSystem {
 			this.transfer_sys = t;
 		}
 
+		@Override protected double setShooterVoltage(double v) {
+			double l = super.setShooterVoltage(v);
+			this.transfer_sys.setShooterOverride(l != v, this);
+			return l;
+		}
+
 		@Override public void initialize() {
 			if(!this.transfer_sys.hasFeedback()) {
 				System.out.println(getClass().getSimpleName() + ": No feedback sensors detected. Defaulting to BasicShoot.");
 			}
 			super.initialize();
+		}
+		@Override public void execute() {
+			// maybe change the super implementation to somehow use the overloaded 'setShooterVoltage' instead of this reimplemntation
+			this.setShooterVoltage(this.shooter_voltage.getAsDouble());
+			if(this.feed_actuate.getAsBoolean()) {
+				super.shooter_sys.setFeedVoltage(this.feed_voltage.getAsDouble(), this);
+			} else {
+				super.shooter_sys.setFeed(0, this);
+			}
 		}
 		// @Override public boolean isFinished() {
 		// 	return this.transfer_sys.hasFeedback() && this.transfer_sys.getCargoCount() <= 0;
@@ -857,6 +887,7 @@ public final class CargoSystem {
 	/**
 	 * Spins the shooter and feed motor until the last limit switch is detected to have a falling edge (cargo just left).
 	 */
+// UPDATE THIS TO EXTEND MANAGEDSHOOT
 	public static class ShootOne extends ShooterSubsystem.ShooterCommand {	// shoots a single cargo with the given speed - transfer sensors required
 
 		protected final TransferSubsystem transfer_sys;
@@ -953,6 +984,7 @@ public final class CargoSystem {
 	 * the phoenix api. Additionally, the feed motor is not allowed to be spun until the target velocity is reached. If the shooter motor(s) are
 	 * not TalonFX's, then this command does nothing. 
 	 */
+// UPDATE THIS TO EXTEND MANAGEDSHOOT (for clrsense ramping handler)
 	public static class ManagedShootCL extends BasicShootCL {
 
 		private final TransferSubsystem transfer_sys;
