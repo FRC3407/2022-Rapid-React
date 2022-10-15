@@ -49,7 +49,7 @@ public final class Constants {
 
 	public static final double 
 // Vision -> inches and degrees
-		heading_offset_thresh = 0.5,	// threshold for targeting angle
+		heading_offset_thresh = 1.0,	// threshold for targeting angle
 		max_heading_offset = 22.0,		// maximum angle range that a target could be offset (used as divisor for P-loop)
 		cargo_thresh = 20.0,			// threshold distance for a cargo to be considered close enough to influenced by intake
 		max_cargo_range_inches = 100.0,		// maximum range that a cargo could be (and detected - used as divisor for P-loop)
@@ -85,7 +85,7 @@ public final class Constants {
 		//shooter_static_voltage = 0.8,	// CURRENTLY JUST AN ESTIMATE
 		shooter_max_voltage = 11.25,
 		shooter_min_voltage = 10.75,
-		shooter_ramp_limit = 12.0,		// volts per second -> ~12.0 means that it will take a second to get to max speed
+		shooter_ramp_limit = 8.0,		// volts per second -> ~12.0 means that it will take a second to get to max speed
 		climber_extend_voltage = 8,
 		climber_hold_ext_voltage = 1,
 		climber_retract_voltage = 10,
@@ -134,23 +134,23 @@ public final class Constants {
 	public static final int
 		cargo_pipeline_scaling = 4	// the cargo pipeline lags pretty bad without downscaling -> full resolution actually doesn't help the detection either
 	;
-	public static final CameraPreset	// these are currently the values from competition - make different values for different locations?
-		driving_camera_preset = new CameraPreset(50, 40, 3500),
-		hub_camera_preset = new CameraPreset(50, 10, 3500),
-		cargo_blue_camera_preset = new CameraPreset(50, 30, 4000),
-		cargo_red_camera_preset = new CameraPreset(50, 15, 3500)
+	public static final CameraPreset.NetworkEditable	// these are currently the values from competition - make different values for different locations?
+		driving_camera_preset = new CameraPreset.NetworkEditable(50, 35, 3500),
+		hub_camera_preset = new CameraPreset.NetworkEditable(50, 10, 3500),
+		cargo_blue_camera_preset = new CameraPreset.NetworkEditable(50, 30, 4000),
+		cargo_red_camera_preset = new CameraPreset.NetworkEditable(50, 15, 3500)
 	;
 	public static final Runnable	// these functions contain all configs that should be applied before each vision usecase
 		vision_driving = ()->{
 			VisionServer.setProcessingEnabled(false);
 			VisionServer.setStatistics(false);
-			VisionServer.applyCameraPreset(driving_camera_preset);
+			VisionServer.applyCameraPreset(driving_camera_preset.get());
 		},
 		vision_cargo = ()->{
 			VisionServer.setProcessingEnabled(true);
 			VisionServer.setStatistics(true);
 			VisionServer.applyCameraPreset(
-				DriverStation.getAlliance() == Alliance.Blue ? cargo_blue_camera_preset : cargo_red_camera_preset
+				DriverStation.getAlliance() == Alliance.Blue ? cargo_blue_camera_preset.get() : cargo_red_camera_preset.get()
 			);
 			RapidReactVision.setCargoPipelineScaling(cargo_pipeline_scaling);
 			RapidReactVision.Cameras.CARGO.setActive();
@@ -158,7 +158,7 @@ public final class Constants {
 		vision_hub = ()->{
 			VisionServer.setProcessingEnabled(true);
 			VisionServer.setStatistics(true);
-			VisionServer.applyCameraPreset(hub_camera_preset);
+			VisionServer.applyCameraPreset(hub_camera_preset.get());
 			RapidReactVision.Cameras.HUB.setActive();
 		}
 	;

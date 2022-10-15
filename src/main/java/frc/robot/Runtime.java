@@ -76,11 +76,11 @@ public class Runtime extends TimedRobot {
 
 
 	private final NetworkTable
-		variables = NetworkTableInstance.getDefault().getTable("Variables");
+		parameters_nt = NetworkTableInstance.getDefault().getTable("Parameters");
 	private final NetworkTableEntry
-		shooter_volts = variables.getEntry("Shooter voltage"),
-		intake_volts = variables.getEntry("Intake voltage"),
-		transfer_volts = variables.getEntry("Transfer voltage")
+		shooter_volts_nt = parameters_nt.getEntry("Shooter voltage"),
+		intake_volts_nt = parameters_nt.getEntry("Intake voltage"),
+		transfer_volts_nt = parameters_nt.getEntry("Transfer voltage")
 	;
 
 
@@ -95,12 +95,16 @@ public class Runtime extends TimedRobot {
 		this.drivebase.setSpeedSquaring(Constants.teleop_drivebase_speed_squaring);
 
 		this.cargo_sys.shooter.rateLimit(Constants.shooter_ramp_limit);
-
-		this.shooter_volts.setDouble(Constants.shooter_max_voltage);
-		this.intake_volts.setDouble(Constants.intake_voltage);
-		this.transfer_volts.setDouble(Constants.transfer_voltage);
-
 		this.cargo_sys.startAutomaticTransfer(Constants.transfer_voltage);
+
+		this.shooter_volts_nt.setDouble(Constants.shooter_max_voltage);
+		this.intake_volts_nt.setDouble(Constants.intake_voltage);
+		this.transfer_volts_nt.setDouble(Constants.transfer_voltage);
+
+		Constants.hub_camera_preset.initializeNT(parameters_nt, "Hub Presets");
+		Constants.cargo_red_camera_preset.initializeNT(parameters_nt, "Red Cargo Presets");
+		Constants.cargo_blue_camera_preset.initializeNT(parameters_nt, "Blue Cargo Presets");
+
 		Constants.vision_cargo.run();
 
 		this.starting_pose = Constants.StartingPose.getSelectable(DriverStation.getAlliance());

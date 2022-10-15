@@ -6,32 +6,22 @@
           "open": true
         }
       },
+      "REV Color Sensor V3[0,82]": {
+        "header": {
+          "open": true
+        }
+      },
+      "REV Color Sensor V3[1,82]": {
+        "header": {
+          "open": true
+        }
+      },
       "Talon FX[0]": {
         "header": {
           "open": true
         }
       },
       "Talon FX[4]": {
-        "header": {
-          "open": true
-        }
-      },
-      "Talon SRX[0]": {
-        "header": {
-          "open": true
-        }
-      },
-      "Talon SRX[1]": {
-        "header": {
-          "open": true
-        }
-      },
-      "Talon SRX[2]": {
-        "header": {
-          "open": true
-        }
-      },
-      "Talon SRX[3]": {
         "header": {
           "open": true
         }
@@ -135,20 +125,13 @@
       "open": true
     },
     "LiveWindow": {
-      "ClosedLoopDifferentialDrive": {
-        "open": true
-      },
       "DriveBase": {
         "open": true
       },
       "Ungrouped": {
         "DifferentialDrive[1]": {
           "open": true
-        },
-        "Scheduler": {
-          "open": true
-        },
-        "open": true
+        }
       }
     },
     "Motion": {
@@ -156,6 +139,18 @@
         "open": true
       },
       "Velocity": {
+        "open": true
+      },
+      "open": true
+    },
+    "Parameters": {
+      "Blue Cargo Presets": {
+        "open": true
+      },
+      "Hub Presets": {
+        "open": true
+      },
+      "Red Cargo Presets": {
         "open": true
       },
       "open": true
