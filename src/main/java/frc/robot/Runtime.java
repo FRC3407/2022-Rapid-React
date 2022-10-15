@@ -105,6 +105,9 @@ public class Runtime extends TimedRobot {
 		Constants.cargo_red_camera_preset.initializeNT(parameters_nt, "Red Cargo Presets");
 		Constants.cargo_blue_camera_preset.initializeNT(parameters_nt, "Blue Cargo Presets");
 
+		RapidReactVision.setHubPipelineMinRange(Constants.min_hub_range_inches);
+		RapidReactVision.setHubPipelineMaxRange(Constants.max_hub_range_inches);
+
 		Constants.vision_cargo.run();
 
 		this.starting_pose = Constants.StartingPose.getSelectable(DriverStation.getAlliance());
@@ -121,7 +124,7 @@ public class Runtime extends TimedRobot {
 		NetworkTableInstance.getDefault().setUpdateRate(1.0 / 30.0);
 
 		new Trigger(()->VisionServer.isConnected()).whenActive(
-			new LambdaCommand(()->System.out.println("Coprocessor Connected!"))
+			new LambdaCommand(()->System.out.println("VisionServer Connected!"))
 		);
 		AutonomousTrigger.Get().whenActive(()->this.auto_command.getSelected().schedule());
 		EnabledTrigger.Get().whenActive(new LambdaCommand.Singular(()->this.drivebase.setInitial(this.starting_pose.getSelected().pose)));

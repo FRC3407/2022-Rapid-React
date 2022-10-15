@@ -160,6 +160,7 @@ public final class Constants {
 			VisionServer.setStatistics(true);
 			VisionServer.applyCameraPreset(hub_camera_preset.get());
 			RapidReactVision.Cameras.HUB.setActive();
+			RapidReactVision.setHubPipelineOverlay(true);
 		}
 	;
 

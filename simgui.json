@@ -25,6 +25,26 @@
         "header": {
           "open": true
         }
+      },
+      "Talon SRX[0]": {
+        "header": {
+          "open": true
+        }
+      },
+      "Talon SRX[1]": {
+        "header": {
+          "open": true
+        }
+      },
+      "Talon SRX[2]": {
+        "header": {
+          "open": true
+        }
+      },
+      "Talon SRX[3]": {
+        "header": {
+          "open": true
+        }
       }
     },
     "PWM Outputs": {
@@ -152,8 +172,7 @@
       },
       "Red Cargo Presets": {
         "open": true
-      },
-      "open": true
+      }
     },
     "SmartDashboard": {
       "Auto Mode": {
