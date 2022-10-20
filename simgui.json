@@ -6,6 +6,16 @@
           "open": true
         }
       },
+      "REV Color Sensor V3[0,82]": {
+        "header": {
+          "open": true
+        }
+      },
+      "REV Color Sensor V3[1,82]": {
+        "header": {
+          "open": true
+        }
+      },
       "Talon FX[0]": {
         "header": {
           "open": true
@@ -62,6 +72,7 @@
       "/LiveWindow/Ungrouped/DigitalInput[8]": "Digital Input",
       "/LiveWindow/Ungrouped/DigitalInput[9]": "Digital Input",
       "/LiveWindow/Ungrouped/MotorControllerGroup[1]": "Motor Controller",
+      "/LiveWindow/Ungrouped/MotorControllerGroup[2]": "Motor Controller",
       "/LiveWindow/Ungrouped/MotorControllerGroup[3]": "Motor Controller",
       "/LiveWindow/Ungrouped/PIDController[10]": "PIDController",
       "/LiveWindow/Ungrouped/PIDController[11]": "PIDController",
@@ -130,23 +141,18 @@
         "open": true
       }
     },
+    "FMSInfo": {
+      "open": true
+    },
     "LiveWindow": {
-      "ClosedLoopDifferentialDrive": {
-        "open": true
-      },
       "DriveBase": {
         "open": true
       },
       "Ungrouped": {
         "DifferentialDrive[1]": {
           "open": true
-        },
-        "Scheduler": {
-          "open": true
-        },
-        "open": true
-      },
-      "open": true
+        }
+      }
     },
     "Motion": {
       "Position": {
@@ -157,6 +163,17 @@
       },
       "open": true
     },
+    "Parameters": {
+      "Blue Cargo Presets": {
+        "open": true
+      },
+      "Hub Presets": {
+        "open": true
+      },
+      "Red Cargo Presets": {
+        "open": true
+      }
+    },
     "SmartDashboard": {
       "Auto Mode": {
         "open": true
@@ -166,8 +183,7 @@
       },
       "Starting Position": {
         "open": true
-      },
-      "open": true
+      }
     },
     "Targets": {
       "Cargo-1b": {
@@ -205,6 +221,9 @@
           "open": true
         },
         "Cargo Pipeline": {
+          "open": true
+        },
+        "TargetSolver Pipeline": {
           "open": true
         },
         "Upper-Hub Pipeline": {

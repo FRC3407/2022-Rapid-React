@@ -1,9 +1,9 @@
 package frc.robot;
 
-import frc.robot.modules.common.Input.AnalogSupplier;
-import frc.robot.modules.common.drive.DriveBase;
-import frc.robot.modules.common.drive.DriveBase.DriveCommandBase;
-import frc.robot.modules.vision.java.VisionServer;
+import frc.robot.team3407.Input.AnalogSupplier;
+import frc.robot.team3407.drive.DriveBase;
+import frc.robot.team3407.drive.DriveBase.DriveCommandBase;
+import frc.robot.vision.java.VisionServer;
 
 import java.util.function.BooleanSupplier;
 
@@ -42,7 +42,7 @@ public final class RapidReactVision {
 			this.key = k;
 		}
 
-		public int getIndex() { return VisionServer.findCameraIdx(this.key); }
+		public int getIndex() { return VisionServer.findPipelineIdx(this.key); }
 		public VisionServer.VsPipeline getObject() { return VisionServer.getPipeline(this.key); }
 		public NetworkTable getTable() { return VisionServer.getPipelinesTable().getSubTable(this.key); }
 		public boolean setActive() { return VisionServer.setPipeline(this.key); }
@@ -71,9 +71,9 @@ public final class RapidReactVision {
 		// }
 	}
 	private static RapidReactVision inst = new RapidReactVision();
-	//public static boolean safeInit() { return inst != null; }
 
 
+// BASIC CHECKS/UPDATERS
 	public static boolean hasHubPipeline() { return Pipelines.HUB_TRACKER.getObject() != null; }
 	public static boolean isHubPipelineValid() { return inst.upperhub != null; }
 	public static boolean hasCargoPipeline() { return Pipelines.CARGO_TRACKER.getObject() != null; }
@@ -101,23 +101,8 @@ public final class RapidReactVision {
 		return verifyHubPipeline() || verifyCargoPipeline();
 	}
 
-	// public static void applySettingsListener() {
-	// 	int p_handle = 0;
-	// 	final int c_handle = VisionServer.cameras.addSubTableListener(
-	// 		(parent, name, table)->{
-	// 			VisionServer.updateCameras();
-	// 			VisionServer.getCamera(name).setExposure(20);
-	// 			VisionServer.getCamera(name).setWhiteBalance(3000);
-	// 			VisionServer.cameras.removeTableListener(c_handle);
-	// 		}, false
-	// 	);
-	// 	VisionServer.pipelines.addSubTableListener(
-	// 		(parent, name, table)->{
-	// 			VisionServer.updatePipelines();
-	// 		}, false
-	// 	);
-	// }
 
+// NT PARAMETER SETTERS
 	public static boolean setHubPipelineScaling(int downscale) {	// returns false on failure
 		if(verifyHubPipeline()) {
 			return inst.upperhub.get().getEntry("Scaling").setDouble((double)downscale);
@@ -126,7 +111,25 @@ public final class RapidReactVision {
 	}
 	public static boolean showHubPipelineThreshold(boolean show) {	// returns false on failure
 		if(verifyHubPipeline()) {
-			return inst.upperhub.get().getEntry("Show Thresholed").setBoolean(show);
+			return inst.upperhub.get().getEntry("Show Threshold").setBoolean(show);
+		}
+		return false;
+	}
+	public static boolean setHubPipelineOverlay(boolean show) {
+		if(verifyHubPipeline()) {
+			return inst.upperhub.get().getEntry("Enable Overlay").setBoolean(show);
+		}
+		return false;
+	}
+	public static boolean setHubPipelineMinRange(double inches) {
+		if(verifyHubPipeline()) {
+			return inst.upperhub.get().getEntry("Minimum Range").setDouble(inches);
+		}
+		return false;
+	}
+	public static boolean setHubPipelineMaxRange(double inches) {
+		if(verifyHubPipeline()) {
+			return inst.upperhub.get().getEntry("Maximum Range").setDouble(inches);
 		}
 		return false;
 	}
@@ -149,6 +152,8 @@ public final class RapidReactVision {
 		return false;
 	}
 
+
+// HIGH LEVEL PIPELINE CONTROL
 	public static boolean isHubPipelineActive() {
 		if(verifyHubPipeline()) {
 			return inst.upperhub == VisionServer.getCurrentPipeline();
@@ -285,8 +290,8 @@ public final class RapidReactVision {
 		return setRedCargoEnabled(false) || setBlueCargoEnabled(false);
 	}
 
-// MAIN METHODS OF USE -> all return null on incorrect target or other error
 
+// MAIN METHODS OF USE -> all return null on incorrect target or other error
 	public static VisionServer.TargetData getHubPosition() {	// returns null on incorrect target
 		verifyHubPipelineActive();
 		return VisionServer.getTargetDataIfMatching("Upper-Hub");
@@ -344,6 +349,7 @@ public final class RapidReactVision {
 		hub_max_range = Constants.max_hub_range_inches,
 		max_heading_offset = Constants.max_heading_offset,
 		heading_thresh = Constants.heading_offset_thresh,
+		distance_thresh = 2.0,	// for hub-assist
 
 		default_cargo_target = Constants.cargo_follow_target_inches,
 
@@ -793,7 +799,7 @@ public final class RapidReactVision {
 		}
 		@Override public boolean isFinished() {
 			if(this.position != null) {
-				return Math.abs(this.position.lr) <= heading_thresh && Math.abs(this.position.distance) <= this.target;
+				return Math.abs(this.position.lr) <= heading_thresh && Math.abs(this.position.distance - this.target) <= distance_thresh;
 			}
 			return this.failed;
 		}
@@ -867,6 +873,9 @@ public final class RapidReactVision {
 			super.end(i);
 			this.drive.end(i);
 			System.out.println("\tHUB ASSIST {V2}: TARGETING COMPLETE.");
+		}
+		@Override public boolean isFinished() {
+			return false;
 		}
 
 

@@ -1,12 +1,19 @@
 package frc.robot.commands;
 
-import frc.robot.Constants;
-import frc.robot.modules.common.drive.DriveBase;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.wpilibj.interfaces.Gyro;
 
+import frc.robot.Constants;
+import frc.robot.team3407.drive.DriveBase;
+
 
 public class GyroDrive {
+
+	public static final double
+		max_error_degrees = 90,		// the angle which represents maximum error
+		static_turn_voltage = Constants.turning_static_voltage,
+		max_turn_voltage = Constants.auto_max_turn_voltage
+	;
 
 	public static class Straight extends DriveBase.DriveCommandBase {
 
@@ -20,23 +27,31 @@ public class GyroDrive {
 			this.speed = s;
 			this.initial = this.gyro.getAngle();
 		}
-		// public Straight(DriveBase db, Gyro gy, double s, double m) {
-		// 	super(db, m);
-		// 	this.gyro = gy;
-		// 	this.speed = s;
-		// 	this.initial = this.gyro.getAngle();
-		// }
 
 		@Override public void initialize() {
 			this.initial = this.gyro.getAngle();
 			System.out.println("Gyro-Straight: Running...");
 		}
 		@Override public void execute() {
-			double o = this.gyro.getAngle() - this.initial;
-			super.autoDrive(this.speed - (o / 90.0 * speed), this.speed + (o / 90.0 * speed));	// probably needs tuning
+			double e = MathUtil.clamp(this.gyro.getAngle() - this.initial, -1.0, 1.0) / max_error_degrees * this.speed;
+			super.autoDrive(this.speed - e, this.speed + e);
 		}
 		@Override public void end(boolean i) {
 			System.out.println("Gyro-Straight: " + (i ? "Terminated." : "Completed."));
+		}
+
+		public static class ByVoltage extends Straight {
+
+			public ByVoltage(DriveBase db, Gyro gy, double v) {
+				super(db, gy, v);
+			}
+
+			@Override public void execute() {
+				double e = MathUtil.clamp(super.gyro.getAngle() - super.initial, -1.0, 1.0) / max_error_degrees * super.speed;
+				super.autoDriveVoltage(super.speed - e, super.speed + e);
+			}
+
+
 		}
 
 
@@ -53,19 +68,16 @@ public class GyroDrive {
 			this.gyro = gy;
 			this.target = deg;
 		}
-		// public TurnInPlace(DriveBase db, Gyro gy, double deg, double m) {	// deg -> angle in degrees, positive is clockwise looking down
-		// 	super(db, m);
-		// 	this.gyro = gy;
-		// 	this.target = deg;
-		// }
 
 		@Override public void initialize() {
 			this.calculated = this.gyro.getAngle() + this.target;
 			System.out.println("TurnInPlace: Running...");
 		}
 		@Override public void execute() {
-			//System.out.println(((this.calculated - this.gyro.getAngle()) / 90.0) * Constants.auto_max_turn_speed);
-			super.autoTurn(MathUtil.clamp(((this.calculated - this.gyro.getAngle()) / 90.0), -1.0, 1.0) * Constants.auto_max_turn_voltage / 10.0);	// also probably needs tuning
+			double e = MathUtil.clamp((this.calculated - this.gyro.getAngle()) / 90.0, -1.0, 1.0);
+			super.autoTurnVoltage(
+				(Math.signum(e) * static_turn_voltage) + (e * (max_turn_voltage - static_turn_voltage))
+			);
 		}
 		@Override public void end(boolean i) {
 			System.out.println("TurnInPlace: " + (i ? "Terminated." : "Completed."));

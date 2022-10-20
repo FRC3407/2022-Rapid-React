@@ -2,20 +2,22 @@ package frc.robot;
 
 import java.nio.file.Path;
 
-import frc.robot.modules.common.drive.*;
-import frc.robot.modules.common.drive.Types.*;
-import frc.robot.modules.vision.java.VisionServer;
-import frc.robot.modules.vision.java.VisionServer.*;
-
 import edu.wpi.first.math.geometry.*;
 import edu.wpi.first.math.util.Units;
+import edu.wpi.first.wpilibj.util.Color;
 import edu.wpi.first.wpilibj.Filesystem;
+import edu.wpi.first.wpilibj.I2C;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
 //import edu.wpi.first.wpilibj.motorcontrol.PWMVictorSPX;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 
 import com.ctre.phoenix.motorcontrol.can.WPI_TalonSRX;
+
+import frc.robot.team3407.drive.*;
+import frc.robot.team3407.drive.Types.*;
+import frc.robot.vision.java.VisionServer;
+import frc.robot.vision.java.VisionServer.*;
 
 
 public final class Constants {
@@ -47,23 +49,25 @@ public final class Constants {
 
 	public static final double 
 // Vision -> inches and degrees
-		heading_offset_thresh = 0.5,	// threshold for targeting angle
+		heading_offset_thresh = 1.0,	// threshold for targeting angle
 		max_heading_offset = 22.0,		// maximum angle range that a target could be offset (used as divisor for P-loop)
 		cargo_thresh = 20.0,			// threshold distance for a cargo to be considered close enough to influenced by intake
 		max_cargo_range_inches = 100.0,		// maximum range that a cargo could be (and detected - used as divisor for P-loop)
 		cargo_follow_target_inches = 5.0,	// the distance away from a cargo that cargo-following commands will target
 		max_hub_range_inches = 215.0,		// maximum range that the hub can be detected from (used as divisor for P-loop)
 		min_hub_range_inches = 170.0,		// minimum range for shooting into the hub
+		hub_targeting_inches = (max_hub_range_inches + min_hub_range_inches) / 2,	// average shooting range - target for automated hub targeting
 
 // "percent output" (1.0 as 100%)
 		uncertainty_continuation_percentage = 0.95,	// if break in target detection, keep powering motors at this percent of the last values used
 
 		teleop_drivebase_scaling = -0.7,	// cap the voltage @70% -> negative because joysticks default to being inverted
 		teleop_drivebase_deadband = 0.05,	// the input range that is discarded
-		teleop_max_input_ramp = 2.0,		// maximum input acceleration in percent/sec^2 -> no more than 200% per second per second
+		teleop_max_input_ramp = 2.5,		// maximum input acceleration in percent/sec^2 -> no more than 200% per second per second
+		teleop_input_power = 1.5,			// power to raise analog (joystick) inputs to for driving
 
 // voltage
-		universal_max_voltage = 10.0,
+		universal_max_voltage = 10.0,	// not really used :?
 
 		auto_max_turn_voltage = 2.5,	// maximum voltage for turning in place during auto
 		auto_max_forward_voltage = 4.5,	// maximum voltage for driving forward during auto
@@ -81,9 +85,11 @@ public final class Constants {
 		//shooter_static_voltage = 0.8,	// CURRENTLY JUST AN ESTIMATE
 		shooter_max_voltage = 11.25,
 		shooter_min_voltage = 10.75,
+		shooter_ramp_limit = 8.0,		// volts per second -> ~12.0 means that it will take a second to get to max speed
 		climber_extend_voltage = 8,
-		climber_hold_voltage = 0,
+		climber_hold_ext_voltage = 1,
 		climber_retract_voltage = 10,
+		climber_hold_ret_voltage = 2,
 
 // Physical properties
 		drivetrack_width_inches = 21.819,	// track width of drivebase
@@ -128,23 +134,23 @@ public final class Constants {
 	public static final int
 		cargo_pipeline_scaling = 4	// the cargo pipeline lags pretty bad without downscaling -> full resolution actually doesn't help the detection either
 	;
-	public static final CameraPreset
-		driving_camera_preset = new CameraPreset(50, 40, 3500),
-		hub_camera_preset = new CameraPreset(50, 10, 3500),
-		cargo_blue_camera_preset = new CameraPreset(50, 30, 4000),
-		cargo_red_camera_preset = new CameraPreset(50, 15, 3500)
+	public static final CameraPreset.NetworkEditable	// these are currently the values from competition - make different values for different locations?
+		driving_camera_preset = new CameraPreset.NetworkEditable(50, 35, 3500),
+		hub_camera_preset = new CameraPreset.NetworkEditable(50, 10, 3500),
+		cargo_blue_camera_preset = new CameraPreset.NetworkEditable(50, 30, 4000),
+		cargo_red_camera_preset = new CameraPreset.NetworkEditable(50, 15, 3500)
 	;
 	public static final Runnable	// these functions contain all configs that should be applied before each vision usecase
 		vision_driving = ()->{
 			VisionServer.setProcessingEnabled(false);
 			VisionServer.setStatistics(false);
-			VisionServer.applyCameraPreset(driving_camera_preset);
+			VisionServer.applyCameraPreset(driving_camera_preset.get());
 		},
 		vision_cargo = ()->{
 			VisionServer.setProcessingEnabled(true);
 			VisionServer.setStatistics(true);
 			VisionServer.applyCameraPreset(
-				DriverStation.getAlliance() == Alliance.Blue ? cargo_blue_camera_preset : cargo_red_camera_preset
+				DriverStation.getAlliance() == Alliance.Blue ? cargo_blue_camera_preset.get() : cargo_red_camera_preset.get()
 			);
 			RapidReactVision.setCargoPipelineScaling(cargo_pipeline_scaling);
 			RapidReactVision.Cameras.CARGO.setActive();
@@ -152,9 +158,21 @@ public final class Constants {
 		vision_hub = ()->{
 			VisionServer.setProcessingEnabled(true);
 			VisionServer.setStatistics(true);
-			VisionServer.applyCameraPreset(hub_camera_preset);
+			VisionServer.applyCameraPreset(hub_camera_preset.get());
 			RapidReactVision.Cameras.HUB.setActive();
+			RapidReactVision.setHubPipelineOverlay(true);
 		}
+	;
+
+
+	public static final I2C.Port
+		front_colorsensor = I2C.Port.kOnboard,
+		back_colorsensor = I2C.Port.kMXP
+	;
+	public static final Color
+		blue_cargo_colormatch = new Color(0.22, 0.45, 0.32),	// calibrated for detecting through a plastic sheet. Originally used Color.kFirstBlue
+		red_cargo_colormatch = new Color(0.32, 0.45, 0.22),		// ^^^ Color.kFirstRed
+		nothing_colormatch = new Color(0.25, 0.45, 0.25)		// the color that is detected when there is no cargo present
 	;
 
 

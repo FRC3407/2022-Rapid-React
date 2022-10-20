@@ -1,2 +1,0 @@
-(pi) 1. not outputing target when alliance changes (works again after restart) -> "active target" just always says 'none'
-2. 

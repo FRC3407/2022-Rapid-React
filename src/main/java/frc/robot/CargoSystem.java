@@ -3,18 +3,26 @@ package frc.robot;
 import java.util.function.BooleanSupplier;
 import java.util.function.DoubleSupplier;
 
-import frc.robot.modules.common.drive.Motors;
-import frc.robot.modules.common.drive.Motors.MotorSupplier;
-import frc.robot.modules.vision.java.VisionServer;
+import edu.wpi.first.wpilibj.DigitalInput;
+import edu.wpi.first.wpilibj.I2C;
+import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.motorcontrol.*;
+import edu.wpi.first.wpilibj.util.Color;
+import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.DriverStation.Alliance;
+import edu.wpi.first.wpilibj2.command.*;
+import edu.wpi.first.math.filter.SlewRateLimiter;
+import edu.wpi.first.networktables.NetworkTableInstance;
+import edu.wpi.first.networktables.NetworkTable;
 
 import com.ctre.phoenix.motorcontrol.*;
 import com.ctre.phoenix.motorcontrol.can.*;
 import com.ctre.phoenix.sensors.SensorInitializationStrategy;
+import com.revrobotics.*;
 
-import edu.wpi.first.wpilibj.DigitalInput;
-import edu.wpi.first.wpilibj.Timer;
-import edu.wpi.first.wpilibj.motorcontrol.*;
-import edu.wpi.first.wpilibj2.command.*;
+import frc.robot.team3407.drive.Motors;
+import frc.robot.team3407.drive.Motors.MotorSupplier;
+import frc.robot.vision.java.VisionServer;
 
 
 /**
@@ -94,35 +102,182 @@ public final class CargoSystem {
 	 */
 	public static class TransferSubsystem implements Subsystem {
 
+		public static abstract class IndexerSystem implements Subsystem {
+
+			protected int count = 0;
+			protected boolean
+				front_state = false, back_state = false,
+				front_state_last = false, back_state_last = false;
+
+			public IndexerSystem() {
+				if(hasFeedback()) {
+					CommandScheduler.getInstance().registerSubsystem(this);
+				}
+			}
+
+			@Override public void periodic() {
+				this.front_state_last = this.front_state;
+				this.back_state_last = this.back_state;
+				this.front_state = this.getFrontRaw();
+				this.back_state = this.getBackRaw();
+				if(this.isFrontRisingEdge()) {
+					this.count++;
+				}
+				if(this.isBackFallingEdge()) {
+					this.count--;
+				}
+			}
+
+			/** Override this method to return true when the sensors are valid */
+			public boolean hasFeedback() { return false; }
+			/** Override this method to return true if the implementation supports color detection */
+			public boolean hasColorDetection() { return false; }
+			/** Override this method so that indexing is functional */
+			public boolean getFrontRaw() { return false; }
+			/** Override this method so that indexing is functional */
+			public boolean getBackRaw() { return false; }
+
+			public final boolean isFrontRisingEdge() {
+				return this.front_state && !this.front_state_last;
+			}
+			public final boolean isFrontFallingEdge() {
+				return !this.front_state && this.front_state_last;
+			}
+			public final boolean isBackRisingEdge() {
+				return this.back_state && !this.back_state_last;
+			}
+			public final boolean isBackFallingEdge() {
+				return !this.back_state && this.back_state_last;
+			}
+			public final int getCount() {
+				return this.count;
+			}
+
+			public Alliance getFrontCargoAlliance() {
+				return Alliance.Invalid;
+			}
+			public Alliance getBackCargoAlliance() {
+				return Alliance.Invalid;
+			}
+			public Alliance getLastBackDetected() {
+				return Alliance.Invalid;
+			}
+
+
+		}
+		public static class DigitalInputIndexer extends IndexerSystem {
+
+			private final DigitalInput front, back;
+
+			public DigitalInputIndexer(int f, int b) {
+				this.front = new DigitalInput(f);
+				this.back = new DigitalInput(b);
+			}
+			public DigitalInputIndexer(DigitalInput f, DigitalInput b) {
+				this.front = f;
+				this.back = b;
+			}
+
+			@Override public boolean hasFeedback() { return this.front != null && this.back != null; }
+			@Override public boolean getFrontRaw() { return this.front != null ? this.front.get() : false; }
+			@Override public boolean getBackRaw() { return this.back != null ? this.back.get() : false; }
+
+
+		}
+		public static class ColorSensorIndexer extends IndexerSystem {
+
+			private static final Color ncolor = Constants.nothing_colormatch;
+			private static final NetworkTable status_table = NetworkTableInstance.getDefault().getTable("ColorSensor Indexer");
+
+			private final ColorSensorV3 front, back;
+			private final ColorMatch matcher = new ColorMatch();
+			private final Color red, blue;
+			private ColorMatchResult f_color, b_color;
+			private Color last_leaving = null;
+
+			public ColorSensorIndexer(ColorSensorV3 f, ColorSensorV3 b, Color red, Color blue, Color n) {
+				this.front = f;
+				this.back = b;
+				this.red = red;
+				this.blue = blue;
+				this.matcher.addColorMatch(red);
+				this.matcher.addColorMatch(blue);
+				this.matcher.addColorMatch(n);
+				CommandScheduler.getInstance().registerSubsystem(this);
+			}
+			public ColorSensorIndexer(I2C.Port f, I2C.Port b, Color red, Color blue, Color n) {
+				this(new ColorSensorV3(f), new ColorSensorV3(b), red, blue, n);
+			}
+
+			@Override public void periodic() {
+				this.f_color = this.matcher.matchClosestColor(this.front != null ? this.front.getColor() : ncolor);
+				this.b_color = this.matcher.matchClosestColor(this.back != null ? this.back.getColor() : ncolor);
+				//System.out.println(this.f_color.color == this.red);
+				super.periodic();
+				if(this.getBackRaw()) {
+					this.last_leaving = this.b_color.color;
+				}
+				status_table.getEntry("Last Back Alliance").setString(this.last_leaving == this.blue ? "Blue" : this.last_leaving == this.red ? "Red" : "Null");
+			}
+			@Override public boolean hasFeedback() {
+				return this.front != null || this.back != null;
+				//return true;
+			}
+			@Override public boolean hasColorDetection() {
+				return this.hasFeedback();
+			}
+			@Override public boolean getFrontRaw() {
+				//System.out.println("Front is null: " + this.f_color == null);
+				return this.f_color != null && (this.f_color.color == this.red || this.f_color.color == this.blue);
+			}
+			@Override public boolean getBackRaw() {
+				//System.out.println("Back is null: " + this.b_color == null);
+				return this.b_color != null && (this.b_color.color == this.red || this.b_color.color == this.blue);
+			}
+
+			@Override public Alliance getFrontCargoAlliance() {
+				return this.f_color.color == this.red ? Alliance.Red : this.f_color.color == this.blue ? Alliance.Blue : Alliance.Invalid;
+			}
+			@Override public Alliance getBackCargoAlliance() {
+				return this.b_color.color == this.red ? Alliance.Red : this.b_color.color == this.blue ? Alliance.Blue : Alliance.Invalid;
+			}
+			@Override public Alliance getLastBackDetected() {
+				return this.last_leaving == this.red ? Alliance.Red : this.last_leaving == this.blue ? Alliance.Blue : Alliance.Invalid; 
+			}
+
+
+		}
+
 		private final MotorControllerGroup motors;
-		private final DigitalInput input, output;
-		private int cargo_cnt = 0;
-		private boolean
-			now_input = false, now_output = false,
-			last_input = false, last_output = false;
+		private final IndexerSystem indexer;
+		private int shooter_override_mult = 1;
 
 		public TransferSubsystem(MotorController... ms) { this(null, null, ms); }
 		public TransferSubsystem(DigitalInput i, DigitalInput o, MotorController... ms) {
 			this.motors = new MotorControllerGroup(ms);
-			this.input = i;
-			this.output = o;
-			if(i != null && o != null) {
-				this.register();
-			}
+			this.indexer = new DigitalInputIndexer(i, o);
+		}
+		public TransferSubsystem(ColorSensorV3 f, ColorSensorV3 b, Color red, Color blue, Color n, MotorController... ms) {
+			this.motors = new MotorControllerGroup(ms);
+			this.indexer = new ColorSensorIndexer(f, b, red, blue, n);
 		}
 		public TransferSubsystem(int... ps) {
 			this(null, null, Motors.pwm_victorspx, ps);
 		}
 		public TransferSubsystem(int i, int o, int... ps) {
 			this(new DigitalInput(i), new DigitalInput(o), Motors.pwm_victorspx, ps);
-			this.register();
+		}
+		public TransferSubsystem(I2C.Port f, I2C.Port b, Color red, Color blue, Color n, int... ps) {
+			this(new ColorSensorV3(f), new ColorSensorV3(b), red, blue, n, Motors.pwm_victorspx, ps);
 		}
 		public<M extends MotorController> TransferSubsystem(MotorSupplier<M> t, int... ps) {
 			this(null, null, t, ps);
 		}
 		public<M extends MotorController> TransferSubsystem(int i, int o, MotorSupplier<M> t, int... ps) {
 			this(new DigitalInput(i), new DigitalInput(o), t, ps);
-			this.register();
+		}
+		public<M extends MotorController> TransferSubsystem(I2C.Port f, I2C.Port b, Color red, Color blue, Color n, MotorSupplier<M> t, int... ps) {
+			this(new ColorSensorV3(f), new ColorSensorV3(b), red, blue, n, t, ps);
 		}
 		public<M extends MotorController> TransferSubsystem(DigitalInput i, DigitalInput o, MotorSupplier<M> t, int... ps) {
 			MotorController[] temp = new MotorController[ps.length];
@@ -130,23 +285,15 @@ public final class CargoSystem {
 				temp[k] = t.create(ps[k]);
 			}
 			this.motors = new MotorControllerGroup(temp);
-			this.input = i;
-			this.output = o;
+			this.indexer = new DigitalInputIndexer(i, o);
 		}
-
-		/**
-		 * Keeps track of the number of cargo that are being manipulated by the transfer system. 
-		 * The counter increments on a rising edge on the input, and decrements on a falling edge on the output.
-		 */
-		@Override public void periodic() {
-			if(this.input != null && this.output != null) {	// should be safe because of check within constructors -> uncomment if issue
-				this.last_input = this.now_input;
-				this.last_output = this.now_output;
-				this.now_input = this.input.get();
-				this.now_output = this.output.get();
-				if(this.isInputRisingEdge()) { this.cargo_cnt++; }
-				if(this.isOutputFallingEdge()) { this.cargo_cnt--; }
+		public<M extends MotorController> TransferSubsystem(ColorSensorV3 f, ColorSensorV3 b, Color red, Color blue, Color n, MotorSupplier<M> t, int... ps) {
+			MotorController[] temp = new MotorController[ps.length];
+			for(int k = 0; k < ps.length; k++) {
+				temp[k] = t.create(ps[k]);
 			}
+			this.motors = new MotorControllerGroup(temp);
+			this.indexer = new ColorSensorIndexer(f, b, red, blue, n);
 		}
 
 		public void startAutomaticTransfer(double s) {
@@ -154,43 +301,53 @@ public final class CargoSystem {
 		}
 
 		public void set(double s, TransferCommand c) {
-			this.motors.set(s);
+			this.motors.set(s * this.shooter_override_mult);
 		}
 		public void setVoltage(double v, TransferCommand c) {
-			this.motors.setVoltage(v);
+			this.motors.setVoltage(v * this.shooter_override_mult);
 		}
 		public void stop(TransferCommand c) {
 			this.motors.stopMotor();
 		}
+		public void setShooterOverride(boolean v, ShooterSubsystem.ShooterCommand c) {	// TRUE to enable override, FALSE to disable
+			this.shooter_override_mult = v ? 0 : 1;
+		}
+
 		public boolean hasFeedback() {
-			return this.input != null && this.output != null;
+			return this.indexer.hasFeedback();
+		}
+		public boolean hasColorDetection() {
+			return this.indexer.hasColorDetection();
 		}
 		public boolean getCurrentInput() {
-			if(this.input != null) {
-				return this.input.get();
-			}
-			return false;
+			return this.indexer.getFrontRaw();
 		}
 		public boolean getCurrentOutput() {
-			if(this.output != null) {
-				return this.output.get();
-			}
-			return false;
+			return this.indexer.getBackRaw();
 		}
 		public boolean isInputRisingEdge() {
-			return !this.last_input && this.now_input;
+			return this.indexer.isFrontRisingEdge();
 		}
 		public boolean isInputFallingEdge() {
-			return this.last_input && !this.now_input;
+			return this.indexer.isFrontFallingEdge();
 		}
 		public boolean isOutputRisingEdge() {
-			return !this.last_output && this.now_output;
+			return this.indexer.isBackRisingEdge();
 		}
 		public boolean isOutputFallingEdge() {
-			return this.last_output && !this.now_output;
+			return this.indexer.isBackFallingEdge();
 		}
 		public int getCargoCount() {
-			return this.cargo_cnt;
+			return this.indexer.getCount();
+		}
+		public Alliance getFrontCargoAlliance() {
+			return this.indexer.getFrontCargoAlliance();
+		}
+		public Alliance getBackCargoAlliance() {
+			return this.indexer.getBackCargoAlliance();
+		}
+		public Alliance getLastBackDetected() {
+			return this.indexer.getLastBackDetected();
 		}
 
 		/**
@@ -228,6 +385,7 @@ public final class CargoSystem {
 
 		private final WPI_TalonFX main, secondary;
 		private final MotorController feed, base_main;
+		private double vlimit = Double.MAX_VALUE;
 
 		private void configureFalcons() {
 			if(this.main != null) {
@@ -287,6 +445,19 @@ public final class CargoSystem {
 			}
 		}
 
+		/** In VOLTAGE not PERCENT OUTPUT */
+		public void rateLimit(double voltage_rate) {
+			this.vlimit = voltage_rate;
+			if(this.main != null) {
+				this.main.configOpenloopRamp(voltage_rate / 12);
+				this.main.configClosedloopRamp(voltage_rate / 12);
+			}
+			if(this.secondary != null) {
+				this.secondary.configOpenloopRamp(voltage_rate / 12);
+				this.secondary.configClosedloopRamp(voltage_rate / 12);
+			}
+		}
+
 		public void setFeed(double s, ShooterCommand c) {
 			if(this.feed != null) {
 				this.feed.set(s);
@@ -303,17 +474,17 @@ public final class CargoSystem {
 			}
 		}
 		public void setShooter(double s, ShooterCommand c) {
-			if(this.main != null) {
-				this.main.set(ControlMode.PercentOutput, s);
-			} else if(this.base_main != null) {
+			if(this.base_main != null) {
 				this.base_main.set(s);
+			} else if(this.main != null) {
+				this.main.set(ControlMode.PercentOutput, s);
 			}
 		}
 		public void setShooterVoltage(double v, ShooterCommand c) {
-			if(this.main != null) {
-				this.main.setVoltage(v);
-			} else if(this.base_main != null) {
+			if(this.base_main != null) {
 				this.base_main.setVoltage(v);
+			} else if(this.main != null) {
+				this.main.setVoltage(v);
 			}
 		}
 		public void setShooterRawVelocity(double vr, ShooterCommand c) {
@@ -325,11 +496,19 @@ public final class CargoSystem {
 			this.setShooterRawVelocity(rpm / 600 * Constants.falcon_units_per_revolution, c);
 		}
 		public void stopShooter(ShooterCommand c) {
-			if(this.main != null) {
-				this.main.stopMotor();
-			} else if(this.base_main != null) {
+			if(this.base_main != null) {
 				this.base_main.stopMotor();
+			} else if(this.main != null) {
+				this.main.stopMotor();
 			}
+		}
+		public double getLastShooterSpeed() {
+			if(this.base_main != null) {
+				return this.base_main.get();
+			} else if(this.main != null) {
+				return this.main.get();
+			}
+			return 0.0;
 		}
 		public double getShooterRawPosition() {
 			if(this.main != null) {
@@ -359,6 +538,8 @@ public final class CargoSystem {
 		public static abstract class ShooterCommand extends CommandBase {
 
 			protected final ShooterSubsystem shooter_sys;
+			protected SlewRateLimiter rate_limit;
+
 			protected ShooterCommand(ShooterSubsystem s) {
 				this.shooter_sys = s;
 				super.addRequirements(s);
@@ -366,6 +547,17 @@ public final class CargoSystem {
 			@Override public void end(boolean i) {
 				this.shooter_sys.stopFeed(this);
 				this.shooter_sys.stopShooter(this);
+			}
+
+			/** Make sure this method is called on initialization */
+			protected void initRateLimit() {
+				this.rate_limit = new SlewRateLimiter(this.shooter_sys.vlimit, 0);
+			}
+			/** Applies rate limit, returns the limited value */
+			protected double setShooterVoltage(double v) {
+				double limited = this.rate_limit.calculate(v);
+				this.shooter_sys.setShooterVoltage(limited, this);
+				return limited;
 			}
 
 			// add shooter access methods
@@ -506,7 +698,7 @@ public final class CargoSystem {
 			System.out.println(getClass().getSimpleName() + ": Running...");
 		}
 		@Override public void execute() {
-			if(this.transfer_sys.cargo_cnt < 2) {
+			if(this.transfer_sys.getCargoCount() < 2) {
 				super.execute();
 			} else {
 				super.setVoltage(0);
@@ -570,7 +762,9 @@ public final class CargoSystem {
 			}
 		}
 		@Override public void execute() {
-			if(super.transfer_sys.getCurrentInput() && !super.transfer_sys.getCurrentOutput() && super.transfer_sys.getCargoCount() <= 2) {
+			//System.out.println("F: " + super.transfer_sys.getCurrentInput() + "\tB: " + super.transfer_sys.getCurrentOutput());
+			if(super.transfer_sys.getCurrentInput() && !super.transfer_sys.getCurrentOutput()/* && !super.transfer_sys.getCurrentOutput() && super.transfer_sys.getCargoCount() <= 2*/) {
+				//System.out.println("running transfer");
 				super.execute();
 			} else {
 				super.set(0);
@@ -608,10 +802,11 @@ public final class CargoSystem {
 		}
 
 		@Override public void initialize() {
+			super.initRateLimit();
 			System.out.println(getClass().getSimpleName() + ": Running...");
 		}
 		@Override public void execute() {
-			super.shooter_sys.setShooterVoltage(this.shooter_voltage.getAsDouble(), this);
+			super.setShooterVoltage(this.shooter_voltage.getAsDouble());
 			if(this.feed_actuate.getAsBoolean()) {
 				super.shooter_sys.setFeedVoltage(this.feed_voltage.getAsDouble(), this);
 			} else {
@@ -636,29 +831,63 @@ public final class CargoSystem {
 		private final TransferSubsystem transfer_sys;
 
 		private ManagedShoot(ShooterSubsystem s, TransferSubsystem t, BooleanSupplier ftrigger, double fvolts, double svolts) {
-			super(s, ftrigger, fvolts, svolts);
+			super(s, ftrigger, ()->fvolts, 
+				t.hasColorDetection() ? 
+					()->{
+						if(DriverStation.getAlliance() == t.getLastBackDetected()) {
+							return svolts;
+						} else {
+							return svolts / 2.0;
+						}
+					} : ()->svolts
+			);
 			this.transfer_sys = t;
 		}
 		private ManagedShoot(ShooterSubsystem s, TransferSubsystem t, BooleanSupplier ftrigger, DoubleSupplier fvolts, DoubleSupplier svolts) {
-			super(s, ftrigger, fvolts, svolts);
+			super(s, ftrigger, fvolts, 
+				t.hasColorDetection() ? 
+				()->{
+					if(DriverStation.getAlliance() == t.getLastBackDetected()) {
+						return svolts.getAsDouble();
+					} else {
+						return svolts.getAsDouble() / 2.0;
+					}
+				} : svolts
+			);
 			this.transfer_sys = t;
+		}
+
+		@Override protected double setShooterVoltage(double v) {
+			double l = super.setShooterVoltage(v);
+			this.transfer_sys.setShooterOverride(l != v, this);
+			return l;
 		}
 
 		@Override public void initialize() {
 			if(!this.transfer_sys.hasFeedback()) {
 				System.out.println(getClass().getSimpleName() + ": No feedback sensors detected. Defaulting to BasicShoot.");
 			}
-			System.out.println(getClass().getSimpleName() + ": Running...");
+			super.initialize();
 		}
-		@Override public boolean isFinished() {
-			return this.transfer_sys.hasFeedback() && this.transfer_sys.getCargoCount() <= 0;
+		@Override public void execute() {
+			// maybe change the super implementation to somehow use the overloaded 'setShooterVoltage' instead of this reimplemntation
+			this.setShooterVoltage(this.shooter_voltage.getAsDouble());
+			if(this.feed_actuate.getAsBoolean()) {
+				super.shooter_sys.setFeedVoltage(this.feed_voltage.getAsDouble(), this);
+			} else {
+				super.shooter_sys.setFeed(0, this);
+			}
 		}
+		// @Override public boolean isFinished() {
+		// 	return this.transfer_sys.hasFeedback() && this.transfer_sys.getCargoCount() <= 0;
+		// }
 
 
 	}
 	/**
 	 * Spins the shooter and feed motor until the last limit switch is detected to have a falling edge (cargo just left).
 	 */
+// UPDATE THIS TO EXTEND MANAGEDSHOOT
 	public static class ShootOne extends ShooterSubsystem.ShooterCommand {	// shoots a single cargo with the given speed - transfer sensors required
 
 		protected final TransferSubsystem transfer_sys;
@@ -677,11 +906,12 @@ public final class CargoSystem {
 
 		@Override public void initialize() {
 			this.transfer_command.initialize();
+			super.initRateLimit();
 			System.out.println(getClass().getSimpleName() + ": Running...");
 		}
 		@Override public void execute() {
 			this.transfer_command.execute();
-			super.shooter_sys.setShooterVoltage(this.shoot_voltage, this);		// spin up shooter
+			super.setShooterVoltage(this.shoot_voltage);		// spin up shooter
 			super.shooter_sys.setFeedVoltage(this.transfer_sys.getCurrentOutput() ? this.feed_voltage : 0, this);	// set feed if output limit triggered
 		}
 		@Override public void end(boolean i) {
@@ -734,7 +964,7 @@ public final class CargoSystem {
 				System.out.println(getClass().getSimpleName() + ": TalonFX not detected. Shooter disabled.");
 				return;
 			}
-			System.out.println(getClass().getSimpleName() + ": Running...");
+			super.initialize();
 		}
 		@Override public void execute() {
 			if(super.shooter_sys.hasTalonShooter()) {	// if no talon, do nothing, else set to given speed
@@ -754,6 +984,7 @@ public final class CargoSystem {
 	 * the phoenix api. Additionally, the feed motor is not allowed to be spun until the target velocity is reached. If the shooter motor(s) are
 	 * not TalonFX's, then this command does nothing. 
 	 */
+// UPDATE THIS TO EXTEND MANAGEDSHOOT (for clrsense ramping handler)
 	public static class ManagedShootCL extends BasicShootCL {
 
 		private final TransferSubsystem transfer_sys;
@@ -768,11 +999,7 @@ public final class CargoSystem {
 			if(!this.transfer_sys.hasFeedback()) {
 				System.out.println(getClass().getSimpleName() + ": No feedback sensors detected. Defaulting to BasicShootCL.");
 			}
-			if(!super.shooter_sys.hasTalonShooter()) {
-				System.out.println(getClass().getSimpleName() + ": TalonFX shooter not detected. Shooter disabled.");
-				return;
-			}
-			System.out.println(getClass().getSimpleName() + ": Running...");
+			super.initialize();
 		}
 		// @Override public void execute() {
 		// 	if(super.shooter_sys.hasTalonShooter()) {	// if no talon, do nothing, else set to given speed
@@ -832,6 +1059,7 @@ public final class CargoSystem {
 				this.failed = true;
 				return;
 			}
+			super.initRateLimit();
 			System.out.println(getClass().getSimpleName() + ": Running...");
 			this.failed = false;
 		}
@@ -840,8 +1068,11 @@ public final class CargoSystem {
 				this.position = RapidReactVision.getHubPosition();
 				if(this.position != null) {
 					this.last_voltage = this.inches2voltage.convert(this.position.distance);	// update calculated voltage
+					if(super.transfer_sys.hasColorDetection() && DriverStation.getAlliance() != super.transfer_sys.getLastBackDetected()) {
+						this.last_voltage /= 2;
+					}
 				}
-				super.shooter_sys.setShooterVoltage(this.last_voltage, this);		// set shooter speed
+				super.setShooterVoltage(this.last_voltage);		// set shooter speed
 				super.shooter_sys.setFeedVoltage(super.feed_actuate.getAsBoolean() ? super.feed_voltage.getAsDouble() : 0, this);	// set feed if booleansupplier allows
 			} else {	// otherwise stop motors
 				super.shooter_sys.setShooter(0, this);
@@ -883,6 +1114,7 @@ public final class CargoSystem {
 				return;
 			}
 			super.transfer_command.initialize();
+			super.initRateLimit();
 			System.out.println(getClass().getSimpleName() + ": Running...");
 			this.failed = false;
 		}
@@ -892,7 +1124,7 @@ public final class CargoSystem {
 			if(this.position != null) {
 				this.last_voltage = this.inches2voltage.convert(this.position.distance);
 			}
-			super.shooter_sys.setShooterVoltage(this.last_voltage, this);
+			super.setShooterVoltage(this.last_voltage);
 			super.shooter_sys.setFeedVoltage(super.transfer_sys.getCurrentOutput() ? super.feed_voltage : 0, this);
 		}
 		@Override public boolean isFinished() {
