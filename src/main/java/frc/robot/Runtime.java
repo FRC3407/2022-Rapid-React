@@ -3,9 +3,12 @@ package frc.robot;
 import frc.robot.commands.*;
 import frc.robot.modules.common.*;
 import frc.robot.modules.common.drive.*;
+import frc.robot.modules.debug.Debug;
 import frc.robot.modules.common.Input.*;
 import frc.robot.modules.common.EventTriggers.*;
 import frc.robot.modules.vision.java.*;
+
+import java.io.IOException;
 
 import edu.wpi.first.wpilibj.*;
 import edu.wpi.first.wpilibj.smartdashboard.*;
@@ -97,7 +100,9 @@ public class Runtime extends TimedRobot {
 	}
 
 	@Override public void robotInit() {
-
+		Debug.newLog();
+		Debug.log("Started Robot");
+		
 		new Trigger(()->VisionServer.isConnected()).whenActive(
 			new LambdaCommand(()->System.out.println("Coprocessor Connected!"))
 		);
