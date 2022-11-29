@@ -1,0 +1,7 @@
+[22:13:29] [Info] (frc.robot.modules.debug.Debug.log) Created console stream
+[22:13:29] [Info] (frc.robot.modules.debug.Debug.newLog) Created debug log
+[22:13:29] [Info] (frc.robot.modules.debug.Debug.log) Started Robot
+[22:13:29] [Info] (frc.robot.modules.vision.java.VisionServer.<init>) VisionServer Initialized.
+[22:13:29] [Info] (edu.wpi.first.wpilibj.TimedRobot.startCompetition) ********** Robot program startup complete **********
+[22:13:29] [Info] (edu.wpi.first.wpilibj2.command.CommandScheduler.run) CommandScheduler loop overrun
+[22:13:30] [Info] (edu.wpi.first.wpilibj.IterativeRobotBase.simulationPeriodic) Default simulationPeriodic() method... Override me!
