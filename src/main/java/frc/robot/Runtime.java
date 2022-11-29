@@ -102,7 +102,6 @@ public class Runtime extends TimedRobot {
 	@Override public void robotInit() {
 		Debug.newLog();
 		Debug.log("Started Robot");
-		
 		new Trigger(()->VisionServer.isConnected()).whenActive(
 			new LambdaCommand(()->System.out.println("Coprocessor Connected!"))
 		);

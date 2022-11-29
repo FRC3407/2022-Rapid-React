@@ -12,9 +12,18 @@ public class Debug {
     static File consoleFile = null;
     static FileOutputStream outStream = null;
     static ExtPrintStream stream = null;
-    public static final int LEVEL_INFO = 0;
-    public static final int LEVEL_WARNING = 1;
-    public static final int LEVEL_ERROR = 2;
+    static ExtPrintStream errStream = null;
+    public static enum Level {
+        INFO (0),
+        WARNING (1),
+        ERROR (2);
+    
+        public final int val;
+        private Level(int v) 
+        { 
+            this.val = v; 
+        }
+    }
     
     /**
      * @return File: debugFile currently in use
@@ -46,12 +55,13 @@ public class Debug {
         {
             //sets System.out and File as output streams
             outStream = new FileOutputStream(consoleFile);
-            stream = new ExtPrintStream(outStream, System.out);
+            stream = new ExtPrintStream(outStream, System.out, false);
+            errStream = new ExtPrintStream(outStream, System.err, true);
             System.setOut(stream);
-            System.setErr(stream);
-            
-            
-        } catch (Exception e) {
+            System.setErr(errStream);
+        } 
+        catch (Exception e) 
+        {
             Debug.log("An error ocoured", 2);
             e.printStackTrace();
         }
@@ -77,7 +87,7 @@ public class Debug {
         }
         catch (IOException e)
         {
-            System.out.println("Debug log or console stream creation failed");
+            System.err.println("Debug log or console stream creation failed");
             e.printStackTrace();
             return false;
         }
@@ -93,49 +103,7 @@ public class Debug {
      */
     public static boolean log()
     {
-        if(!isFile())
-        {
-            return false;
-        }
-        DateTimeFormatter dtfFile = DateTimeFormatter.ofPattern("[HH:mm:ss]");
-        LocalDateTime now = LocalDateTime.now();  
-        StackTraceElement[] stackTraceElements = Thread.currentThread().getStackTrace();
-        FileWriter writer = null;
-        BufferedWriter bufferedWriter = null;
-        PrintWriter printWriter = null;
-        try
-        {
-            try
-            {
-                writer = new FileWriter(debugFile, true);
-            }
-            catch(IOException e)
-            {
-                Debug.log("An error ocoured", 2);
-                e.printStackTrace();
-                return false;
-            }
-            bufferedWriter = new BufferedWriter(writer);
-            printWriter = new PrintWriter(bufferedWriter);
-            printWriter.println("["+dtfFile.format(now)+"] [Info] ("+stackTraceElements[2].getClassName()+"."+stackTraceElements[2].getMethodName()+")");
-            printWriter.flush();
-        }
-        finally
-        {
-            try
-            {
-                printWriter.close();
-                bufferedWriter.close();
-                writer.close();
-            }
-            catch (IOException e)
-            {
-                Debug.log("An error ocoured", 2);
-                e.printStackTrace();
-                return false;
-            }
-        }
-        return true;
+        return log("", 0);
     }
 
      /**
@@ -146,51 +114,7 @@ public class Debug {
      */
     public static boolean log(String msg)
     {
-        if(!isFile())
-        {
-            return false;
-        }
-        DateTimeFormatter dtfFile = DateTimeFormatter.ofPattern("[HH:mm:ss]");
-        LocalDateTime now = LocalDateTime.now();  
-        StackTraceElement[] stackTraceElements = Thread.currentThread().getStackTrace();
-        FileWriter writer = null;
-        BufferedWriter bufferedWriter = null;
-        PrintWriter printWriter = null;
-        
-        try
-        {
-            try
-            {
-                writer = new FileWriter(debugFile, true);
-            }
-            catch(IOException e)
-            {
-                Debug.log("An error ocoured", 2);
-                e.printStackTrace();
-                return false;
-            }
-            bufferedWriter = new BufferedWriter(writer);
-            printWriter = new PrintWriter(bufferedWriter);
-            
-            printWriter.println("["+dtfFile.format(now)+"] [Info] ("+stackTraceElements[2].getClassName()+"."+stackTraceElements[2].getMethodName()+") "+msg);
-            printWriter.flush();
-        }
-        finally
-        {
-            try
-            {
-                printWriter.close();
-                bufferedWriter.close();
-                writer.close();
-            }
-            catch (IOException e)
-            {
-                Debug.log("An error ocoured", 2);
-                e.printStackTrace();
-                return false;
-            }
-        }
-        return true;
+        return log(msg, 0);
     }
 
     /**
@@ -221,20 +145,21 @@ public class Debug {
             }
             catch(IOException e)
             {
-                Debug.log("An error ocoured", 2);
+                System.err.println("File writer creation failed");
                 e.printStackTrace();
                 return false;
             }
             bufferedWriter = new BufferedWriter(writer);
             printWriter = new PrintWriter(bufferedWriter);
-            switch(errorLevel) {
-                case LEVEL_INFO:
+            Level level = Level.values()[errorLevel];
+            switch(level) {
+                case INFO:
                     msgLevel = "[Info]";
                     break;
-                case LEVEL_WARNING:
+                case WARNING:
                     msgLevel = "[Warning]";
                     break;
-                case LEVEL_ERROR:
+                case ERROR:
                     msgLevel = "[Error]";
                     break;
             }
@@ -251,7 +176,7 @@ public class Debug {
             }
             catch (IOException e)
             {
-                Debug.log("An error ocoured", 2);
+                System.err.println("printWriter, bufferedWriter, or writer failed to close");
                 e.printStackTrace();
                 return false;
             }

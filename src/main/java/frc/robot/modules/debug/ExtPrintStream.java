@@ -15,11 +15,12 @@ import java.time.format.DateTimeFormatter;
 public class ExtPrintStream extends PrintStream {
     private final PrintStream second;
     private final DateTimeFormatter dtf = DateTimeFormatter.ofPattern("[HH:mm:ss]");
-
-    public ExtPrintStream(OutputStream outputStream, PrintStream printStream)
+    private boolean isErrStream;
+    public ExtPrintStream(OutputStream outputStream, PrintStream printStream, boolean isErrStream)
     {
         super(outputStream);
         this.second = printStream;
+        this.isErrStream = isErrStream;
     }
 
     @Override
@@ -85,7 +86,14 @@ public class ExtPrintStream extends PrintStream {
                 }
                     bufferedWriter = new BufferedWriter(writer);
                     printWriter = new PrintWriter(bufferedWriter);
-                    printWriter.println("["+dtf.format(now)+"] [Info] ("+stackTraceElements[2].getClassName()+"."+stackTraceElements[2].getMethodName()+") "+x);
+                    if(isErrStream)
+                    {
+                        printWriter.println("["+dtf.format(now)+"] [Error] (on line "+stackTraceElements[2].getLineNumber()+" of "+stackTraceElements[2].getClassName()+"."+stackTraceElements[2].getMethodName()+") "+x);
+                    }
+                    else
+                    {
+                        printWriter.println("["+dtf.format(now)+"] [Info] ("+stackTraceElements[2].getClassName()+"."+stackTraceElements[2].getMethodName()+") "+x);
+                    }
                     printWriter.flush();
             }
             finally
