@@ -116,8 +116,8 @@ public final class Constants {
 			1.0668,	// "kA"(volts * seconds^2 / meters) -> voltage required for each additional meter/second^2 of acceleration -> from SysID characterization
 			3.5176,	// "kP"(volts * seconds / meters) -> voltage added to correct for error
 			universal_max_voltage,	// (volts) maximum voltage that can be supplied
-			1.5,	// (meters per second) maximum velocity in meters per second
-			1.5		// (meters per second^2) maximum acceleration in meters per second squared
+			2.5,	// (meters per second) maximum velocity in meters per second
+			2.5		// (meters per second^2) maximum acceleration in meters per second squared
 		);
 
 

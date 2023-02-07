@@ -252,6 +252,10 @@ public class Runtime extends TimedRobot {
 				Xbox.Analog.RT.getExponentialLimitedSupplier(this.input, Constants.teleop_max_input_ramp, Constants.teleop_input_power),
 				dm, dm		// supply the same input for inc and dec so that wrap-around is used instead
 			)	// schedule mode drive when in teleop mode
+			// this.drivebase.tankDriveVelocity(	// use this code for velocity drive
+			// 	Xbox.Analog.LY.getSupplier(this.input),
+			// 	Xbox.Analog.RY.getSupplier(this.input)
+			// )
 		).whileActiveOnce(
 			new ClimberSubsystem.HoldToggleControl.FullLoop(
 				this.climb_sys, climb_toggle.getSupplier(this.input),
