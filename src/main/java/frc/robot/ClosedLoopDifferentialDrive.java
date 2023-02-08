@@ -1,5 +1,6 @@
 package frc.robot;
 
+import java.util.function.DoubleSupplier;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
@@ -82,6 +83,18 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 				this.kS(),
 				this.kV(),
 				this.kA()
+			);
+		}
+		public PIDController getFeedbackController() {
+			return new PIDController(this.kP(), 0.0, 0.0, 0.0);
+		}
+		public ProfiledPIDController getProfiledFeedbackController() {
+			return new ProfiledPIDController(
+				this.kP(), 0.0, 0.0,
+				new TrapezoidProfile.Constraints(
+					this.max_velocity_meters_per_sec,
+					this.max_acceleration_meters_per_sec_sqrd
+				)
 			);
 		}
 
@@ -190,6 +203,12 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 		b.addDoubleProperty("Rotation (Continuous)", ()->this.getContinuousAngle(), null);
 	}
 
+	public TankDriveVelocity tankDriveVelocity(DoubleSupplier lvel, DoubleSupplier rvel) {
+		return new TankDriveVelocity(this, lvel, rvel);
+	}
+	public TankDriveVelocity_P tankDriveVelocityProfiled(DoubleSupplier lvel, DoubleSupplier rvel) {
+		return new TankDriveVelocity_P(this, lvel, rvel);
+	}
 	public FollowTrajectory followTrajectory(Trajectory t) {
 		return new FollowTrajectory(this, t);
 	}
@@ -339,6 +358,98 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 
 
 	}
+
+	public static class TankDriveVelocity extends CLDriveCommand {
+
+		private final DoubleSupplier left, right;
+		private final PIDController left_fb, right_fb;
+
+		public TankDriveVelocity(
+			ClosedLoopDifferentialDrive db, DoubleSupplier l, DoubleSupplier r
+		) {
+			super(db);
+			this.left = l;
+			this.right = r;
+			this.left_fb = db.params.getFeedbackController();
+			this.right_fb = db.params.getFeedbackController();
+		}
+
+		@Override
+		public void initialize() {
+			this.left_fb.reset();
+			this.right_fb.reset();
+		}
+		@Override
+		public void execute() {
+			double
+				lt = this.left.getAsDouble(),	// the target velocity from the left input --> METERS PER SECOND
+				rt = this.right.getAsDouble(),	// ^^^ for the right side
+				lc = super.drivebase_cl.getLeftVelocity(),  // the actual velocity
+				rc = super.drivebase_cl.getRightVelocity();
+				super.setDriveVoltage(
+					this.drivebase_cl.feedforward.calculate(lt) +  // the calculated feedforward
+						this.left_fb.calculate(lc, lt),   		// add the feedback adjustment
+					this.drivebase_cl.feedforward.calculate(rt) +
+						this.right_fb.calculate(rc, rt)
+				);
+		}
+		@Override
+		public void end(boolean interrupted) {
+			super.setDriveVoltage(0.0, 0.0);
+		}
+		@Override
+		public boolean isFinished() {
+			return false;
+		}
+
+
+	}
+	public static class TankDriveVelocity_P extends CLDriveCommand {
+
+		private final DoubleSupplier left, right;
+		private final ProfiledPIDController left_fb, right_fb;
+
+		public TankDriveVelocity_P(
+			ClosedLoopDifferentialDrive db, DoubleSupplier l, DoubleSupplier r
+		) {
+			super(db);
+			this.left = l;
+			this.right = r;
+			this.left_fb = db.params.getProfiledFeedbackController();
+			this.right_fb = db.params.getProfiledFeedbackController();
+		}
+
+		@Override
+		public void initialize() {
+			this.left_fb.reset(0);
+			this.right_fb.reset(0);
+		}
+		@Override
+		public void execute() {
+			double
+				lt = this.left.getAsDouble(),	// the target velocity from the left input --> METERS PER SECOND
+				rt = this.right.getAsDouble(),	// ^^^ for the right side
+				lc = super.drivebase_cl.getLeftVelocity(),  // the actual velocity
+				rc = super.drivebase_cl.getRightVelocity();
+			super.setDriveVoltage(
+				super.drivebase_cl.feedforward.calculate(lt) +  // the calculated feedforward
+					this.left_fb.calculate(lc, lt),   		// add the feedback adjustment
+				super.drivebase_cl.feedforward.calculate(rt) +
+					this.right_fb.calculate(rc, rt)
+			);
+		}
+		@Override
+		public void end(boolean interrupted) {
+			super.setDriveVoltage(0.0, 0.0);
+		}
+		@Override
+		public boolean isFinished() {
+			return false;
+		}
+
+
+	}
+
 	/**
 	 * Extends CLDriveCommand and wraps a RamseteCommand (and prints status)
 	 */
