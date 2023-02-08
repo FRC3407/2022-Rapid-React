@@ -116,6 +116,7 @@ public class Runtime extends TimedRobot {
 		this.auto_command.setDefaultOption("CL Auto", new Auto.ClosedLoop(this.drivebase, this.cargo_sys));
 		this.auto_command.addOption("Basic-Taxi", new Auto.OpenLoop(this.drivebase, this.cargo_sys));
 		this.auto_command.addOption("Test Deploy", this.cargo_sys.deployIntake());
+		this.auto_command.addOption("Test Velocity Drive", this.drivebase.tankDriveVelocity(()->1.0, ()->1.0));
 		SmartDashboard.putData("Auto Command", this.auto_command);
 	}
 
@@ -243,19 +244,19 @@ public class Runtime extends TimedRobot {
 		TeleopTrigger.Get().whenActive(
 			Constants.vision_driving
 		).whenActive(	// we can't compose a sequentialcommandgroup here because the modedrive command is used elsewhere
-			this.drivebase.modeDrive(
-				Xbox.Analog.LX.getExponentialLimitedSupplier(this.input, Constants.teleop_max_input_ramp, Constants.teleop_input_power),
-				Xbox.Analog.LY.getExponentialLimitedSupplier(this.input, Constants.teleop_max_input_ramp, Constants.teleop_input_power),
-				Xbox.Analog.LT.getExponentialLimitedSupplier(this.input, Constants.teleop_max_input_ramp, Constants.teleop_input_power),
-				Xbox.Analog.RX.getExponentialLimitedSupplier(this.input, Constants.teleop_max_input_ramp, Constants.teleop_input_power),
-				Xbox.Analog.RY.getExponentialLimitedSupplier(this.input, Constants.teleop_max_input_ramp, Constants.teleop_input_power),
-				Xbox.Analog.RT.getExponentialLimitedSupplier(this.input, Constants.teleop_max_input_ramp, Constants.teleop_input_power),
-				dm, dm		// supply the same input for inc and dec so that wrap-around is used instead
-			)	// schedule mode drive when in teleop mode
-			// this.drivebase.tankDriveVelocity(	// use this code for velocity drive
-			// 	Xbox.Analog.LY.getSupplier(this.input),
-			// 	Xbox.Analog.RY.getSupplier(this.input)
-			// )
+			// this.drivebase.modeDrive(
+			// 	Xbox.Analog.LX.getExponentialLimitedSupplier(this.input, Constants.teleop_max_input_ramp, Constants.teleop_input_power),
+			// 	Xbox.Analog.LY.getExponentialLimitedSupplier(this.input, Constants.teleop_max_input_ramp, Constants.teleop_input_power),
+			// 	Xbox.Analog.LT.getExponentialLimitedSupplier(this.input, Constants.teleop_max_input_ramp, Constants.teleop_input_power),
+			// 	Xbox.Analog.RX.getExponentialLimitedSupplier(this.input, Constants.teleop_max_input_ramp, Constants.teleop_input_power),
+			// 	Xbox.Analog.RY.getExponentialLimitedSupplier(this.input, Constants.teleop_max_input_ramp, Constants.teleop_input_power),
+			// 	Xbox.Analog.RT.getExponentialLimitedSupplier(this.input, Constants.teleop_max_input_ramp, Constants.teleop_input_power),
+			// 	dm, dm		// supply the same input for inc and dec so that wrap-around is used instead
+			// )	// schedule mode drive when in teleop mode
+			this.drivebase.tankDriveVelocity(	// use this code for velocity drive
+				Xbox.Analog.LY.getSupplier(this.input),
+				Xbox.Analog.RY.getSupplier(this.input)
+			)
 		).whileActiveOnce(
 			new ClimberSubsystem.HoldToggleControl.FullLoop(
 				this.climb_sys, climb_toggle.getSupplier(this.input),
