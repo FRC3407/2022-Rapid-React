@@ -86,7 +86,7 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 			);
 		}
 		public PIDController getFeedbackController() {
-			return new PIDController(this.kP(), 0.0, 0.0, 0.0);
+			return new PIDController(this.kP(), 0.0, 0.0);
 		}
 		public ProfiledPIDController getProfiledFeedbackController() {
 			return new ProfiledPIDController(

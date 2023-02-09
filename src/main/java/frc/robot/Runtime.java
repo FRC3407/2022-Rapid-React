@@ -117,6 +117,7 @@ public class Runtime extends TimedRobot {
 		this.auto_command.addOption("Basic-Taxi", new Auto.OpenLoop(this.drivebase, this.cargo_sys));
 		this.auto_command.addOption("Test Deploy", this.cargo_sys.deployIntake());
 		this.auto_command.addOption("Test Velocity Drive", this.drivebase.tankDriveVelocity(()->1.0, ()->1.0));
+		this.auto_command.addOption("Test Active Park", this.drivebase.activePark(100.0));
 		SmartDashboard.putData("Auto Command", this.auto_command);
 	}
 
@@ -427,12 +428,16 @@ public class Runtime extends TimedRobot {
 		TeleopTrigger.Get().whenActive(
 			Constants.vision_driving
 		).whenActive(		// schedule mode drive when in teleop mode
-			this.drivebase.modeDrive(
-				Attack3.Analog.X.getExponentialLimitedSupplier(this.stick_left, Constants.teleop_max_input_ramp, Constants.teleop_input_power),
-				Attack3.Analog.Y.getExponentialLimitedSupplier(this.stick_left, Constants.teleop_max_input_ramp, Constants.teleop_input_power),
-				Attack3.Analog.X.getExponentialLimitedSupplier(this.stick_right, Constants.teleop_max_input_ramp, Constants.teleop_input_power),
-				Attack3.Analog.Y.getExponentialLimitedSupplier(this.stick_right, Constants.teleop_max_input_ramp, Constants.teleop_input_power),
-				dm, dm	// supply the same input for inc and dec so that wrap-around is used instead
+			// this.drivebase.modeDrive(
+			// 	Attack3.Analog.X.getExponentialLimitedSupplier(this.stick_left, Constants.teleop_max_input_ramp, Constants.teleop_input_power),
+			// 	Attack3.Analog.Y.getExponentialLimitedSupplier(this.stick_left, Constants.teleop_max_input_ramp, Constants.teleop_input_power),
+			// 	Attack3.Analog.X.getExponentialLimitedSupplier(this.stick_right, Constants.teleop_max_input_ramp, Constants.teleop_input_power),
+			// 	Attack3.Analog.Y.getExponentialLimitedSupplier(this.stick_right, Constants.teleop_max_input_ramp, Constants.teleop_input_power),
+			// 	dm, dm	// supply the same input for inc and dec so that wrap-around is used instead
+			// )
+			this.drivebase.tankDriveVelocity(	// use this code for velocity drive
+				()->-2.5*Attack3.Analog.Y.getSupplier(this.stick_left).get(),
+				()->-2.5*Attack3.Analog.Y.getSupplier(this.stick_right).get()
 			)
 		).whileActiveOnce(		// start climb controls
 			new ClimberSubsystem.HoldToggleControl(
