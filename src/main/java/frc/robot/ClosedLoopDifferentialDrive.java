@@ -86,7 +86,7 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 			);
 		}
 		public PIDController getFeedbackController() {
-			return new PIDController(this.kP(), 0.0, 0.0, 0.0);
+			return new PIDController(this.kP(), 0.0, 0.0);
 		}
 		public ProfiledPIDController getProfiledFeedbackController() {
 			return new ProfiledPIDController(
@@ -208,6 +208,9 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 	}
 	public TankDriveVelocity_P tankDriveVelocityProfiled(DoubleSupplier lvel, DoubleSupplier rvel) {
 		return new TankDriveVelocity_P(this, lvel, rvel);
+	}
+	public ActivePark activePark(double p_gain) {
+		return new ActivePark(this, p_gain);
 	}
 	public FollowTrajectory followTrajectory(Trajectory t) {
 		return new FollowTrajectory(this, t);
@@ -449,6 +452,41 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 
 
 	}
+	public static class ActivePark extends CLDriveCommand {
+
+        private final double volts_per_meter;
+        private double linit, rinit;
+
+        public ActivePark(ClosedLoopDifferentialDrive db, double p) { // p is the proportional gain, in volts per meter [error]
+            super(db);
+            this.volts_per_meter = p;
+        }
+
+        @Override
+        public void initialize() {
+            this.linit = super.drivebase_cl.getLeftPositionMeters();
+            this.rinit = super.drivebase_cl.getRightPositionMeters();
+        }
+        @Override
+        public void execute() {
+            double le = super.drivebase_cl.getLeftPositionMeters() - this.linit;
+            double re = super.drivebase_cl.getRightPositionMeters() - this.rinit;
+            super.setDriveVoltage(
+                -le * this.volts_per_meter,     // we are assuming that positive position for the encoders is the same direction as positive voltage
+                -re * this.volts_per_meter
+            );
+        }
+        @Override
+        public void end(boolean interrupted) {
+            super.setDriveVoltage(0.0, 0.0);
+        }
+        @Override
+        public boolean isFinished() {
+            return false;
+        }
+
+
+    }
 
 	/**
 	 * Extends CLDriveCommand and wraps a RamseteCommand (and prints status)
