@@ -200,7 +200,22 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 		b.addDoubleProperty("Right Distance", ()->this.getRightPositionMeters(), null);
 		b.addDoubleProperty("Left Velocity", ()->this.getLeftVelocity(), null);
 		b.addDoubleProperty("Right Velocity", ()->this.getRightVelocity(), null);
-		b.addDoubleProperty("Rotation (Continuous)", ()->this.getContinuousAngle(), null);
+		b.addDoubleProperty("Rotation (Total)", ()->this.getContinuousAngle(), null);
+		b.addDoubleArrayProperty("Output Voltage [L, R]",
+            ()->{ return new double[]{
+                this.left.getMotorOutputVoltage(),
+                this.right.getMotorOutputVoltage()
+            }; }, null);
+        b.addDoubleArrayProperty("Output Current [L, R]",
+            ()->{ return new double[]{
+                this.left.getStatorCurrent(),
+                this.right.getStatorCurrent()
+            }; }, null);
+        b.addDoubleArrayProperty("Controller Temps [L, R]",
+            ()->{ return new double[]{
+                this.left.getTemperature(),
+                this.right.getTemperature()
+            }; }, null);
 	}
 
 	public TankDriveVelocity tankDriveVelocity(DoubleSupplier lvel, DoubleSupplier rvel) {

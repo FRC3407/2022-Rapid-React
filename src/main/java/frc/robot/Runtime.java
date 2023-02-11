@@ -11,7 +11,7 @@ import com.revrobotics.*;
 
 import frc.robot.commands.*;
 import frc.robot.vision.java.*;
-import frc.robot.team3407.ADIS16470;
+import frc.robot.team3407.ADIS16470_3X;
 import frc.robot.team3407.Input.*;
 import frc.robot.team3407.drive.*;
 import frc.robot.team3407.drive.Types.DriveMode;
@@ -36,8 +36,8 @@ public class Runtime extends TimedRobot {
 		stick_right = new InputDevice(2)	// arcade stick (right)
 	;
 
-	private final ADIS16470
-		spi_imu = new ADIS16470()
+	private final ADIS16470_3X
+		spi_imu = new ADIS16470_3X()
 	;
 	private final ColorSensorV3
 		front_color = new ColorSensorV3(Constants.front_colorsensor),
@@ -46,7 +46,7 @@ public class Runtime extends TimedRobot {
 	private final ClosedLoopDifferentialDrive
 		drivebase = new ClosedLoopDifferentialDrive(
 			Constants.drivebase_map_2022,
-			this.spi_imu,
+			this.spi_imu.getGyroAxis(ADIS16470_3X.IMUAxis.kZ),
 			Constants.cl_params,
 			Constants.cl_encoder_inversions
 		)
@@ -119,6 +119,9 @@ public class Runtime extends TimedRobot {
 		this.auto_command.addOption("Test Velocity Drive", this.drivebase.tankDriveVelocity(()->1.0, ()->1.0));
 		this.auto_command.addOption("Test Active Park", this.drivebase.activePark(100.0));
 		SmartDashboard.putData("Auto Command", this.auto_command);
+
+		SmartDashboard.putData(this.spi_imu);
+		SmartDashboard.putData(this.drivebase);
 	}
 
 	@Override public void robotInit() {
