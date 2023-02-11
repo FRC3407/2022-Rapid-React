@@ -255,8 +255,12 @@ public class Runtime extends TimedRobot {
 			// 	dm, dm		// supply the same input for inc and dec so that wrap-around is used instead
 			// )	// schedule mode drive when in teleop mode
 			this.drivebase.tankDriveVelocity(	// use this code for velocity drive
-				Xbox.Analog.LY.getSupplier(this.input),
-				Xbox.Analog.RY.getSupplier(this.input)
+				Xbox.Analog.LY.getDriveInputSupplier(this.input,
+					Constants.teleop_drivebase_deadband, -2.5, 1.0
+				),
+				Xbox.Analog.RY.getDriveInputSupplier(this.input,
+					Constants.teleop_drivebase_deadband, -2.5, 1.0
+				)
 			)
 		).whileActiveOnce(
 			new ClimberSubsystem.HoldToggleControl.FullLoop(
@@ -436,8 +440,12 @@ public class Runtime extends TimedRobot {
 			// 	dm, dm	// supply the same input for inc and dec so that wrap-around is used instead
 			// )
 			this.drivebase.tankDriveVelocity(	// use this code for velocity drive
-				()->-2.5*Attack3.Analog.Y.getSupplier(this.stick_left).get(),
-				()->-2.5*Attack3.Analog.Y.getSupplier(this.stick_right).get()
+				Attack3.Analog.Y.getDriveInputSupplier(this.stick_left,
+					Constants.teleop_drivebase_deadband, -2.5, 1.0
+				),
+				Attack3.Analog.Y.getDriveInputSupplier(this.stick_right,
+					Constants.teleop_drivebase_deadband, -2.5, 1.0
+				)
 			)
 		).whileActiveOnce(		// start climb controls
 			new ClimberSubsystem.HoldToggleControl(
