@@ -500,8 +500,69 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
             return false;
         }
 
-
     }
+	public static class BalancePark extends CLDriveCommand {
+
+		private final Gyro pitch_axis;
+		private final double
+			volts_per_meter,
+			volts_per_degree;
+		private double
+			left_balanced, right_balanced,
+			pitch_init;
+
+		private double out = 0.0;
+
+		public BalancePark(ClosedLoopDifferentialDrive db, Gyro pitch, double pv, double pa) {
+			super(db);
+			this.pitch_axis = pitch;
+			this.volts_per_meter = pv;
+			this.volts_per_degree = pa;
+		}
+
+		@Override
+        public void initialize() {
+            this.left_balanced = super.drivebase_cl.getLeftPositionMeters();
+            this.right_balanced = super.drivebase_cl.getRightPositionMeters();
+			this.pitch_init = this.pitch_axis.getAngle();
+        }
+		@Override
+		public void execute() {
+			double le = super.drivebase_cl.getLeftPositionMeters() - this.left_balanced;
+			double re = super.drivebase_cl.getRightPositionMeters() - this.right_balanced;
+			double ae = this.pitch_axis.getAngle() - this.pitch_init;
+			this.out = -ae * this.volts_per_degree;
+			super.setDriveVoltage(
+				this.out,
+				this.out
+			);
+			// super.setDriveVoltage(
+			// 	(-le * this.volts_per_meter) + (ae * volts_per_degree),
+			// 	(-re * this.volts_per_meter) + (ae * volts_per_degree)
+			// );
+			// if(Math.abs(ae) < 1e-3) {
+			// 	this.left_balanced = super.drivebase_cl.getLeftPositionMeters();
+           	// 	this.right_balanced = super.drivebase_cl.getRightPositionMeters();
+			// }
+			// if(Math.abs(le) < 1e-5 && Math.abs(re) < 1e-5 && Math.abs(ae) > 1.0) {
+			// 	this.pitch_init = this.pitch_axis.getAngle();
+			// }
+		}
+		@Override
+        public void end(boolean interrupted) {
+            super.setDriveVoltage(0.0, 0.0);
+        }
+        @Override
+        public boolean isFinished() {
+            return false;
+        }
+
+		@Override
+		public void initSendable(SendableBuilder b) {
+			b.addDoubleProperty("AE Output Volts", ()->this.out, null);
+		}
+
+	}
 
 	/**
 	 * Extends CLDriveCommand and wraps a RamseteCommand (and prints status)
