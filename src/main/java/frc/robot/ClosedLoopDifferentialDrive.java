@@ -224,9 +224,6 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 	public TankDriveVelocity_P tankDriveVelocityProfiled(DoubleSupplier lvel, DoubleSupplier rvel) {
 		return new TankDriveVelocity_P(this, lvel, rvel);
 	}
-	public ActivePark activePark(double p_gain) {
-		return new ActivePark(this, p_gain);
-	}
 	public FollowTrajectory followTrajectory(Trajectory t) {
 		return new FollowTrajectory(this, t);
 	}
@@ -379,7 +376,7 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 
 	public static class TankDriveVelocity extends CLDriveCommand {
 
-		private final DoubleSupplier left, right;
+		protected final DoubleSupplier left, right;
 		private final PIDController left_fb, right_fb;
 
 		public TankDriveVelocity(
@@ -392,6 +389,18 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 			this.right_fb = db.params.getFeedbackController();
 		}
 
+		protected void applyVelocity(double lv, double rv) {
+			double
+				lc = super.drivebase_cl.getLeftVelocity(),  // the actual velocity
+				rc = super.drivebase_cl.getRightVelocity();
+			super.setDriveVoltage(
+				this.drivebase_cl.feedforward.calculate(lv) +  // the calculated feedforward
+					this.left_fb.calculate(lc, lv),   		// add the feedback adjustment
+				this.drivebase_cl.feedforward.calculate(rv) +
+					this.right_fb.calculate(rc, rv)
+			);
+		}
+
 		@Override
 		public void initialize() {
 			this.left_fb.reset();
@@ -399,17 +408,10 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 		}
 		@Override
 		public void execute() {
-			double
-				lt = this.left.getAsDouble(),	// the target velocity from the left input --> METERS PER SECOND
-				rt = this.right.getAsDouble(),	// ^^^ for the right side
-				lc = super.drivebase_cl.getLeftVelocity(),  // the actual velocity
-				rc = super.drivebase_cl.getRightVelocity();
-				super.setDriveVoltage(
-					this.drivebase_cl.feedforward.calculate(lt) +  // the calculated feedforward
-						this.left_fb.calculate(lc, lt),   		// add the feedback adjustment
-					this.drivebase_cl.feedforward.calculate(rt) +
-						this.right_fb.calculate(rc, rt)
-				);
+			this.applyVelocity(
+				this.left.getAsDouble(),
+				this.right.getAsDouble()
+			);
 		}
 		@Override
 		public void end(boolean interrupted) {
@@ -465,102 +467,6 @@ public class ClosedLoopDifferentialDrive extends DriveBase {
 			return false;
 		}
 
-
-	}
-	public static class ActivePark extends CLDriveCommand {
-
-        private final double volts_per_meter;
-        private double linit, rinit;
-
-        public ActivePark(ClosedLoopDifferentialDrive db, double p) { // p is the proportional gain, in volts per meter [error]
-            super(db);
-            this.volts_per_meter = p;
-        }
-
-        @Override
-        public void initialize() {
-            this.linit = super.drivebase_cl.getLeftPositionMeters();
-            this.rinit = super.drivebase_cl.getRightPositionMeters();
-        }
-        @Override
-        public void execute() {
-            double le = super.drivebase_cl.getLeftPositionMeters() - this.linit;
-            double re = super.drivebase_cl.getRightPositionMeters() - this.rinit;
-            super.setDriveVoltage(
-                -le * this.volts_per_meter,     // we are assuming that positive position for the encoders is the same direction as positive voltage
-                -re * this.volts_per_meter
-            );
-        }
-        @Override
-        public void end(boolean interrupted) {
-            super.setDriveVoltage(0.0, 0.0);
-        }
-        @Override
-        public boolean isFinished() {
-            return false;
-        }
-
-    }
-	public static class BalancePark extends CLDriveCommand {
-
-		private final Gyro pitch_axis;
-		private final double
-			volts_per_meter,
-			volts_per_degree;
-		private double
-			left_balanced, right_balanced,
-			pitch_init;
-
-		private double out = 0.0;
-
-		public BalancePark(ClosedLoopDifferentialDrive db, Gyro pitch, double pv, double pa) {
-			super(db);
-			this.pitch_axis = pitch;
-			this.volts_per_meter = pv;
-			this.volts_per_degree = pa;
-		}
-
-		@Override
-        public void initialize() {
-            this.left_balanced = super.drivebase_cl.getLeftPositionMeters();
-            this.right_balanced = super.drivebase_cl.getRightPositionMeters();
-			this.pitch_init = this.pitch_axis.getAngle();
-        }
-		@Override
-		public void execute() {
-			double le = super.drivebase_cl.getLeftPositionMeters() - this.left_balanced;
-			double re = super.drivebase_cl.getRightPositionMeters() - this.right_balanced;
-			double ae = this.pitch_axis.getAngle() - this.pitch_init;
-			this.out = -ae * this.volts_per_degree;
-			super.setDriveVoltage(
-				this.out,
-				this.out
-			);
-			// super.setDriveVoltage(
-			// 	(-le * this.volts_per_meter) + (ae * volts_per_degree),
-			// 	(-re * this.volts_per_meter) + (ae * volts_per_degree)
-			// );
-			// if(Math.abs(ae) < 1e-3) {
-			// 	this.left_balanced = super.drivebase_cl.getLeftPositionMeters();
-           	// 	this.right_balanced = super.drivebase_cl.getRightPositionMeters();
-			// }
-			// if(Math.abs(le) < 1e-5 && Math.abs(re) < 1e-5 && Math.abs(ae) > 1.0) {
-			// 	this.pitch_init = this.pitch_axis.getAngle();
-			// }
-		}
-		@Override
-        public void end(boolean interrupted) {
-            super.setDriveVoltage(0.0, 0.0);
-        }
-        @Override
-        public boolean isFinished() {
-            return false;
-        }
-
-		@Override
-		public void initSendable(SendableBuilder b) {
-			b.addDoubleProperty("AE Output Volts", ()->this.out, null);
-		}
 
 	}
 

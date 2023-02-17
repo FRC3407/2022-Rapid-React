@@ -1,6 +1,11 @@
 {
   "HALProvider": {
     "Other Devices": {
+      "ADIS16470[0]": {
+        "header": {
+          "open": true
+        }
+      },
       "BuiltInAccel": {
         "header": {
           "open": true
@@ -45,11 +50,6 @@
         "header": {
           "open": true
         }
-      }
-    },
-    "PWM Outputs": {
-      "window": {
-        "visible": true
       }
     }
   },
@@ -119,16 +119,13 @@
       "/LiveWindow/WeekZero": "Subsystem",
       "/SmartDashboard/Auto Command": "String Chooser",
       "/SmartDashboard/Auto Mode": "String Chooser",
+      "/SmartDashboard/Commands/AutoPad": "Command",
       "/SmartDashboard/Robot Location": "Field2d",
+      "/SmartDashboard/Robot/Drivebase": "Subsystem",
       "/SmartDashboard/Starting Position": "String Chooser"
     },
     "windows": {
       "/SmartDashboard/Auto Command": {
-        "window": {
-          "visible": true
-        }
-      },
-      "/SmartDashboard/Starting Position": {
         "window": {
           "visible": true
         }
@@ -141,18 +138,17 @@
         "open": true
       }
     },
-    "FMSInfo": {
-      "open": true
-    },
     "LiveWindow": {
       "DriveBase": {
         "open": true
       },
       "Ungrouped": {
-        "DifferentialDrive[1]": {
+        "Servo[9]": {
           "open": true
-        }
-      }
+        },
+        "open": true
+      },
+      "open": true
     },
     "Motion": {
       "Position": {
@@ -178,12 +174,25 @@
       "Auto Mode": {
         "open": true
       },
-      "Robot Location": {
+      "Commands": {
+        "AutoPad": {
+          "open": true
+        },
+        "open": true
+      },
+      "Robot": {
+        "Drivebase": {
+          "open": true
+        },
+        "IMU": {
+          "open": true
+        },
         "open": true
       },
       "Starting Position": {
         "open": true
-      }
+      },
+      "open": true
     },
     "Targets": {
       "Cargo-1b": {
