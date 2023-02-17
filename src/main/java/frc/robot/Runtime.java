@@ -117,12 +117,6 @@ public class Runtime extends TimedRobot {
 		this.auto_command.addOption("Basic-Taxi", new Auto.OpenLoop(this.drivebase, this.cargo_sys));
 		this.auto_command.addOption("Test Deploy", this.cargo_sys.deployIntake());
 		this.auto_command.addOption("Test Velocity Drive", this.drivebase.tankDriveVelocity(()->1.0, ()->1.0));
-		this.auto_command.addOption("Test Active Park", this.drivebase.activePark(100.0));
-		ClosedLoopDifferentialDrive.BalancePark bp = new ClosedLoopDifferentialDrive.BalancePark(
-			this.drivebase, this.spi_imu.getGyroAxis(ADIS16470_3X.IMUAxis.kX), 100.0, 0.2
-		);
-		SmartDashboard.putData("Balance Park", bp);
-		this.auto_command.addOption("Test Balance Park", bp);
 		SmartDashboard.putData("Auto Command", this.auto_command);
 
 		SmartDashboard.putData("IMU", this.spi_imu);
@@ -130,6 +124,8 @@ public class Runtime extends TimedRobot {
 	}
 
 	@Override public void robotInit() {
+
+		DataLogManager.start();
 
 		NetworkTableInstance.getDefault().setUpdateRate(1.0 / 30.0);
 
@@ -151,8 +147,7 @@ public class Runtime extends TimedRobot {
 					try{ Thread.sleep(500); }	// half a second
 					catch(InterruptedException e) { System.out.println(e.getMessage()); }
 					if(this.input.isConnected()) {
-						this.xboxTestControls();
-						//this.xboxControls();
+						this.xboxControls();
 						System.out.println("Xbox Bindings Initialized.");
 						return;
 					} else if(this.stick_left.isConnected() && this.stick_right.isConnected()) {
@@ -230,24 +225,6 @@ public class Runtime extends TimedRobot {
 
 
 
-
-	public void xboxTestControls() {
-		Trigger a = Xbox.Digital.A.getToggleFrom(this.input);
-		Trigger b = Xbox.Digital.B.getToggleFrom(this.input);
-		Trigger x = Xbox.Digital.X.getToggleFrom(this.input);
-		ServoTest.ConfigServo s = new ServoTest.ConfigServo(9, 0.5, 2.5);
-		TeleopTrigger.Get().and(a).and(b.negate()).and(x.negate()).whenActive(
-			new ServoTest.Angle(s, 45)
-		);
-		TeleopTrigger.Get().and(b).and(a.negate()).and(x.negate()).whenActive(
-			new ServoTest.Percentage(s, 0.75)
-		);
-		TeleopTrigger.Get().and(x).and(a.negate()).and(b.negate()).whenActive(
-			new ServoTest.Percentage(s,
-				()->Xbox.Analog.RX.getValueOf(this.input) * 0.5 + 0.5	// [-1,1] --> [0,1]
-			)
-		);
-	}
 
 	private void xboxControls() {	// setup bindings for xbox controller
 
